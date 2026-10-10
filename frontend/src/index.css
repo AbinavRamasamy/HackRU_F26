@@ -88,42 +88,60 @@ button {
 .main-dashboard-grid {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 32px;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .grid-col-left {
   flex: 0 1 500px;
   width: 100%;
   max-width: 500px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  z-index: 40;
 }
 
 .grid-col-right {
   flex: 0 1 500px;
   width: 100%;
   max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 @media (max-width: 980px) {
   .main-dashboard-grid {
     flex-direction: column;
     gap: 16px;
+    height: auto;
   }
   .grid-col-left,
   .grid-col-right {
     max-width: 100%;
     flex: 1 1 100%;
+    height: auto;
   }
 }
 
-/* Bottom Floating Radar Widget */
+/* Bottom Floating Radar Widget: Always Aligned to the Bottom */
 .bottom-floating-radar-widget {
   width: 100%;
-  margin-top: 14px;
-  position: relative;
-  z-index: 10;
+  margin-top: auto;
+  padding-top: 10px;
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  flex-shrink: 0;
 }
+
 
 
 

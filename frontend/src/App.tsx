@@ -289,7 +289,7 @@ export function App() {
     <div style={{
       width: '100%',
       margin: 0,
-      padding: '16px 28px 20px',
+      padding: '12px 24px 12px',
       minHeight: '100vh',
       boxSizing: 'border-box',
       display: 'flex',
@@ -301,7 +301,7 @@ export function App() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '14px',
+        marginBottom: '10px',
         position: 'relative'
       }}>
         {/* 1. Logo (Top Left) */}
@@ -389,18 +389,19 @@ export function App() {
       </header>
 
       {/* Main Dashboard Overhauled Grid */}
-      <div className="main-dashboard-grid" style={{ marginBottom: '16px' }}>
+      <div className="main-dashboard-grid" style={{ marginBottom: '12px' }}>
         {/* Left Column: Schedule as base layer + Commute Planner overlayed */}
         <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 40 }}>
           {/* Card 1: Course Schedule (Previous Look - Base Layer underneath Planner) */}
           <div
             className="glass-panel"
             style={{
-              padding: '16px 18px',
-              maxHeight: classes.length > 0 ? 'clamp(360px, calc(100vh - 330px), 560px)' : undefined,
-              minHeight: classes.length > 0 ? '360px' : undefined,
+              padding: '14px 16px',
+              flex: '1 1 auto',
+              height: classes.length > 0 ? '100%' : 'auto',
+              maxHeight: classes.length > 0 ? 'calc(100vh - 350px)' : undefined,
               overflowY: classes.length > 0 ? 'auto' : undefined,
-              paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '230px') : '16px',
+              paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '230px') : '14px',
               position: 'relative',
               zIndex: 1
             }}
@@ -572,8 +573,8 @@ export function App() {
             left: classes.length > 0 ? 0 : undefined,
             right: classes.length > 0 ? 0 : undefined,
             zIndex: 50,
-            marginTop: classes.length > 0 ? 0 : '14px',
-            padding: '14px 16px',
+            marginTop: classes.length > 0 ? 0 : 'auto',
+            padding: '13px 15px',
             background: classes.length > 0 ? 'rgba(16, 20, 31, 0.96)' : undefined,
             backdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
             WebkitBackdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,

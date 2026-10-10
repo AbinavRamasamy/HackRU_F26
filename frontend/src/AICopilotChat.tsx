@@ -68,18 +68,18 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', ...style }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+    <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', ...style }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <div style={{
           background: 'rgba(204, 0, 51, 0.2)',
-          padding: '6px',
+          padding: '5px',
           borderRadius: '8px',
           color: '#ff4d6d'
         }}>
-          <Sparkles size={16} />
+          <Sparkles size={15} />
         </div>
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
           <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Natural language routing & delay prediction</p>
         </div>
       </div>
@@ -90,8 +90,8 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         flexDirection: 'column',
         gap: '8px',
         flex: 1,
-        minHeight: '160px',
-        maxHeight: '220px',
+        minHeight: '130px',
+        maxHeight: '180px',
         overflowY: 'auto',
         marginBottom: '10px',
         paddingRight: '4px'

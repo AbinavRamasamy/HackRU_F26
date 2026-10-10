@@ -56,15 +56,15 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   });
 
   const floatingWidgetStyle: React.CSSProperties = isFloatingWidget ? {
-    borderRadius: '20px',
-    background: 'rgba(18, 20, 29, 0.88)',
+    borderRadius: '16px',
+    background: 'rgba(18, 20, 29, 0.92)',
     backdropFilter: 'blur(24px)',
     WebkitBackdropFilter: 'blur(24px)',
     border: '1px solid rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(204, 0, 51, 0.12)',
-    padding: '16px 20px'
+    boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(204, 0, 51, 0.12)',
+    padding: '12px 18px'
   } : {
-    padding: '16px 20px'
+    padding: '12px 18px'
   };
 
   return (
@@ -239,7 +239,14 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           <span>Active Rutgers Fleet Telemetry ({filteredBuses.length} Vehicles Tracked)</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '8px',
+          maxHeight: '85px',
+          overflowY: 'auto',
+          paddingRight: '4px'
+        }}>
           {filteredBuses.map(b => (
             <div key={b.id} style={{
               display: 'flex',
