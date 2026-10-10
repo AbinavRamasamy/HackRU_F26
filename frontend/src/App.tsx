@@ -90,7 +90,33 @@ export function App() {
       setPlanResult({
         origin: originCampus,
         destination: destCampus,
-        recommended_routes: originCampus === "Busch" && destCampus === "Livingston" ? ["B"] : ["LX"],
+        routes: [
+          {
+            name: originCampus === "Busch" && destCampus === "Livingston" ? "Route B (Direct)" : "Route LX (Express)",
+            type: "Direct Bus",
+            estimated_minutes: originCampus === "Busch" && destCampus === "Livingston" ? 7 : 10,
+            rush_hour_minutes: originCampus === "Busch" && destCampus === "Livingston" ? 12 : 18,
+            badge: "Fastest Direct",
+            description: `Board the ${originCampus === "Busch" && destCampus === "Livingston" ? "Route B" : "Route LX"} express line directly to your destination.`
+          },
+          {
+            name: "Rutgers E-Scooter / Bike",
+            type: "Bike / E-Scooter",
+            estimated_minutes: 12,
+            rush_hour_minutes: 14,
+            badge: "Active Commute",
+            description: "Paved bike trail connecting campuses, bypassing highway bottleneck."
+          },
+          {
+            name: "Transfer via College Ave",
+            type: "Transfer Route",
+            estimated_minutes: 24,
+            rush_hour_minutes: 32,
+            badge: "Transfer Connection",
+            description: "Connecting transit loop through Scott Hall / The Yard."
+          }
+        ],
+        primary_route: originCampus === "Busch" && destCampus === "Livingston" ? "Route B" : "Route LX",
         base_minutes: 7,
         rush_hour_minutes: 14,
         advice: `Board the ${originCampus === "Busch" && destCampus === "Livingston" ? "B" : "LX"} bus. Allow ~14 mins during peak transitions.`
@@ -156,12 +182,31 @@ export function App() {
         setPlanResult(data);
       }
     } catch {
+      const isSame = currentOrigin === targetCampus;
       setPlanResult({
         origin: currentOrigin,
         destination: targetCampus,
-        recommended_routes: currentOrigin === targetCampus ? ["Walk / Campus Loop"] : ["LX"],
-        base_minutes: currentOrigin === targetCampus ? 5 : 12,
-        rush_hour_minutes: currentOrigin === targetCampus ? 8 : 22,
+        routes: [
+          {
+            name: isSame ? "Campus Pedestrian Walk" : "Direct Campus Express",
+            type: isSame ? "Walking Path" : "Direct Bus",
+            estimated_minutes: isSame ? 5 : 12,
+            rush_hour_minutes: isSame ? 7 : 18,
+            badge: "Fastest Direct",
+            description: isSame ? `Direct pedestrian walk to ${nextClass.building}.` : `Board express line directly to ${targetCampus}.`
+          },
+          {
+            name: "Rutgers E-Scooter / Bike",
+            type: "Bike / E-Scooter",
+            estimated_minutes: isSame ? 3 : 15,
+            rush_hour_minutes: isSame ? 4 : 16,
+            badge: "Active Commute",
+            description: "Bike or e-scooter across dedicated campus trails."
+          }
+        ],
+        primary_route: isSame ? "Walk / Campus Loop" : "LX",
+        base_minutes: isSame ? 5 : 12,
+        rush_hour_minutes: isSame ? 8 : 22,
         advice: `Heading to ${nextClass.course} at ${nextClass.startTime} on ${targetCampus}.`
       });
     }
@@ -604,38 +649,128 @@ export function App() {
           </button>
 
           {planResult && (
-            <div style={{
-              padding: '16px',
-              borderRadius: '10px',
-              background: 'rgba(204, 0, 51, 0.08)',
-              border: '1px solid rgba(204, 0, 51, 0.25)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 700 }}>Best Route:</span>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: 800,
-                    color: '#fff',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    background: planResult.primary_route?.includes('Weekend') ? '#0d9488' : '#cc0033'
-                  }}>
-                    {planResult.primary_route || planResult.recommended_routes?.[0]}
+            <div style={{ marginTop: '10px' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Navigation size={14} color="#ff4d6d" />
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Suggested Routes ({planResult.routes?.length || 1})
                   </span>
-                  {planResult.alternative_routes && planResult.alternative_routes.length > 0 && (
-                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                      (Alt: {planResult.alternative_routes.join(', ')})
-                    </span>
-                  )}
                 </div>
-                <span style={{ fontSize: '13px', color: '#ff4d6d', fontWeight: 800 }}>
-                  ~{planResult.rush_hour_minutes || planResult.base_minutes} mins
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  Ranked by travel time
                 </span>
               </div>
-              <p style={{ fontSize: '12px', color: '#d1d5db', lineHeight: 1.5, marginTop: '6px' }}>
-                {planResult.advice}
-              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(planResult.routes || [
+                  {
+                    name: planResult.primary_route || planResult.recommended_routes?.[0] || "Direct Route",
+                    type: "Direct Bus",
+                    estimated_minutes: planResult.rush_hour_minutes || planResult.base_minutes || 15,
+                    badge: "Fastest",
+                    description: planResult.advice
+                  }
+                ]).map((route: any, idx: number) => {
+                  const isTop = idx === 0;
+                  const nameLower = (route.name || '').toLowerCase();
+                  const typeLower = (route.type || '').toLowerCase();
+
+                  const isWeekend = nameLower.includes('weekend');
+                  const isBikeOrWalk = typeLower.includes('bike') || typeLower.includes('walk') || typeLower.includes('scooter');
+                  const isTransfer = typeLower.includes('transfer');
+                  const isShuttle = typeLower.includes('shuttle') || nameLower.includes('knight');
+
+                  const badgeBg = isWeekend
+                    ? '#0d9488'
+                    : isBikeOrWalk
+                    ? '#10b981'
+                    : isTransfer
+                    ? '#2563eb'
+                    : isShuttle
+                    ? '#7c3aed'
+                    : '#cc0033';
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        background: isTop ? 'rgba(204, 0, 51, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isTop ? '1px solid rgba(204, 0, 51, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            color: isTop ? '#ff4d6d' : '#9ca3af',
+                            minWidth: '20px'
+                          }}>
+                            #{idx + 1}
+                          </span>
+
+                          <span style={{
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            color: '#fff',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            background: badgeBg
+                          }}>
+                            {route.name}
+                          </span>
+
+                          {route.badge && (
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                              color: isTop ? '#ff4d6d' : '#d1d5db'
+                            }}>
+                              {route.badge}
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            color: isTop ? '#ff4d6d' : '#e5e7eb'
+                          }}>
+                            ~{route.estimated_minutes} mins
+                          </span>
+                          {route.rush_hour_minutes && route.rush_hour_minutes !== route.estimated_minutes && (
+                            <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                              (peak ~{route.rush_hour_minutes}m)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p style={{
+                        fontSize: '11px',
+                        color: '#d1d5db',
+                        lineHeight: 1.45,
+                        margin: '4px 0 0 28px'
+                      }}>
+                        {route.description || planResult.advice}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

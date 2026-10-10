@@ -10,6 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
+from app.commute_planner import get_commute_routes
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -246,67 +247,20 @@ async def copilot_chat(req: ChatQueryRequest):
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
-    # Check if origin and destination are identical
-    if plan.origin_campus == plan.destination_campus:
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": "Campus Walk / Internal Loop",
-            "alternative_routes": [],
-            "base_minutes": 5,
-            "rush_hour_minutes": 8,
-            "advice": f"You are already on {plan.origin_campus}! A direct 5-8 minute walk or local stop hopper is faster than waiting for an inter-campus bus."
-        }
-
-    weekend = datetime.now().weekday() >= 5
-    if weekend:
-        # On weekends, choose between Weekend 1 and Weekend 2 based on direction
-        # Weekend 1: College Ave -> Busch -> Livingston -> Cook/Douglass -> College Ave
-        # Weekend 2: College Ave -> Cook/Douglass -> Livingston -> Busch -> College Ave
-        if (plan.origin_campus == "College Ave" and plan.destination_campus in ["Busch", "Livingston"]) or \
-           (plan.origin_campus == "Busch" and plan.destination_campus == "Livingston") or \
-           (plan.origin_campus == "Livingston" and plan.destination_campus == "Cook"):
-            best_route = "Weekend 1"
-            alt_route = "Weekend 2"
-            eta = 14
-        else:
-            best_route = "Weekend 2"
-            alt_route = "Weekend 1"
-            eta = 16
-
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": best_route,
-            "alternative_routes": [alt_route],
-            "base_minutes": eta,
-            "rush_hour_minutes": eta + 3,
-            "advice": f"Take {best_route} for the fastest direct loop from {plan.origin_campus} to {plan.destination_campus}. ({alt_route} also circles here if it arrives first)."
-        }
-
-    pair = (plan.origin_campus, plan.destination_campus)
-    matrix_entry = TRANSIT_MATRIX.get(pair)
-    if not matrix_entry:
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": "Transfer via College Ave (Scott Hall)",
-            "alternative_routes": [],
-            "base_minutes": 25,
-            "rush_hour_minutes": 32,
-            "advice": "No direct single bus line between these two campuses. Board a connecting bus to College Ave (Scott Hall / The Yard) and transfer."
-        }
+    routes = get_commute_routes(plan.origin_campus, plan.destination_campus, plan.target_arrival_time)
     
-    routes = matrix_entry["routes"]
-    primary = routes[0]
-    alts = routes[1:] if len(routes) > 1 else []
-
+    primary = routes[0]["name"] if routes else "Direct Route"
+    alts = [r["name"] for r in routes[1:]] if len(routes) > 1 else []
+    base_mins = routes[0]["estimated_minutes"] if routes else 10
+    rush_mins = routes[0]["rush_hour_minutes"] if routes else 15
+    
     return {
         "origin": plan.origin_campus,
         "destination": plan.destination_campus,
+        "routes": routes,
         "primary_route": primary,
         "alternative_routes": alts,
-        "base_minutes": matrix_entry["base_minutes"],
-        "rush_hour_minutes": matrix_entry["peak_minutes"],
-        "advice": f"Take the {primary} bus from {plan.origin_campus} to {plan.destination_campus}. " + (f"Alternative: {', '.join(alts)}. " if alts else "") + f"Allow ~{matrix_entry['peak_minutes']} mins during peak transitions."
+        "base_minutes": base_mins,
+        "rush_hour_minutes": rush_mins,
+        "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
