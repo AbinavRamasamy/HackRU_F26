@@ -11,6 +11,7 @@ from dotenv import load_dotenv, find_dotenv
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
 from app.commute_planner import get_commute_routes
+from app.weather import get_commute_weather_guidance
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -155,11 +156,16 @@ from app.schedule_parser import parse_schedule_with_gemini
 from app.ics_parser import parse_ics_schedule
 
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...)):
+async def upload_schedule(file: Optional[UploadFile] = File(None)):
     """
     Uploads a class schedule screenshot (via Gemini Vision OCR) or an .ics calendar file.
     Extracts meetings for the current week and returns them sorted by date and time.
     """
+    if not file or not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No file provided. Ensure the form-data field name is 'file' and a file is selected."
+        )
     contents = await file.read()
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
@@ -264,3 +270,15 @@ def calculate_commute(plan: CommutePlanRequest):
         "rush_hour_minutes": rush_mins,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
+
+@app.get("/api/weather")
+async def get_weather(lat: Optional[float] = None, lon: Optional[float] = None):
+    """
+    Returns real-time Rutgers campus weather and actionable commute guidance (clothing advice, transit buffer).
+    """
+    kwargs = {}
+    if lat is not None:
+        kwargs["lat"] = lat
+    if lon is not None:
+        kwargs["lon"] = lon
+    return await get_commute_weather_guidance(**kwargs)
