@@ -86,7 +86,13 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
       }}>
         {campuses.map(c => {
           const isSelected = selectedCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
-          const campusBuses = buses.filter(b => b.destination.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)));
+          // Filter buses that are either tagged with this campus or have next stop on this campus
+          const campusBuses = buses.filter(b => {
+            const bCampus = (b as any).campus || "";
+            const bStop = b.next_stop || "";
+            return bCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)) ||
+                   bStop.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
+          });
 
           return (
             <div
@@ -95,10 +101,11 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
               style={{
                 padding: '16px',
                 borderRadius: '12px',
-                background: isSelected ? 'rgba(204, 0, 51, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-                border: isSelected ? '1px solid rgba(204, 0, 51, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)',
+                background: isSelected ? 'rgba(204, 0, 51, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                border: isSelected ? '1px solid rgba(204, 0, 51, 0.6)' : '1px solid rgba(255, 255, 255, 0.05)',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                position: 'relative'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -106,9 +113,9 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                 <span style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  color: c.color,
+                  color: campusBuses.length > 0 ? c.color : '#9ca3af',
                   padding: '2px 8px',
-                  background: 'rgba(255,255,255,0.05)',
+                  background: campusBuses.length > 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
                   borderRadius: '10px'
                 }}>
                   {campusBuses.length} active buses
@@ -117,18 +124,24 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
               <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '12px' }}>{c.desc}</p>
               
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {campusBuses.map(b => (
-                  <span key={b.id} style={{
-                    fontSize: '10px',
-                    fontWeight: 800,
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    background: b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#10b981',
-                    color: '#fff'
-                  }}>
-                    {b.route} ({b.eta_mins}m)
+                {campusBuses.length > 0 ? (
+                  campusBuses.map(b => (
+                    <span key={b.id} style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
+                      color: '#fff'
+                    }}>
+                      {b.route === 'Weekend 1' ? 'WKND 1' : b.route === 'Weekend 2' ? 'WKND 2' : b.route} ({b.eta_mins}m)
+                    </span>
+                  ))
+                ) : (
+                  <span style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic' }}>
+                    Circulating nearby
                   </span>
-                ))}
+                )}
               </div>
             </div>
           );

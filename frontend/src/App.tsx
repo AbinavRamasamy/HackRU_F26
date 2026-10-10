@@ -407,14 +407,29 @@ export function App() {
               border: '1px solid rgba(204, 0, 51, 0.25)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#f3f4f6' }}>
-                  Recommended: {planResult.recommended_routes.join(', ')}
-                </span>
-                <span style={{ fontSize: '12px', color: '#ff4d6d', fontWeight: 700 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: 700 }}>Best Route:</span>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: 800,
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    background: planResult.primary_route?.includes('Weekend') ? '#0d9488' : '#cc0033'
+                  }}>
+                    {planResult.primary_route || planResult.recommended_routes?.[0]}
+                  </span>
+                  {planResult.alternative_routes && planResult.alternative_routes.length > 0 && (
+                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                      (Alt: {planResult.alternative_routes.join(', ')})
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: '13px', color: '#ff4d6d', fontWeight: 800 }}>
                   ~{planResult.rush_hour_minutes || planResult.base_minutes} mins
                 </span>
               </div>
-              <p style={{ fontSize: '12px', color: '#d1d5db', lineHeight: 1.5 }}>
+              <p style={{ fontSize: '12px', color: '#d1d5db', lineHeight: 1.5, marginTop: '6px' }}>
                 {planResult.advice}
               </p>
             </div>

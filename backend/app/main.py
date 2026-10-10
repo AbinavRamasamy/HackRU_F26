@@ -109,12 +109,25 @@ async def get_live_telemetry(route: Optional[str] = None):
                     if load is not None:
                         occupancy = f"{int(load)}% Full" if load > 40 else "Many Seats Available"
 
+                    # Determine which campus the vehicle is currently in
+                    lat = t.get("lat")
+                    lon = t.get("lon")
+                    bus_campus = "College Ave"
+                    if lat and lon:
+                        if lat > 40.515:
+                            bus_campus = "Busch" if lon < -74.450 else "Livingston"
+                        elif lat < 40.492:
+                            bus_campus = "Cook / Douglass"
+                        else:
+                            bus_campus = "College Ave"
+
                     live_buses.append({
                         "id": str(t.get("runNumber") or tid),
                         "route": route_display,
                         "destination": line_long or "Campus Route",
-                        "lat": t.get("lat"),
-                        "lon": t.get("lon"),
+                        "lat": lat,
+                        "lon": lon,
+                        "campus": bus_campus,
                         "speed_mph": round(t.get("speed") or 18),
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
@@ -208,42 +221,67 @@ async def copilot_chat(req: ChatQueryRequest):
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
-    weekend = datetime.now().weekday() >= 5
-    if weekend:
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "recommended_routes": ["Weekend 1", "Weekend 2"],
-            "base_minutes": 15,
-            "rush_hour_minutes": 18,
-            "advice": "Rutgers runs the Weekend 1 & Weekend 2 bus loops today! Both lines circulate between all campuses (Busch, Livingston, College Ave, and Cook/Douglass)."
-        }
-
-    pair = (plan.origin_campus, plan.destination_campus)
+    # Check if origin and destination are identical
     if plan.origin_campus == plan.destination_campus:
         return {
             "origin": plan.origin_campus,
             "destination": plan.destination_campus,
-            "recommended_routes": ["Walking / Campus Loop"],
-            "estimated_travel_minutes": 8,
-            "advice": "Both locations are on the same campus! Walking or catching the local campus loop is recommended."
+            "primary_route": "Campus Walk / Internal Loop",
+            "alternative_routes": [],
+            "base_minutes": 5,
+            "rush_hour_minutes": 8,
+            "advice": f"You are already on {plan.origin_campus}! A direct 5-8 minute walk or local stop hopper is faster than waiting for an inter-campus bus."
         }
-    
+
+    weekend = datetime.now().weekday() >= 5
+    if weekend:
+        # On weekends, choose between Weekend 1 and Weekend 2 based on direction
+        # Weekend 1: College Ave -> Busch -> Livingston -> Cook/Douglass -> College Ave
+        # Weekend 2: College Ave -> Cook/Douglass -> Livingston -> Busch -> College Ave
+        if (plan.origin_campus == "College Ave" and plan.destination_campus in ["Busch", "Livingston"]) or \
+           (plan.origin_campus == "Busch" and plan.destination_campus == "Livingston") or \
+           (plan.origin_campus == "Livingston" and plan.destination_campus == "Cook"):
+            best_route = "Weekend 1"
+            alt_route = "Weekend 2"
+            eta = 14
+        else:
+            best_route = "Weekend 2"
+            alt_route = "Weekend 1"
+            eta = 16
+
+        return {
+            "origin": plan.origin_campus,
+            "destination": plan.destination_campus,
+            "primary_route": best_route,
+            "alternative_routes": [alt_route],
+            "base_minutes": eta,
+            "rush_hour_minutes": eta + 3,
+            "advice": f"Take {best_route} for the fastest direct loop from {plan.origin_campus} to {plan.destination_campus}. ({alt_route} also circles here if it arrives first)."
+        }
+
+    pair = (plan.origin_campus, plan.destination_campus)
     matrix_entry = TRANSIT_MATRIX.get(pair)
     if not matrix_entry:
         return {
             "origin": plan.origin_campus,
             "destination": plan.destination_campus,
-            "recommended_routes": ["Transfer via College Ave (Scott Hall)"],
-            "estimated_travel_minutes": 30,
-            "advice": "No direct single bus route. Board a bus to College Ave (Scott Hall / The Yard) and transfer."
+            "primary_route": "Transfer via College Ave (Scott Hall)",
+            "alternative_routes": [],
+            "base_minutes": 25,
+            "rush_hour_minutes": 32,
+            "advice": "No direct single bus line between these two campuses. Board a connecting bus to College Ave (Scott Hall / The Yard) and transfer."
         }
     
+    routes = matrix_entry["routes"]
+    primary = routes[0]
+    alts = routes[1:] if len(routes) > 1 else []
+
     return {
         "origin": plan.origin_campus,
         "destination": plan.destination_campus,
-        "recommended_routes": matrix_entry["routes"],
+        "primary_route": primary,
+        "alternative_routes": alts,
         "base_minutes": matrix_entry["base_minutes"],
         "rush_hour_minutes": matrix_entry["peak_minutes"],
-        "advice": f"Take the {', '.join(matrix_entry['routes'])}. Allow ~{matrix_entry['peak_minutes']} mins during peak class transition intervals."
+        "advice": f"Take the {primary} bus from {plan.origin_campus} to {plan.destination_campus}. " + (f"Alternative: {', '.join(alts)}. " if alts else "") + f"Allow ~{matrix_entry['peak_minutes']} mins during peak transitions."
     }
