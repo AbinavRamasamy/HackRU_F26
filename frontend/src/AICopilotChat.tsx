@@ -17,9 +17,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      text: `Hey! I'm your Rutgers Transit Copilot. You're currently at ${currentCampus}. Ask me anything like: 'I need to get to Tillett Hall on Livingston for my 12:10 class—what bus should I take?'`,
-      recommendedRoute: "B",
-      eta: 4
+      text: `Hey! I'm your Rutgers Transit Copilot. You're currently at ${currentCampus}. Ask me anything like: 'I need to get to Tillett Hall on Livingston for my 12:10 class—what bus should I take?'`
     }
   ]);
   const [input, setInput] = useState("");
@@ -132,22 +130,6 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
               lineHeight: 1.5
             }}>
               <div>{m.text}</div>
-              {m.recommendedRoute && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '8px',
-                  padding: '3px 8px',
-                  background: 'rgba(255,255,255,0.06)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#38bdf8'
-                }}>
-                  Recommended: Route {m.recommendedRoute} (in {m.eta} mins)
-                </div>
-              )}
             </div>
 
             {m.role === 'user' && (
