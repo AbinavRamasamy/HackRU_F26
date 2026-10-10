@@ -413,28 +413,6 @@ export function App() {
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Your Schedule</h3>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleGetToNextClass}
-                  title="Calculate best transit route to your next upcoming class"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 10px',
-                    borderRadius: '6px',
-                    background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
-                    border: '1px solid rgba(255, 51, 102, 0.4)',
-                    color: '#fff',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(204, 0, 51, 0.3)'
-                  }}
-                >
-                  <Navigation size={12} color="#fff" />
-                  Get to Next Class
-                </button>
-
                 <label style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -485,409 +463,436 @@ export function App() {
                 </div>
               </div>
             ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {/* Day Filter Pills */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
-                <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
-                {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
-                  <button
-                    key={day}
-                    onClick={() => setSelectedDayFilter(day)}
-                    style={{
-                      padding: '3px 9px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      border: selectedDayFilter === day ? '1px solid #ff3366' : '1px solid rgba(255, 255, 255, 0.1)',
-                      background: selectedDayFilter === day ? 'rgba(204, 0, 51, 0.3)' : 'rgba(255, 255, 255, 0.03)',
-                      color: selectedDayFilter === day ? '#fff' : '#9ca3af',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {day === "ALL" ? "All Week" : day}
-                  </button>
-                ))}
-              </div>
-
-              {classes
-                .filter(cls => {
-                  if (selectedDayFilter === "ALL") return true;
-                  const days = Array.isArray(cls.days) ? cls.days : [cls.days];
-                  return days.includes(selectedDayFilter);
-                })
-                .map((cls, idx) => (
-                  <div key={idx} style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.06)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {cls.course}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
-                        <span>
-                          <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
-                        {cls.startTime} - {cls.endTime}
-                      </div>
-                      <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          fontWeight: 800,
-                          padding: '2px 7px',
-                          borderRadius: '4px',
-                          background: 'rgba(204, 0, 51, 0.2)',
-                          border: '1px solid rgba(204, 0, 51, 0.45)',
-                          color: '#ff4d6d'
-                        }}>
-                          {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-
-        {/* Card 2: Inter-Campus Transit Routing - OVERLAYED ON TOP of the schedule */}
-        <div
-          id="commute-planner-section"
-          className="glass-panel"
-          style={{
-            position: classes.length > 0 ? 'absolute' : 'relative',
-            bottom: classes.length > 0 ? 0 : undefined,
-            left: classes.length > 0 ? 0 : undefined,
-            right: classes.length > 0 ? 0 : undefined,
-            zIndex: 40,
-            marginTop: classes.length > 0 ? 0 : 'auto',
-            maxHeight: classes.length > 0 ? (plannerMinimized ? 'auto' : 'calc(100% - 60px)') : undefined,
-            overflowY: 'auto',
-            padding: '12px 14px',
-            background: 'rgba(16, 20, 31, 0.96)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(204, 0, 51, 0.18)',
-            borderRadius: '16px',
-            transition: 'all 0.25s ease'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={17} color="#ff3366" />
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Inter-Campus Commute Planner</h3>
-            </div>
-            {classes.length > 0 && (
-              <button
-                onClick={() => setPlannerMinimized(prev => !prev)}
-                title={plannerMinimized ? "Expand Commute Planner" : "Minimize to reveal schedule underneath"}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  color: '#e5e7eb',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                {plannerMinimized ? <>Expand <ChevronUp size={12} /></> : <>Minimize <ChevronDown size={12} /></>}
-              </button>
-            )}
-          </div>
-
-          {!plannerMinimized && (
-            <>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <label style={{ fontSize: '11px', color: '#9ca3af' }}>Origin Campus</label>
-                {geoStatus === "granted" ? (
-                  <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                    Live GPS ({resolvedGeo?.distanceMiles})
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => requestLocationPermission(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#ff4d6d',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      padding: 0
-                    }}
-                  >
-                    <LocateFixed size={10} /> Use My Location
-                  </button>
-                )}
-              </div>
-              <select
-                value={originCampus}
-                onChange={(e) => setOriginCampus(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
-              >
-                <option value="Busch" style={{ background: '#161922' }}>Busch</option>
-                <option value="Livingston" style={{ background: '#161922' }}>Livingston</option>
-                <option value="College Ave" style={{ background: '#161922' }}>College Ave</option>
-                <option value="Cook" style={{ background: '#161922' }}>Cook / Douglass</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>Destination Campus</label>
-              <select
-                value={destCampus}
-                onChange={(e) => setDestCampus(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '7px 10px',
-                  borderRadius: '6px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
-              >
-                <option value="Livingston" style={{ background: '#161922' }}>Livingston</option>
-                <option value="Busch" style={{ background: '#161922' }}>Busch</option>
-                <option value="College Ave" style={{ background: '#161922' }}>College Ave</option>
-                <option value="Cook" style={{ background: '#161922' }}>Cook / Douglass</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            onClick={handleCalculateRoute}
-            style={{
-              width: '100%',
-              padding: '9px 12px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '13px',
-              boxShadow: '0 3px 12px rgba(204, 0, 51, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              marginBottom: '10px'
-            }}
-          >
-            Compute Smart Route <ArrowRight size={14} />
-          </button>
-
-          {planResult && (() => {
-            const routesList = (planResult.routes && planResult.routes.length > 0) ? planResult.routes : [
-              {
-                name: planResult.primary_route || planResult.recommended_routes?.[0] || "Direct Route",
-                type: "Direct Bus",
-                estimated_minutes: planResult.rush_hour_minutes || planResult.base_minutes || 15,
-                badge: "Fastest",
-                description: planResult.advice
-              }
-            ];
-            const visibleRoutes = expandedRoutes ? routesList : routesList.slice(0, 1);
-
-            return (
-              <div style={{ marginTop: '10px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Navigation size={13} color="#ff4d6d" />
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Suggested Routes ({routesList.length})
-                    </span>
-                  </div>
-
-                  {routesList.length > 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Day Filter Pills */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
+                  {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
                     <button
-                      onClick={() => setExpandedRoutes(prev => !prev)}
-                      title={expandedRoutes ? "Minimize to 1 route" : `Expand all ${routesList.length} routes`}
+                      key={day}
+                      onClick={() => setSelectedDayFilter(day)}
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '3px 8px',
+                        padding: '3px 9px',
                         borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.14)',
-                        color: '#f3f4f6',
                         fontSize: '11px',
                         fontWeight: 700,
                         cursor: 'pointer',
+                        border: selectedDayFilter === day ? '1px solid #ff3366' : '1px solid rgba(255, 255, 255, 0.1)',
+                        background: selectedDayFilter === day ? 'rgba(204, 0, 51, 0.3)' : 'rgba(255, 255, 255, 0.03)',
+                        color: selectedDayFilter === day ? '#fff' : '#9ca3af',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      {expandedRoutes ? (
-                        <>Minimize <ChevronUp size={13} /></>
-                      ) : (
-                        <>+{routesList.length - 1} More <ChevronDown size={13} /></>
-                      )}
+                      {day === "ALL" ? "All Week" : day}
                     </button>
-                  )}
+                  ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {visibleRoutes.map((route: any, idx: number) => {
-                    const isTop = idx === 0;
-                    const nameLower = (route.name || '').toLowerCase();
-                    const typeLower = (route.type || '').toLowerCase();
+                {classes
+                  .filter(cls => {
+                    if (selectedDayFilter === "ALL") return true;
+                    const days = Array.isArray(cls.days) ? cls.days : [cls.days];
+                    return days.includes(selectedDayFilter);
+                  })
+                  .map((cls, idx) => (
+                    <div key={idx} style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {cls.course}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
+                          <span>
+                            <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
+                          </span>
+                        </div>
+                      </div>
 
-                    const isWeekend = nameLower.includes('weekend');
-                    const isBikeOrWalk = typeLower.includes('bike') || typeLower.includes('walk') || typeLower.includes('scooter');
-                    const isTransfer = typeLower.includes('transfer');
-                    const isShuttle = typeLower.includes('shuttle') || nameLower.includes('knight');
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
+                          {cls.startTime} - {cls.endTime}
+                        </div>
+                        <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            background: 'rgba(204, 0, 51, 0.2)',
+                            border: '1px solid rgba(204, 0, 51, 0.45)',
+                            color: '#ff4d6d'
+                          }}>
+                            {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
 
-                    const badgeBg = isWeekend
-                      ? '#0d9488'
-                      : isBikeOrWalk
-                        ? '#10b981'
-                        : isTransfer
-                          ? '#2563eb'
-                          : isShuttle
-                            ? '#7c3aed'
-                            : '#cc0033';
+          {/* Card 2: Inter-Campus Transit Routing - OVERLAYED ON TOP of the schedule */}
+          <div
+            id="commute-planner-section"
+            className="glass-panel"
+            style={{
+              position: classes.length > 0 ? 'absolute' : 'relative',
+              bottom: classes.length > 0 ? 0 : undefined,
+              left: classes.length > 0 ? 0 : undefined,
+              right: classes.length > 0 ? 0 : undefined,
+              zIndex: 40,
+              marginTop: classes.length > 0 ? 0 : 'auto',
+              maxHeight: classes.length > 0 ? (plannerMinimized ? 'auto' : 'calc(100% - 60px)') : undefined,
+              overflowY: 'auto',
+              padding: '12px 14px',
+              background: 'rgba(16, 20, 31, 0.96)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(204, 0, 51, 0.18)',
+              borderRadius: '16px',
+              transition: 'all 0.25s ease'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Zap size={17} color="#ff3366" />
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Campus Commute Planner</h3>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {classes.length > 0 && (
+                  <button
+                    onClick={handleGetToNextClass}
+                    title="Calculate best transit route to your next upcoming class"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
+                      border: '1px solid rgba(255, 51, 102, 0.4)',
+                      color: '#fff',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(204, 0, 51, 0.3)',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Navigation size={11} color="#fff" />
+                    Get Next Class
+                  </button>
+                )}
+                {classes.length > 0 && (
+                  <button
+                    onClick={() => setPlannerMinimized(prev => !prev)}
+                    title={plannerMinimized ? "Expand Commute Planner" : "Minimize to reveal schedule underneath"}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: '#e5e7eb',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {plannerMinimized ? <>Expand <ChevronUp size={12} /></> : <>Minimize <ChevronDown size={12} /></>}
+                  </button>
+                )}
+              </div>
+            </div>
 
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          background: isTop ? 'rgba(204, 0, 51, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                          border: isTop ? '1px solid rgba(204, 0, 51, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span style={{
-                              fontSize: '10px',
-                              fontWeight: 800,
-                              color: isTop ? '#ff4d6d' : '#9ca3af',
-                              minWidth: '18px'
-                            }}>
-                              #{idx + 1}
-                            </span>
+            {!plannerMinimized && (
+              <>
 
-                            <span style={{
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              color: '#fff',
-                              padding: '2px 7px',
-                              borderRadius: '5px',
-                              background: badgeBg
-                            }}>
-                              {route.name}
-                            </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '11px', color: '#9ca3af' }}>Origin Campus</label>
+                      {geoStatus === "granted" ? (
+                        <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                          Live GPS ({resolvedGeo?.distanceMiles})
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => requestLocationPermission(true)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ff4d6d',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: 0
+                          }}
+                        >
+                          <LocateFixed size={10} /> Use My Location
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      value={originCampus}
+                      onChange={(e) => setOriginCampus(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#fff',
+                        fontSize: '13px',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="Busch" style={{ background: '#161922' }}>Busch</option>
+                      <option value="Livingston" style={{ background: '#161922' }}>Livingston</option>
+                      <option value="College Ave" style={{ background: '#161922' }}>College Ave</option>
+                      <option value="Cook" style={{ background: '#161922' }}>Cook / Douglass</option>
+                    </select>
+                  </div>
 
-                            {route.badge && (
-                              <span style={{
-                                fontSize: '9px',
-                                fontWeight: 700,
-                                padding: '2px 5px',
-                                borderRadius: '4px',
-                                background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                                color: isTop ? '#ff4d6d' : '#d1d5db'
-                              }}>
-                                {route.badge}
-                              </span>
-                            )}
-                          </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>Destination Campus</label>
+                    <select
+                      value={destCampus}
+                      onChange={(e) => setDestCampus(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '7px 10px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        color: '#fff',
+                        fontSize: '13px',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="Livingston" style={{ background: '#161922' }}>Livingston</option>
+                      <option value="Busch" style={{ background: '#161922' }}>Busch</option>
+                      <option value="College Ave" style={{ background: '#161922' }}>College Ave</option>
+                      <option value="Cook" style={{ background: '#161922' }}>Cook / Douglass</option>
+                    </select>
+                  </div>
+                </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              color: isTop ? '#ff4d6d' : '#e5e7eb'
-                            }}>
-                              ~{route.estimated_minutes} mins
-                            </span>
-                            {route.rush_hour_minutes && route.rush_hour_minutes !== route.estimated_minutes && (
-                              <span style={{ fontSize: '9px', color: '#9ca3af' }}>
-                                (peak ~{route.rush_hour_minutes}m)
-                              </span>
-                            )}
-                          </div>
+                <button
+                  onClick={handleCalculateRoute}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    boxShadow: '0 3px 12px rgba(204, 0, 51, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    marginBottom: '10px'
+                  }}
+                >
+                  Compute Smart Route <ArrowRight size={14} />
+                </button>
+
+                {planResult && (() => {
+                  const routesList = (planResult.routes && planResult.routes.length > 0) ? planResult.routes : [
+                    {
+                      name: planResult.primary_route || planResult.recommended_routes?.[0] || "Direct Route",
+                      type: "Direct Bus",
+                      estimated_minutes: planResult.rush_hour_minutes || planResult.base_minutes || 15,
+                      badge: "Fastest",
+                      description: planResult.advice
+                    }
+                  ];
+                  const visibleRoutes = expandedRoutes ? routesList : routesList.slice(0, 1);
+
+                  return (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Navigation size={13} color="#ff4d6d" />
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Suggested Routes ({routesList.length})
+                          </span>
                         </div>
 
-                        <p style={{
-                          fontSize: '11px',
-                          color: '#d1d5db',
-                          lineHeight: 1.4,
-                          margin: '3px 0 0 24px'
-                        }}>
-                          {route.description || planResult.advice}
-                        </p>
+                        {routesList.length > 1 && (
+                          <button
+                            onClick={() => setExpandedRoutes(prev => !prev)}
+                            title={expandedRoutes ? "Minimize to 1 route" : `Expand all ${routesList.length} routes`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              background: 'rgba(255, 255, 255, 0.06)',
+                              border: '1px solid rgba(255, 255, 255, 0.14)',
+                              color: '#f3f4f6',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {expandedRoutes ? (
+                              <>Minimize <ChevronUp size={13} /></>
+                            ) : (
+                              <>+{routesList.length - 1} More <ChevronDown size={13} /></>
+                            )}
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-          </>
-          )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {visibleRoutes.map((route: any, idx: number) => {
+                          const isTop = idx === 0;
+                          const nameLower = (route.name || '').toLowerCase();
+                          const typeLower = (route.type || '').toLowerCase();
+
+                          const isWeekend = nameLower.includes('weekend');
+                          const isBikeOrWalk = typeLower.includes('bike') || typeLower.includes('walk') || typeLower.includes('scooter');
+                          const isTransfer = typeLower.includes('transfer');
+                          const isShuttle = typeLower.includes('shuttle') || nameLower.includes('knight');
+
+                          const badgeBg = isWeekend
+                            ? '#0d9488'
+                            : isBikeOrWalk
+                              ? '#10b981'
+                              : isTransfer
+                                ? '#2563eb'
+                                : isShuttle
+                                  ? '#7c3aed'
+                                  : '#cc0033';
+
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                background: isTop ? 'rgba(204, 0, 51, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                                border: isTop ? '1px solid rgba(204, 0, 51, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    color: isTop ? '#ff4d6d' : '#9ca3af',
+                                    minWidth: '18px'
+                                  }}>
+                                    #{idx + 1}
+                                  </span>
+
+                                  <span style={{
+                                    fontSize: '12px',
+                                    fontWeight: 800,
+                                    color: '#fff',
+                                    padding: '2px 7px',
+                                    borderRadius: '5px',
+                                    background: badgeBg
+                                  }}>
+                                    {route.name}
+                                  </span>
+
+                                  {route.badge && (
+                                    <span style={{
+                                      fontSize: '9px',
+                                      fontWeight: 700,
+                                      padding: '2px 5px',
+                                      borderRadius: '4px',
+                                      background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                                      color: isTop ? '#ff4d6d' : '#d1d5db'
+                                    }}>
+                                      {route.badge}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{
+                                    fontSize: '12px',
+                                    fontWeight: 800,
+                                    color: isTop ? '#ff4d6d' : '#e5e7eb'
+                                  }}>
+                                    ~{route.estimated_minutes} mins
+                                  </span>
+                                  {route.rush_hour_minutes && route.rush_hour_minutes !== route.estimated_minutes && (
+                                    <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                                      (peak ~{route.rush_hour_minutes}m)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <p style={{
+                                fontSize: '11px',
+                                color: '#d1d5db',
+                                lineHeight: 1.4,
+                                margin: '3px 0 0 24px'
+                              }}>
+                                {route.description || planResult.advice}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        </div>
+        {/* End of Left Column (Schedule & Planner) */}
+
+        {/* Right Column: 5. Ask ScarletHop Copilot in Right Side */}
+        <div className="grid-col-right" style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <AICopilotChat currentCampus={currentLocation} />
         </div>
       </div>
-      {/* End of Left Column (Schedule & Planner) */}
+      {/* End of Upper 2-Column Dashboard Grid */}
 
-      {/* Right Column: 5. Ask ScarletHop Copilot in Right Side */}
-      <div className="grid-col-right" style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <AICopilotChat currentCampus={currentLocation} />
+      {/* 6. Rutgers Live Transit Radar: Bottom Floating HUD Overlay */}
+      <div className="bottom-floating-radar-widget">
+        <CampusRadar
+          buses={buses}
+          selectedCampus={originCampus}
+          onSelectCampus={(c) => setOriginCampus(c)}
+          isFloatingWidget={true}
+        />
       </div>
-    </div>
-    {/* End of Upper 2-Column Dashboard Grid */}
-
-    {/* 6. Rutgers Live Transit Radar: Bottom Floating HUD Overlay */}
-    <div className="bottom-floating-radar-widget">
-      <CampusRadar
-        buses={buses}
-        selectedCampus={originCampus}
-        onSelectCampus={(c) => setOriginCampus(c)}
-        isFloatingWidget={true}
-      />
-    </div>
 
     </div>
   );
