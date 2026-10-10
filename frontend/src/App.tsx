@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
+import { WidgetEmbedModal } from './WidgetEmbedModal';
 
 interface ClassItem {
   course: string;
@@ -50,6 +51,7 @@ export function App() {
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
+  const [showEmbedModal, setShowEmbedModal] = useState(false);
   const [buses, setBuses] = useState<any[]>([]);
 
   useEffect(() => {
@@ -155,6 +157,26 @@ export function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={() => setShowEmbedModal(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#f3f4f6',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <Code size={13} color="#ff4d6d" />
+            Embed Widget
+          </button>
+
           <button
             onClick={() => setDemoMode(!demoMode)}
             style={{
@@ -375,6 +397,12 @@ export function App() {
       <TransitWidget 
         currentCampus="College Ave"
         nextClass={classes[1]}
+      />
+
+      {/* Embed Code Modal */}
+      <WidgetEmbedModal 
+        isOpen={showEmbedModal}
+        onClose={() => setShowEmbedModal(false)}
       />
     </div>
   );
