@@ -142,33 +142,41 @@ export const TransitWidget: React.FC<TransitWidgetProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '8px 12px',
+                padding: '8px 10px',
                 background: 'rgba(255,255,255,0.02)',
                 borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.04)'
+                border: '1px solid rgba(255,255,255,0.04)',
+                overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
                   <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: bus.route === 'LX' ? '#ff5722' : bus.route === 'B' ? '#3b82f6' : '#10b981',
+                    padding: '3px 6px',
+                    minWidth: '45px',
+                    height: '26px',
+                    borderRadius: '6px',
+                    background: bus.route.includes('Weekend 1') ? '#0d9488' : bus.route.includes('Weekend 2') ? '#10b981' : bus.route === 'LX' ? '#ff5722' : bus.route === 'B' ? '#3b82f6' : '#6366f1',
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '12px'
+                    fontSize: '10px',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap'
                   }}>
-                    {bus.route}
+                    {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
                   </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#f3f4f6' }}>To {bus.destination}</div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af' }}>{bus.next_stop} • {bus.occupancy}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      To {bus.destination}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {bus.next_stop} • {bus.occupancy}
+                    </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
                 </div>
               </div>
             ))}

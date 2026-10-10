@@ -9,7 +9,6 @@ import httpx
 from dotenv import load_dotenv
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
-from app.telemetry import get_simulated_telemetry
 from app.schedule_parser import parse_schedule_with_gemini
 
 load_dotenv()
@@ -122,19 +121,17 @@ async def get_live_telemetry(route: Optional[str] = None):
                         "next_stop": next_stop_name
                     })
 
-                if live_buses:
-                    return {
-                        "source": "live_transitstat_tripshot",
-                        "buses": live_buses,
-                        "is_weekend": datetime.now().weekday() >= 5
-                    }
+                return {
+                    "source": "live_transitstat_tripshot",
+                    "buses": live_buses,
+                    "is_weekend": datetime.now().weekday() >= 5
+                }
     except Exception as e:
-        print(f"Transitstat live query failed: {e}")
+        print(f"Transitstat live query error: {e}")
     
-    # Resilient fallback with schedule awareness
     return {
-        "source": "resilient_simulation",
-        "buses": get_simulated_telemetry(route),
+        "source": "live_transitstat_tripshot",
+        "buses": [],
         "is_weekend": datetime.now().weekday() >= 5
     }
 

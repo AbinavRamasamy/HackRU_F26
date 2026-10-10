@@ -147,41 +147,63 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           <span>Active Rutgers Fleet Telemetry ({filteredBuses.length} Vehicles Tracked)</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
           {filteredBuses.map(b => (
             <div key={b.id} style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '10px 14px',
-              borderRadius: '8px',
+              padding: '12px 14px',
+              borderRadius: '10px',
               background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.05)'
+              border: '1px solid rgba(255,255,255,0.06)',
+              overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '10px' }}>
                 <div style={{
-                  width: '32px',
+                  padding: '4px 8px',
+                  minWidth: '50px',
                   height: '32px',
                   borderRadius: '6px',
-                  background: b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#10b981',
+                  background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
                   color: '#fff',
                   fontWeight: 800,
                   fontSize: '11px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap'
                 }}>
-                  {b.route}
+                  {b.route === "Weekend 1" ? "WKND 1" : b.route === "Weekend 2" ? "WKND 2" : b.route}
                 </div>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>To {b.destination}</div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>{b.next_stop} • {b.speed_mph} mph</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#fff',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    To {b.destination}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#9ca3af',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    marginTop: '2px'
+                  }}>
+                    {b.next_stop} • {b.speed_mph} mph
+                  </div>
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', fontWeight: 800, color: '#38bdf8' }}>{b.eta_mins} mins</div>
-                <div style={{ fontSize: '10px', color: b.occupancy.includes('Full') ? '#f87171' : '#34d399' }}>{b.occupancy}</div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8' }}>{b.eta_mins} mins</div>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: b.occupancy.includes('Full') ? '#f87171' : '#34d399' }}>{b.occupancy}</div>
               </div>
             </div>
           ))}

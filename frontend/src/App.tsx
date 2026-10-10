@@ -51,7 +51,6 @@ export function App() {
   const [currentLocation, setCurrentLocation] = useState("Busch Student Center");
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
   const [showEmbedModal, setShowEmbedModal] = useState(false);
   const [buses, setBuses] = useState<any[]>([]);
 
@@ -219,8 +218,7 @@ export function App() {
             Embed Widget
           </button>
 
-          <button
-            onClick={() => setDemoMode(!demoMode)}
+          <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -228,21 +226,20 @@ export function App() {
               fontSize: '12px',
               padding: '6px 14px',
               borderRadius: '20px',
-              background: demoMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
-              border: demoMode ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(16, 185, 129, 0.25)',
-              color: demoMode ? '#fbbf24' : '#34d399',
-              fontWeight: 600,
-              cursor: 'pointer'
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              color: '#34d399',
+              fontWeight: 600
             }}
           >
             <span style={{
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: demoMode ? '#fbbf24' : '#34d399'
+              background: '#34d399'
             }} />
-            {demoMode ? "Demo Safety Mode (Active)" : "TripShot & Telemetry Online"}
-          </button>
+            Transitstat.us (TripShot Live)
+          </div>
         </div>
       </header>
 
