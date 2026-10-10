@@ -100,14 +100,14 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         position: 'absolute',
         top: 'calc(100% + 12px)',
         right: 0,
-        width: '380px',
+        width: '420px',
         maxWidth: 'calc(100vw - 32px)',
         zIndex: 9999,
         background: '#161922',
         borderRadius: '16px',
         border: '1px solid rgba(255, 255, 255, 0.14)',
         boxShadow: '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-        padding: '20px',
+        padding: '22px',
         animation: 'fadeIn 0.2s ease-in-out'
       }}
     >
@@ -116,7 +116,7 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         style={{
           position: 'absolute',
           top: '-7px',
-          right: '58px',
+          right: '64px',
           width: '14px',
           height: '14px',
           background: '#161922',
@@ -128,40 +128,40 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       />
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             background: 'rgba(204, 0, 51, 0.2)',
             color: '#ff4d6d',
-            padding: '6px',
-            borderRadius: '8px',
+            padding: '7px',
+            borderRadius: '10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Sparkles size={16} />
+            <Sparkles size={17} />
           </div>
           <div>
-            <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#f3f4f6', margin: 0 }}>Rutgers Transit Glance</h4>
-            <span style={{ fontSize: '10px', color: '#34d399', fontWeight: 600 }}>● Live Telemetry Active</span>
+            <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#f3f4f6', margin: 0 }}>Rutgers Transit Glance</h4>
+            <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 600 }}>● Live Telemetry Active</span>
           </div>
         </div>
       </div>
 
       {/* Departing Location Pill */}
       <div style={{
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#38bdf8',
-        marginBottom: '12px',
-        padding: '6px 10px',
+        marginBottom: '14px',
+        padding: '8px 12px',
         background: 'rgba(56, 189, 248, 0.1)',
         borderRadius: '8px',
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '8px',
         border: '1px solid rgba(56, 189, 248, 0.2)'
       }}>
-        <MapPin size={13} color="#38bdf8" />
+        <MapPin size={14} color="#38bdf8" />
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Current Origin: <strong>{currentCampus}</strong>
         </span>
@@ -172,28 +172,28 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         <div style={{
           background: 'rgba(255, 255, 255, 0.04)',
           borderRadius: '10px',
-          padding: '12px',
+          padding: '14px',
           marginBottom: '14px',
           border: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
           <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
             Next Destination
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>
             {nextClass.course}
           </div>
-          <div style={{ fontSize: '11px', color: '#d1d5db', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-            <MapPin size={11} color="#cc0033" />
+          <div style={{ fontSize: '12px', color: '#d1d5db', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}>
+            <MapPin size={12} color="#cc0033" />
             {nextClass.building} ({nextClass.campus}) at {nextClass.startTime}
           </div>
         </div>
       )}
 
       {/* Incoming Buses List */}
-      <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      <div style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
         Incoming Buses ({buses.length})
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto', paddingRight: '2px' }}>
         {buses.length === 0 ? (
           <div style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '16px' }}>
             Syncing live arrivals...
@@ -220,41 +220,41 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '8px 10px',
+                padding: '11px 14px',
                 background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '10px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
                 overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '10px' }}>
                   <div style={{
-                    padding: '3px 6px',
-                    minWidth: '45px',
-                    height: '24px',
-                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    minWidth: '58px',
+                    height: '28px',
+                    borderRadius: '7px',
                     background: badgeBg,
                     color: '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 800,
-                    fontSize: '10px',
+                    fontSize: '11px',
                     flexShrink: 0,
                     whiteSpace: 'nowrap'
                   }}>
                     {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
                   </div>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       To {bus.destination}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {bus.next_stop} • {bus.occupancy}
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
                 </div>
               </div>
             );
@@ -264,17 +264,17 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
 
       {/* Traffic Alert */}
       <div style={{
-        marginTop: '12px',
+        marginTop: '14px',
         fontSize: '11px',
         color: '#fbbf24',
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
         background: 'rgba(245, 158, 11, 0.1)',
-        padding: '8px 10px',
+        padding: '9px 12px',
         borderRadius: '8px'
       }}>
-        <AlertTriangle size={13} />
+        <AlertTriangle size={14} />
         <span>Peak campus headways active. Allow +5 mins.</span>
       </div>
 
@@ -287,15 +287,15 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Embed in Canvas/Notion</span>
+        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Embed in Canvas / Notion</span>
         <button
           onClick={copyEmbedCode}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '6px',
             fontSize: '11px',
-            padding: '4px 10px',
+            padding: '5px 12px',
             borderRadius: '6px',
             background: copied ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)',
             border: copied ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
