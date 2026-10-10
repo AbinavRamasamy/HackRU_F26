@@ -477,7 +477,153 @@ export function App() {
             boxSizing: 'border-box'
           }}>
             {/* ========================================================
-                SECTION 1: DIRECTIONS & TRANSIT OPTIONS (TOP)
+                SECTION 1: COURSE SCHEDULE (TOP)
+                ======================================================== */}
+            <div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Calendar size={15} color="#FF375F" />
+                  <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+                    Course Schedule
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {classes.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Clear all classes from your schedule?")) {
+                          setClasses([]);
+                        }
+                      }}
+                      className="apple-btn-secondary"
+                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
+                      title="Clear all imported classes"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
+                    <Upload size={11} />
+                    {uploading ? "Importing..." : "Import"}
+                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Apple Day Segmented Control */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                <div className="apple-segmented-control" style={{ width: '100%', justifyContent: 'space-between' }}>
+                  {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
+                    <button
+                      key={day}
+                      onClick={() => setSelectedDayFilter(day)}
+                      className={`apple-segment-btn ${selectedDayFilter === day ? 'active' : ''}`}
+                      style={{ flex: 1, padding: '3px 6px', fontSize: '11px' }}
+                    >
+                      {day === "ALL" ? "All" : day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Class List */}
+              {classes.length === 0 ? (
+                <div style={{
+                  padding: '16px',
+                  borderRadius: '14px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 10px', maxWidth: '240px' }}>
+                    Upload an .ics schedule or WebReg screenshot to view classes and auto-navigate between them.
+                  </p>
+                  <label className="apple-btn-primary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
+                    <Upload size={11} />
+                    Choose File
+                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {classes
+                    .filter(cls => {
+                      if (selectedDayFilter === "ALL") return true;
+                      const days = Array.isArray(cls.days) ? cls.days : [cls.days];
+                      return days.includes(selectedDayFilter);
+                    })
+                    .map((cls, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: '12px',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px'
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {cls.course}
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <MapPin size={10} color="#FF375F" />
+                            <span>{cls.location || cls.building} ({cls.campus})</span>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#0A84FF', fontVariantNumeric: 'tabular-nums' }}>
+                            {cls.startTime} - {cls.endTime}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => handleGetToNextClass(cls)}
+                              className="apple-btn-secondary"
+                              style={{ padding: '3px 8px', fontSize: '10.5px' }}
+                              title="Calculate transit & start map navigation to this class"
+                            >
+                              Route ➔
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClass(cls);
+                              }}
+                              className="apple-icon-btn"
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '6px',
+                                background: 'rgba(255, 69, 58, 0.12)',
+                                border: '1px solid rgba(255, 69, 58, 0.25)',
+                                color: '#FF453A'
+                              }}
+                              title={`Delete ${cls.course} from schedule`}
+                            >
+                              <Trash2 size={11} color="#FF453A" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+            {/* Subtle Divider */}
+            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '2px 0' }} />
+
+            {/* ========================================================
+                SECTION 2: DIRECTIONS & TRANSIT OPTIONS (BELOW SCHEDULE)
                 ======================================================== */}
             <div>
               <div style={{
@@ -952,152 +1098,6 @@ export function App() {
                 );
               })()}
             </div>
-
-            {/* Subtle Divider */}
-            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '2px 0' }} />
-
-            {/* ========================================================
-                SECTION 2: COURSE SCHEDULE (BELOW DIRECTIONS)
-                ======================================================== */}
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <Calendar size={15} color="#FF375F" />
-                  <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
-                    Course Schedule
-                  </h2>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {classes.length > 0 && (
-                    <button
-                      onClick={() => {
-                        if (window.confirm("Clear all classes from your schedule?")) {
-                          setClasses([]);
-                        }
-                      }}
-                      className="apple-btn-secondary"
-                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
-                      title="Clear all imported classes"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    {uploading ? "Importing..." : "Import"}
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
-                </div>
-              </div>
-
-              {/* Apple Day Segmented Control */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-                <div className="apple-segmented-control" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
-                    <button
-                      key={day}
-                      onClick={() => setSelectedDayFilter(day)}
-                      className={`apple-segment-btn ${selectedDayFilter === day ? 'active' : ''}`}
-                      style={{ flex: 1, padding: '3px 6px', fontSize: '11px' }}
-                    >
-                      {day === "ALL" ? "All" : day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Class List */}
-              {classes.length === 0 ? (
-                <div style={{
-                  padding: '16px',
-                  borderRadius: '14px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px dashed rgba(255, 255, 255, 0.1)',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 10px', maxWidth: '240px' }}>
-                    Upload an .ics schedule or WebReg screenshot to view classes and auto-navigate between them.
-                  </p>
-                  <label className="apple-btn-primary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    Choose File
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                  {classes
-                    .filter(cls => {
-                      if (selectedDayFilter === "ALL") return true;
-                      const days = Array.isArray(cls.days) ? cls.days : [cls.days];
-                      return days.includes(selectedDayFilter);
-                    })
-                    .map((cls, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.06)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '8px'
-                        }}
-                      >
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {cls.course}
-                          </div>
-                          <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <MapPin size={10} color="#FF375F" />
-                            <span>{cls.location || cls.building} ({cls.campus})</span>
-                          </div>
-                        </div>
-
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#0A84FF', fontVariantNumeric: 'tabular-nums' }}>
-                            {cls.startTime} - {cls.endTime}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => handleGetToNextClass(cls)}
-                              className="apple-btn-secondary"
-                              style={{ padding: '3px 8px', fontSize: '10.5px' }}
-                              title="Calculate transit & start map navigation to this class"
-                            >
-                              Route ➔
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteClass(cls);
-                              }}
-                              className="apple-icon-btn"
-                              style={{
-                                width: '22px',
-                                height: '22px',
-                                borderRadius: '6px',
-                                background: 'rgba(255, 69, 58, 0.12)',
-                                border: '1px solid rgba(255, 69, 58, 0.25)',
-                                color: '#FF453A'
-                              }}
-                              title={`Delete ${cls.course} from schedule`}
-                            >
-                              <Trash2 size={11} color="#FF453A" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
             </div>
           </div>
         </div>

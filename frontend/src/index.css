@@ -399,6 +399,17 @@ button:active {
 }
 
 /* Dark Theme for Leaflet Controls */
+.leaflet-bottom.leaflet-right {
+  margin-bottom: 56px !important;
+  margin-right: 14px !important;
+  z-index: 999 !important;
+}
+
+.leaflet-control-zoom {
+  margin-bottom: 0 !important;
+  margin-right: 0 !important;
+}
+
 .leaflet-bar {
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
@@ -418,3 +429,4 @@ button:active {
   background-color: rgba(44, 44, 46, 0.98) !important;
   color: #ffffff !important;
 }
+
