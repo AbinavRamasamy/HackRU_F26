@@ -63,11 +63,34 @@ def is_all_day(prop_line: str) -> bool:
     val = prop_line.split(":")[-1].strip()
     return "T" not in val
 
+def get_current_semester_bounds(ref_date: date):
+    """
+    Returns (semester_start, semester_end, semester_name) based on official Rutgers semester dates.
+    - Fall Semester: Sept 1 to Dec 23
+    - Spring Semester: Jan 15 to May 15
+    - Summer Session: May 25 to Aug 20
+    """
+    year = ref_date.year
+    month = ref_date.month
+
+    if month >= 9:
+        # Fall Semester (starts Sept 1, ends Dec 23)
+        return date(year, 9, 1), date(year, 12, 23), "Fall"
+    elif month <= 5 and (month > 1 or ref_date.day >= 15):
+        # Spring Semester (starts mid-Jan, ends mid-May)
+        return date(year, 1, 15), date(year, 5, 15), "Spring"
+    elif 5 < month < 9:
+        # Summer Session (starts late May, ends mid-Aug)
+        return date(year, 5, 25), date(year, 8, 20), "Summer"
+    else:
+        # Winter Session (early Jan)
+        return date(year, 1, 2), date(year, 1, 14), "Winter"
+
 def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
     """
     Parses an .ics (iCalendar) file and extracts active class meetings for the CURRENT week only.
     - Excludes non-class personal events (birthdays, holidays, all-day events).
-    - Excludes old semesters (e.g. Spring courses) and un-started future semesters.
+    - Enforces strict Rutgers semester cutoff dates (e.g. ignores August summer/orientation events).
     - Consolidates identical meetings (same course, time, location) with merged day codes.
     - Returns classes ordered strictly by Date (day of week) and Time.
     """
@@ -77,8 +100,8 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
     current_monday = (now - timedelta(days=now.weekday())).date()
     current_sunday = current_monday + timedelta(days=6)
     
-    # Cutoff for current semester (a semester lasts ~120 days)
-    semester_start_cutoff = current_monday - timedelta(days=120)
+    # Strict semester cutoff dates for Rutgers
+    semester_start, semester_end, semester_name = get_current_semester_bounds(current_monday)
 
     raw_events = []
     in_vevent = False
@@ -118,10 +141,16 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
         if not dtstart:
             continue
 
+        # 3. Enforce semester cutoffs: Skip any event that started before official semester start (e.g. in August)
+        if dtstart.date() < semester_start:
+            continue
+        if dtstart.date() > semester_end:
+            continue
+
         dtend_line = ev.get("DTEND", "")
         dtend = parse_ics_datetime(dtend_line)
 
-        # 3. Verify meeting duration (classes are between 25 mins and 5 hours)
+        # 4. Verify meeting duration (academic classes are between 25 mins and 5 hours)
         if dtend:
             duration_minutes = (dtend - dtstart).total_seconds() / 60
             if duration_minutes < 25 or duration_minutes > 300:
@@ -155,7 +184,7 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
                 continue
 
             # Check UNTIL: if sequence ended before this week, discard
-            until_match = re.search(r"UNTIL=(\d{8}(?:T\d{6}Z?)?)", rrule)
+            until_match = re.search(r"UNTIL=(\d{8}(?:T\d{6}Z?)?)", rrule_upper)
             if until_match:
                 until_str = until_match.group(1)
                 match_until_date = re.match(r"^(\d{4})(\d{2})(\d{2})", until_str)
@@ -165,15 +194,17 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
                     if until_date < current_monday:
                         # Recurrence ended before the current week
                         continue
-            else:
-                # If no UNTIL, ensure event started within the current semester window
-                if dtstart.date() < semester_start_cutoff:
-                    # Old course from a past semester (e.g. Spring 2026)
+
+            # Check COUNT: if limited occurrences, check that it didn't end before this week
+            count_match = re.search(r"COUNT=(\d+)", rrule_upper)
+            if count_match:
+                count_val = int(count_match.group(1))
+                last_occurrence = dtstart.date() + timedelta(weeks=count_val)
+                if last_occurrence < current_monday:
                     continue
 
-            # Ensure event has already started
+            # Ensure event has already started by end of current week
             if dtstart.date() > current_sunday:
-                # Future semester / event not started yet
                 continue
 
             # Extract BYDAY recurrence days
