@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, MapPin, Code, Navigation, LocateFixed } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, MapPin, Code, Navigation, LocateFixed, ChevronDown, ChevronUp } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
@@ -37,6 +37,8 @@ export const sortClassesByDateAndTime = (items: ClassItem[]): ClassItem[] => {
 export function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
+  const [expandedRoutes, setExpandedRoutes] = useState<boolean>(false);
+  const [schedulePositionBelow, setSchedulePositionBelow] = useState<boolean>(true);
 
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
@@ -469,8 +471,97 @@ export function App() {
                   </div>
                 </div>
               </div>
+            ) : schedulePositionBelow ? (
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                background: 'rgba(204, 0, 51, 0.08)',
+                border: '1px solid rgba(204, 0, 51, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    background: 'rgba(204, 0, 51, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Calendar size={15} color="#ff3366" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {classes.length} Classes Active
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      Next: {classes[0]?.course} ({classes[0]?.startTime || 'TBD'})
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => {
+                      const el = document.getElementById("full-schedule-section");
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#38bdf8',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Schedule Below ↓
+                  </button>
+                  <button
+                    onClick={() => setSchedulePositionBelow(false)}
+                    title="Display full schedule inside this sidebar card"
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: '#9ca3af',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Inline
+                  </button>
+                </div>
+              </div>
             ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>Schedule displayed inline</span>
+                <button
+                  onClick={() => setSchedulePositionBelow(true)}
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#38bdf8',
+                    background: 'rgba(56, 189, 248, 0.1)',
+                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                    padding: '2px 7px',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Move Below Radar ↓
+                </button>
+              </div>
               {/* Day Filter Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
@@ -651,131 +742,185 @@ export function App() {
             Compute Smart Route <ArrowRight size={14} />
           </button>
 
-          {planResult && (
-            <div style={{ marginTop: '10px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Navigation size={14} color="#ff4d6d" />
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Suggested Routes ({planResult.routes?.length || 1})
-                  </span>
-                </div>
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                  Ranked by travel time
-                </span>
-              </div>
+          {planResult && (() => {
+            const routesList = (planResult.routes && planResult.routes.length > 0) ? planResult.routes : [
+              {
+                name: planResult.primary_route || planResult.recommended_routes?.[0] || "Direct Route",
+                type: "Direct Bus",
+                estimated_minutes: planResult.rush_hour_minutes || planResult.base_minutes || 15,
+                badge: "Fastest",
+                description: planResult.advice
+              }
+            ];
+            const visibleRoutes = expandedRoutes ? routesList : routesList.slice(0, 1);
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(planResult.routes || [
-                  {
-                    name: planResult.primary_route || planResult.recommended_routes?.[0] || "Direct Route",
-                    type: "Direct Bus",
-                    estimated_minutes: planResult.rush_hour_minutes || planResult.base_minutes || 15,
-                    badge: "Fastest",
-                    description: planResult.advice
-                  }
-                ]).map((route: any, idx: number) => {
-                  const isTop = idx === 0;
-                  const nameLower = (route.name || '').toLowerCase();
-                  const typeLower = (route.type || '').toLowerCase();
+            return (
+              <div style={{ marginTop: '10px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Navigation size={13} color="#ff4d6d" />
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Suggested Routes ({routesList.length})
+                    </span>
+                  </div>
 
-                  const isWeekend = nameLower.includes('weekend');
-                  const isBikeOrWalk = typeLower.includes('bike') || typeLower.includes('walk') || typeLower.includes('scooter');
-                  const isTransfer = typeLower.includes('transfer');
-                  const isShuttle = typeLower.includes('shuttle') || nameLower.includes('knight');
-
-                  const badgeBg = isWeekend
-                    ? '#0d9488'
-                    : isBikeOrWalk
-                      ? '#10b981'
-                      : isTransfer
-                        ? '#2563eb'
-                        : isShuttle
-                          ? '#7c3aed'
-                          : '#cc0033';
-
-                  return (
-                    <div
-                      key={idx}
+                  {routesList.length > 1 && (
+                    <button
+                      onClick={() => setExpandedRoutes(prev => !prev)}
+                      title={expandedRoutes ? "Minimize to 1 route" : `Expand all ${routesList.length} routes`}
                       style={{
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        background: isTop ? 'rgba(204, 0, 51, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                        border: isTop ? '1px solid rgba(204, 0, 51, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-                        transition: 'all 0.2s ease'
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.14)',
+                        color: '#f3f4f6',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{
-                            fontSize: '11px',
-                            fontWeight: 800,
-                            color: isTop ? '#ff4d6d' : '#9ca3af',
-                            minWidth: '20px'
-                          }}>
-                            #{idx + 1}
-                          </span>
+                      {expandedRoutes ? (
+                        <>Minimize <ChevronUp size={13} /></>
+                      ) : (
+                        <>+{routesList.length - 1} More <ChevronDown size={13} /></>
+                      )}
+                    </button>
+                  )}
+                </div>
 
-                          <span style={{
-                            fontSize: '13px',
-                            fontWeight: 800,
-                            color: '#fff',
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            background: badgeBg
-                          }}>
-                            {route.name}
-                          </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {visibleRoutes.map((route: any, idx: number) => {
+                    const isTop = idx === 0;
+                    const nameLower = (route.name || '').toLowerCase();
+                    const typeLower = (route.type || '').toLowerCase();
 
-                          {route.badge && (
+                    const isWeekend = nameLower.includes('weekend');
+                    const isBikeOrWalk = typeLower.includes('bike') || typeLower.includes('walk') || typeLower.includes('scooter');
+                    const isTransfer = typeLower.includes('transfer');
+                    const isShuttle = typeLower.includes('shuttle') || nameLower.includes('knight');
+
+                    const badgeBg = isWeekend
+                      ? '#0d9488'
+                      : isBikeOrWalk
+                        ? '#10b981'
+                        : isTransfer
+                          ? '#2563eb'
+                          : isShuttle
+                            ? '#7c3aed'
+                            : '#cc0033';
+
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          background: isTop ? 'rgba(204, 0, 51, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                          border: isTop ? '1px solid rgba(204, 0, 51, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <span style={{
                               fontSize: '10px',
-                              fontWeight: 700,
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                              color: isTop ? '#ff4d6d' : '#d1d5db'
+                              fontWeight: 800,
+                              color: isTop ? '#ff4d6d' : '#9ca3af',
+                              minWidth: '18px'
                             }}>
-                              {route.badge}
+                              #{idx + 1}
                             </span>
-                          )}
+
+                            <span style={{
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              color: '#fff',
+                              padding: '2px 7px',
+                              borderRadius: '5px',
+                              background: badgeBg
+                            }}>
+                              {route.name}
+                            </span>
+
+                            {route.badge && (
+                              <span style={{
+                                fontSize: '9px',
+                                fontWeight: 700,
+                                padding: '2px 5px',
+                                borderRadius: '4px',
+                                background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                                color: isTop ? '#ff4d6d' : '#d1d5db'
+                              }}>
+                                {route.badge}
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              color: isTop ? '#ff4d6d' : '#e5e7eb'
+                            }}>
+                              ~{route.estimated_minutes} mins
+                            </span>
+                            {route.rush_hour_minutes && route.rush_hour_minutes !== route.estimated_minutes && (
+                              <span style={{ fontSize: '9px', color: '#9ca3af' }}>
+                                (peak ~{route.rush_hour_minutes}m)
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span style={{
-                            fontSize: '13px',
-                            fontWeight: 800,
-                            color: isTop ? '#ff4d6d' : '#e5e7eb'
-                          }}>
-                            ~{route.estimated_minutes} mins
-                          </span>
-                          {route.rush_hour_minutes && route.rush_hour_minutes !== route.estimated_minutes && (
-                            <span style={{ fontSize: '10px', color: '#9ca3af' }}>
-                              (peak ~{route.rush_hour_minutes}m)
-                            </span>
-                          )}
-                        </div>
+                        <p style={{
+                          fontSize: '11px',
+                          color: '#d1d5db',
+                          lineHeight: 1.4,
+                          margin: '3px 0 0 24px'
+                        }}>
+                          {route.description || planResult.advice}
+                        </p>
                       </div>
+                    );
+                  })}
 
-                      <p style={{
+                  {!expandedRoutes && routesList.length > 1 && (
+                    <button
+                      onClick={() => setExpandedRoutes(true)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px dashed rgba(255, 255, 255, 0.12)',
+                        borderRadius: '6px',
+                        color: '#38bdf8',
                         fontSize: '11px',
-                        color: '#d1d5db',
-                        lineHeight: 1.45,
-                        margin: '4px 0 0 28px'
-                      }}>
-                        {route.description || planResult.advice}
-                      </p>
-                    </div>
-                  );
-                })}
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        padding: '5px 8px',
+                        width: '100%',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>Show {routesList.length - 1} more option{routesList.length > 2 ? 's' : ''} ({routesList.slice(1).map((r: any) => r.name).join(', ')})</span>
+                      <ChevronDown size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
       {/* End of Left Column (Schedule & Planner) */}
@@ -796,6 +941,102 @@ export function App() {
         isFloatingWidget={true}
       />
     </div>
+
+    {/* 7. Schedule Section: placed UNDER Live Rutgers Transit Radar and Commute Planner cards */}
+    {classes.length > 0 && schedulePositionBelow && (
+      <div id="full-schedule-section" className="glass-panel" style={{ width: '100%', marginTop: '16px', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Calendar size={18} color="#ff3366" />
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Your Course Schedule</h3>
+              <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>{classes.length} classes loaded • Auto-synchronized with Rutgers Transit</p>
+            </div>
+          </div>
+
+          {/* Day Filter Pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
+            {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
+              <button
+                key={day}
+                onClick={() => setSelectedDayFilter(day)}
+                style={{
+                  padding: '3px 9px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: selectedDayFilter === day ? '1px solid #ff3366' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: selectedDayFilter === day ? 'rgba(204, 0, 51, 0.3)' : 'rgba(255, 255, 255, 0.03)',
+                  color: selectedDayFilter === day ? '#fff' : '#9ca3af',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {day === "ALL" ? "All Week" : day}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Classes grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '10px'
+        }}>
+          {classes
+            .filter(cls => {
+              if (selectedDayFilter === "ALL") return true;
+              const days = Array.isArray(cls.days) ? cls.days : [cls.days];
+              return days.includes(selectedDayFilter);
+            })
+            .map((cls, idx) => (
+              <div key={idx} style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {cls.course}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {cls.location || cls.building || "Campus Classroom"} ({cls.campus})
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
+                    {cls.startTime} - {cls.endTime}
+                  </div>
+                  <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(204, 0, 51, 0.2)',
+                      border: '1px solid rgba(204, 0, 51, 0.45)',
+                      color: '#ff4d6d'
+                    }}>
+                      {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
+    )}
 
     </div>
   );
