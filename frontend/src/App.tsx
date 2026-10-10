@@ -396,11 +396,12 @@ export function App() {
           <div
             className="glass-panel"
             style={{
-              padding: '12px 14px',
+              padding: '14px 16px',
               flex: '0 0 auto',
-              height: classes.length > 0 ? '185px' : 'auto',
-              maxHeight: classes.length > 0 ? '185px' : undefined,
+              height: classes.length > 0 ? '250px' : 'auto',
+              maxHeight: classes.length > 0 ? '250px' : undefined,
               overflowY: classes.length > 0 ? 'auto' : undefined,
+              paddingBottom: classes.length > 0 ? (plannerMinimized ? '45px' : '75px') : '14px',
               position: 'relative',
               zIndex: 1
             }}
@@ -516,20 +517,20 @@ export function App() {
                 })
                 .map((cls, idx) => (
                   <div key={idx} style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
                     background: 'rgba(255, 255, 255, 0.02)',
                     border: '1px solid rgba(255, 255, 255, 0.06)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '10px'
+                    gap: '12px'
                   }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {cls.course}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
                         <span>
                           <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
@@ -541,11 +542,11 @@ export function App() {
                       <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
                         {cls.startTime} - {cls.endTime}
                       </div>
-                      <div style={{ marginTop: '2px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
                         <span style={{
                           fontSize: '10px',
                           fontWeight: 800,
-                          padding: '1px 6px',
+                          padding: '2px 7px',
                           borderRadius: '4px',
                           background: 'rgba(204, 0, 51, 0.2)',
                           border: '1px solid rgba(204, 0, 51, 0.45)',

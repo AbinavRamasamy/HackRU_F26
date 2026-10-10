@@ -66,18 +66,27 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', ...style }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+    <div className="glass-panel" style={{
+      padding: '16px 18px',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      minHeight: '380px',
+      maxHeight: '410px',
+      boxSizing: 'border-box',
+      ...style
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div style={{
           background: 'rgba(204, 0, 51, 0.2)',
-          padding: '5px',
+          padding: '6px',
           borderRadius: '8px',
           color: '#ff4d6d'
         }}>
-          <Sparkles size={15} />
+          <Sparkles size={16} />
         </div>
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
           <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Natural language routing & delay prediction</p>
         </div>
       </div>
@@ -86,12 +95,12 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '10px',
         flex: 1,
-        minHeight: '130px',
-        maxHeight: '180px',
+        minHeight: '210px',
+        maxHeight: '260px',
         overflowY: 'auto',
-        marginBottom: '10px',
+        marginBottom: '12px',
         paddingRight: '4px'
       }}>
         {messages.map((m, idx) => (
@@ -152,7 +161,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
       </div>
 
       {/* Input Field */}
-      <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
         <input
           type="text"
           value={input}
@@ -161,7 +170,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
           placeholder="Ask e.g. 'How do I get to Busch Hill Center from The Yard?'"
           style={{
             flex: 1,
-            padding: '8px 12px',
+            padding: '10px 14px',
             borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -174,7 +183,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
           onClick={handleSend}
           disabled={loading}
           style={{
-            padding: '8px 14px',
+            padding: '10px 16px',
             borderRadius: '8px',
             background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
             color: '#fff',
@@ -182,7 +191,10 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
             fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '5px'
+            gap: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(204, 0, 51, 0.35)'
           }}
         >
           {loading ? "..." : "Send"} <Send size={13} />
