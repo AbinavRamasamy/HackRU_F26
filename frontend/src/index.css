@@ -77,3 +77,35 @@ button {
 .animate-pulse-ring {
   animation: pulse-ring 2.5s infinite ease-in-out;
 }
+
+/* Overhauled Dashboard Responsive Grid */
+.main-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 420px) minmax(460px, 1fr) minmax(340px, 400px);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1240px) and (min-width: 861px) {
+  .main-dashboard-grid {
+    grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr);
+  }
+  .grid-col-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .grid-col-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .grid-col-radar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 860px) {
+  .main-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

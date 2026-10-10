@@ -17,12 +17,14 @@ interface CampusRadarProps {
   buses: BusLocation[];
   selectedCampus: string;
   onSelectCampus: (campus: string) => void;
+  style?: React.CSSProperties;
 }
 
 export const CampusRadar: React.FC<CampusRadarProps> = ({
   buses,
   selectedCampus,
-  onSelectCampus
+  onSelectCampus,
+  style
 }) => {
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
 
@@ -51,7 +53,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   });
 
   return (
-    <div className="glass-panel" style={{ padding: '28px', marginTop: '32px' }}>
+    <div className="glass-panel" style={{ padding: '24px', ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{

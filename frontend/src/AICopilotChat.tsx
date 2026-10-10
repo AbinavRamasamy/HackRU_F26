@@ -10,9 +10,10 @@ interface Message {
 
 interface AICopilotChatProps {
   currentCampus?: string;
+  style?: React.CSSProperties;
 }
 
-export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center" }) => {
+export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center", style }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -67,7 +68,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px', marginTop: '32px' }}>
+    <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
         <div style={{
           background: 'rgba(204, 0, 51, 0.2)',
@@ -88,7 +89,9 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        maxHeight: '260px',
+        flex: 1,
+        minHeight: '380px',
+        maxHeight: '560px',
         overflowY: 'auto',
         marginBottom: '16px',
         paddingRight: '6px'

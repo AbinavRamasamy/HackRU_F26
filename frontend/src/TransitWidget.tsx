@@ -99,7 +99,8 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       style={{
         position: 'absolute',
         top: 'calc(100% + 12px)',
-        right: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
         width: '420px',
         maxWidth: 'calc(100vw - 32px)',
         zIndex: 9999,
@@ -116,7 +117,8 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         style={{
           position: 'absolute',
           top: '-7px',
-          right: '64px',
+          left: '50%',
+          marginLeft: '-7px',
           width: '14px',
           height: '14px',
           background: '#161922',

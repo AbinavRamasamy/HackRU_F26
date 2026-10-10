@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation, LocateFixed } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, MapPin, Code, Navigation, LocateFixed } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
@@ -284,10 +284,17 @@ export function App() {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '24px 20px', minHeight: '100vh' }}>
       {/* Top Navbar */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <header style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '28px',
+        position: 'relative'
+      }}>
+        {/* 1. Logo (Top Left) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 0', justifyContent: 'flex-start' }}>
           <div style={{
             width: '42px',
             height: '42px',
@@ -301,54 +308,56 @@ export function App() {
             <Bus size={24} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', color: '#fff' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', color: '#fff', margin: 0 }}>
               Scarlet<span style={{ color: '#ff3366' }}>Hop</span>
             </h1>
-            <p style={{ fontSize: '12px', color: '#9ca3af' }}>Predictive Rutgers Transit Copilot</p>
+            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Predictive Rutgers Transit Copilot</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative' }}>
-            <button
-              ref={widgetTriggerRef}
-              onClick={() => setShowWidgetOverlay(prev => !prev)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                background: showWidgetOverlay ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
-                border: showWidgetOverlay ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#f3f4f6',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: showWidgetOverlay ? '0 0 14px rgba(255, 255, 255, 0.12)' : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Code size={13} color="#ff4d6d" />
-              Transit Widget
-            </button>
+        {/* 2. Transit Widget (Top Middle) */}
+        <div style={{ display: 'flex', justifyContent: 'center', flex: '0 0 auto', position: 'relative' }}>
+          <button
+            ref={widgetTriggerRef}
+            onClick={() => setShowWidgetOverlay(prev => !prev)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              padding: '8px 20px',
+              borderRadius: '24px',
+              background: showWidgetOverlay ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+              border: showWidgetOverlay ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#f3f4f6',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: showWidgetOverlay ? '0 0 16px rgba(255, 255, 255, 0.15)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Code size={15} color="#ff4d6d" />
+            Transit Widget
+          </button>
 
-            <TransitWidget
-              isOpen={showWidgetOverlay}
-              onClose={() => setShowWidgetOverlay(false)}
-              triggerRef={widgetTriggerRef}
-              currentCampus={currentLocation}
-              nextClass={classes[0]}
-            />
-          </div>
+          <TransitWidget
+            isOpen={showWidgetOverlay}
+            onClose={() => setShowWidgetOverlay(false)}
+            triggerRef={widgetTriggerRef}
+            currentCampus={currentLocation}
+            nextClass={classes[0]}
+          />
+        </div>
 
+        {/* 3. transitstat.us indicator (Top Right) */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', flex: '1 1 0' }}>
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               fontSize: '12px',
-              padding: '6px 14px',
+              padding: '8px 16px',
               borderRadius: '20px',
               background: 'rgba(16, 185, 129, 0.12)',
               border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -357,45 +366,23 @@ export function App() {
             }}
           >
             <span style={{
-              width: '6px',
-              height: '6px',
+              width: '7px',
+              height: '7px',
               borderRadius: '50%',
-              background: '#34d399'
+              background: '#34d399',
+              boxShadow: '0 0 8px #34d399'
             }} />
             Transitstat.us (TripShot Live)
           </div>
         </div>
       </header>
 
-      {/* Hero Header */}
-      <section style={{ textAlign: 'center', marginBottom: '56px' }}>
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 16px',
-          borderRadius: '24px',
-          background: 'rgba(204, 0, 51, 0.12)',
-          border: '1px solid rgba(204, 0, 51, 0.3)',
-          color: '#ff4d6d',
-          fontSize: '13px',
-          fontWeight: 700,
-          marginBottom: '16px'
-        }}>
-          <Sparkles size={16} /> Powered by Multimodal AI & Live Rutgers Feeds
-        </div>
-        <h2 style={{ fontSize: '42px', fontWeight: 800, letterSpacing: '-1px', lineHeight: 1.2, marginBottom: '16px' }}>
-          Never Miss A Class <span className="scarlet-gradient-text">Across Rutgers</span>
-        </h2>
-        <p style={{ fontSize: '16px', color: '#9ca3af', maxWidth: '640px', margin: '0 auto' }}>
-          Upload your course schedule or inspect real-time inter-campus bus routes. Our AI handles the walking buffers, Route 18 congestion, and tight transfers.
-        </p>
-      </section>
-
-      {/* Main Grid: Schedule Section & Transit Planner */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '28px', marginBottom: '56px' }}>
-        {/* Card 1: Course Schedule Ingestion */}
-        <div className="glass-panel" style={{ padding: '28px' }}>
+      {/* Main Dashboard Overhauled Grid */}
+      <div className="main-dashboard-grid">
+        {/* Left Column: 4. Schedule Widget (Top) + Planner (Middle-Bottom Left) */}
+        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Card 1: Course Schedule Ingestion */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Calendar size={20} color="#ff3366" />
@@ -574,7 +561,7 @@ export function App() {
         </div>
 
         {/* Card 2: Inter-Campus Transit Routing */}
-        <div id="commute-planner-section" className="glass-panel" style={{ padding: '28px' }}>
+        <div id="commute-planner-section" className="glass-panel" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Zap size={20} color="#ff3366" />
             <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Inter-Campus Commute Planner</h3>
@@ -802,16 +789,22 @@ export function App() {
           )}
         </div>
       </div>
+      {/* End of Left Column */}
 
-      {/* Campus Radar & Fleet Visualizer */}
-      <CampusRadar
-        buses={buses}
-        selectedCampus={originCampus}
-        onSelectCampus={(c) => setOriginCampus(c)}
-      />
+      {/* Middle Column: 6. Rutgers Live Radar in Bottom Middle */}
+      <div className="grid-col-radar" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <CampusRadar
+          buses={buses}
+          selectedCampus={originCampus}
+          onSelectCampus={(c) => setOriginCampus(c)}
+        />
+      </div>
 
-      {/* AI Copilot Chat Assistant */}
-      <AICopilotChat currentCampus={currentLocation} />
+      {/* Right Column: 5. Ask ScarletHop Copilot in Right Side */}
+      <div className="grid-col-right" style={{ position: 'sticky', top: '24px' }}>
+        <AICopilotChat currentCampus={currentLocation} />
+      </div>
+    </div>
 
     </div>
   );
