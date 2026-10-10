@@ -564,12 +564,12 @@ export function App() {
               transition: 'all 0.25s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={17} color="#ff3366" />
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Campus Commute Planner</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px', gap: '8px', flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                <Zap size={16} color="#ff3366" style={{ flexShrink: 0 }} />
+                <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, whiteSpace: 'nowrap' }}>Campus Commute Planner</h3>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                 {classes.length > 0 && (
                   <button
                     onClick={handleGetToNextClass}
@@ -804,13 +804,14 @@ export function App() {
                                 transition: 'all 0.2s ease'
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
                                   <span style={{
                                     fontSize: '10px',
                                     fontWeight: 800,
                                     color: isTop ? '#ff4d6d' : '#9ca3af',
-                                    minWidth: '18px'
+                                    minWidth: '18px',
+                                    flexShrink: 0
                                   }}>
                                     #{idx + 1}
                                   </span>
@@ -821,7 +822,9 @@ export function App() {
                                     color: '#fff',
                                     padding: '2px 7px',
                                     borderRadius: '5px',
-                                    background: badgeBg
+                                    background: badgeBg,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
                                   }}>
                                     {route.name}
                                   </span>
@@ -833,14 +836,16 @@ export function App() {
                                       padding: '2px 5px',
                                       borderRadius: '4px',
                                       background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                                      color: isTop ? '#ff4d6d' : '#d1d5db'
+                                      color: isTop ? '#ff4d6d' : '#d1d5db',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0
                                     }}>
                                       {route.badge}
                                     </span>
                                   )}
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                   <span style={{
                                     fontSize: '12px',
                                     fontWeight: 800,
