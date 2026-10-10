@@ -47,7 +47,63 @@ def health_check():
     return {"status": "online", "service": "ScarletHop API", "version": "1.0.0"}
 
 @app.get("/api/stops")
-def get_stops():
+async def get_stops():
+    """
+    Returns authoritative Rutgers transit stops with lat/long and route associations,
+    dynamically synchronized with store.transitstat.us/tripshot/rutgers.
+    """
+    transit_api_url = os.getenv("TRANSITSTATUS_API_URL") or "https://store.transitstat.us/tripshot/rutgers"
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                transit_api_url,
+                headers={"User-Agent": "Mozilla/5.0 (ScarletHop/1.0)"}
+            )
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                stations = raw_data.get("stations", {})
+                lines = raw_data.get("lines", {})
+                
+                # Build station to routes map
+                station_routes = {}
+                for l_id, l_info in lines.items():
+                    r_name = l_info.get("lineNameShort") or l_info.get("lineNameLong")
+                    for sid in l_info.get("stations", []):
+                        station_routes.setdefault(sid, []).append(r_name)
+
+                live_stops = {}
+                for sid, s in stations.items():
+                    lat = s.get("lat")
+                    lon = s.get("lon")
+                    # Filter New Brunswick bounding box
+                    if lat and lon and 40.46 <= lat <= 40.56 and -74.50 <= lon <= -74.40:
+                        name = s.get("stationName") or f"Stop {sid}"
+                        campus = "College Ave"
+                        name_l = name.lower()
+                        if any(k in name_l for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin", "rodkin"]):
+                            campus = "Busch"
+                        elif any(k in name_l for k in ["livingston", "plaza", "quad", "arena"]):
+                            campus = "Livingston"
+                        elif any(k in name_l for k in ["college hall", "gibbons"]):
+                            campus = "Douglass"
+                        elif any(k in name_l for k in ["red oak", "lipman", "biel", "henderson", "cook"]):
+                            campus = "Cook"
+                        elif lat > 40.51:
+                            campus = "Livingston" if lon > -74.45 else "Busch"
+                        elif lat < 40.49:
+                            campus = "Cook"
+
+                        routes = station_routes.get(sid, [])
+                        live_stops[name] = {
+                            "id": sid,
+                            "campus": campus,
+                            "coords": [lat, lon],
+                            "routes": routes
+                        }
+                if live_stops:
+                    return live_stops
+    except Exception:
+        pass
     return CAMPUS_STOPS
 
 @app.get("/api/buildings")
@@ -134,6 +190,17 @@ async def get_live_telemetry(route: Optional[str] = None):
                     elif t.get("destStation"):
                         next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
 
+                    # Extract upcoming stops itinerary
+                    upcoming_stops = []
+                    if future_preds:
+                        for p in future_preds[:5]:
+                            st = p.get("stationName")
+                            if st and not any(u["station"] == st for u in upcoming_stops):
+                                upcoming_stops.append({
+                                    "station": st,
+                                    "eta_mins": max(1, round((p.get("actualETA") - now_ms) / 60000))
+                                })
+
                     # Occupancy
                     extra = t.get("extra", {}) or {}
                     load = extra.get("load")
@@ -165,7 +232,8 @@ async def get_live_telemetry(route: Optional[str] = None):
                         "speed_mph": calc_speed,
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
-                        "next_stop": next_stop_name
+                        "next_stop": next_stop_name,
+                        "upcoming_stops": upcoming_stops
                     })
 
                 return {
