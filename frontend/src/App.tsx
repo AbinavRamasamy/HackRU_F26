@@ -564,7 +564,20 @@ export function App() {
               transition: 'all 0.25s ease'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px', gap: '8px', flexWrap: 'nowrap' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: plannerMinimized ? 0 : '10px',
+              gap: '8px',
+              flexWrap: 'nowrap',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              background: 'rgba(16, 20, 31, 0.98)',
+              paddingTop: '2px',
+              paddingBottom: plannerMinimized ? '2px' : '4px'
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
                 <Zap size={16} color="#ff3366" style={{ flexShrink: 0 }} />
                 <h3 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, whiteSpace: 'nowrap' }}>Campus Commute Planner</h3>
@@ -594,28 +607,26 @@ export function App() {
                     Get Next Class
                   </button>
                 )}
-                {classes.length > 0 && (
-                  <button
-                    onClick={() => setPlannerMinimized(prev => !prev)}
-                    title={plannerMinimized ? "Expand Commute Planner" : "Minimize to reveal schedule underneath"}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '5px 10px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      color: '#e5e7eb',
-                      fontSize: '11.5px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {plannerMinimized ? <>Expand <ChevronUp size={13} /></> : <>Minimize <ChevronDown size={13} /></>}
-                  </button>
-                )}
+                <button
+                  onClick={() => setPlannerMinimized(prev => !prev)}
+                  title={plannerMinimized ? "Expand Commute Planner" : "Minimize to reveal schedule underneath"}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#e5e7eb',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {plannerMinimized ? <>Expand <ChevronUp size={13} /></> : <>Minimize <ChevronDown size={13} /></>}
+                </button>
               </div>
             </div>
 
