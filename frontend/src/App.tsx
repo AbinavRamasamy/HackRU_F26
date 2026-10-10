@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
+import { CampusRadar } from './CampusRadar';
+import { AICopilotChat } from './AICopilotChat';
 
 interface ClassItem {
   course: string;
@@ -47,6 +49,32 @@ export function App() {
   const [destCampus, setDestCampus] = useState("Livingston");
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [buses, setBuses] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchBuses = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/telemetry");
+        if (res.ok) {
+          const data = await res.json();
+          setBuses(data.buses || []);
+        }
+      } catch {
+        // Fallback
+        setBuses([
+          { id: "bus-101", route: "LX", destination: "Livingston", lat: 40.5050, lon: -74.4500, speed_mph: 22, occupancy: "Standing Room Only", eta_mins: 3, next_stop: "The Yard" },
+          { id: "bus-102", route: "LX", destination: "College Ave", lat: 40.5220, lon: -74.4360, speed_mph: 18, occupancy: "Seats Available", eta_mins: 7, next_stop: "Livingston Plaza" },
+          { id: "bus-201", route: "B", destination: "Busch", lat: 40.5245, lon: -74.4420, speed_mph: 26, occupancy: "Seats Available", eta_mins: 4, next_stop: "Hill Center" },
+          { id: "bus-301", route: "A", destination: "Busch", lat: 40.5100, lon: -74.4550, speed_mph: 15, occupancy: "Many Seats Available", eta_mins: 5, next_stop: "Busch Student Center" },
+          { id: "bus-401", route: "F", destination: "Cook/Douglass", lat: 40.4950, lon: -74.4440, speed_mph: 12, occupancy: "Full", eta_mins: 8, next_stop: "College Hall" }
+        ]);
+      }
+    };
+    fetchBuses();
+    const interval = setInterval(fetchBuses, 12000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleCalculateRoute = async () => {
     try {
@@ -127,21 +155,30 @@ export function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '12px',
-            padding: '6px 14px',
-            borderRadius: '20px',
-            background: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            color: '#34d399',
-            fontWeight: 600
-          }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34d399' }} />
-            TripShot & Telemetry Online
-          </span>
+          <button
+            onClick={() => setDemoMode(!demoMode)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: demoMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+              border: demoMode ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(16, 185, 129, 0.25)',
+              color: demoMode ? '#fbbf24' : '#34d399',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: demoMode ? '#fbbf24' : '#34d399'
+            }} />
+            {demoMode ? "Demo Safety Mode (Active)" : "TripShot & Telemetry Online"}
+          </button>
         </div>
       </header>
 
@@ -323,6 +360,16 @@ export function App() {
           )}
         </div>
       </div>
+
+      {/* Campus Radar & Fleet Visualizer */}
+      <CampusRadar 
+        buses={buses}
+        selectedCampus={originCampus}
+        onSelectCampus={(c) => setOriginCampus(c)}
+      />
+
+      {/* AI Copilot Chat Assistant */}
+      <AICopilotChat />
 
       {/* Embed Floating Widget */}
       <TransitWidget 

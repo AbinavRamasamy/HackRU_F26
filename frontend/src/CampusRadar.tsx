@@ -1,0 +1,192 @@
+import React, { useState } from 'react';
+import { Navigation, Compass } from 'lucide-react';
+
+interface BusLocation {
+  id: string;
+  route: string;
+  destination: string;
+  lat: number;
+  lon: number;
+  eta_mins: number;
+  occupancy: string;
+  next_stop: string;
+  speed_mph: number;
+}
+
+interface CampusRadarProps {
+  buses: BusLocation[];
+  selectedCampus: string;
+  onSelectCampus: (campus: string) => void;
+}
+
+export const CampusRadar: React.FC<CampusRadarProps> = ({
+  buses,
+  selectedCampus,
+  onSelectCampus
+}) => {
+  const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
+
+  const campuses = [
+    { name: "College Ave", desc: "The Yard, Scott Hall, Student Center", color: "#cc0033" },
+    { name: "Livingston", desc: "LSC, Plaza, Quads, RBS", color: "#ff5722" },
+    { name: "Busch", desc: "Hill Center, ARC, Weeks, BSC", color: "#3b82f6" },
+    { name: "Cook / Douglass", desc: "College Hall, Red Oak Lane, Biel Rd", color: "#10b981" }
+  ];
+
+  const filteredBuses = selectedRoute === "ALL" 
+    ? buses 
+    : buses.filter(b => b.route === selectedRoute);
+
+  return (
+    <div className="glass-panel" style={{ padding: '28px', marginTop: '32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            background: 'rgba(204, 0, 51, 0.2)',
+            padding: '8px',
+            borderRadius: '10px',
+            color: '#ff4d6d'
+          }}>
+            <Compass size={22} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Live Rutgers Transit Radar</h3>
+            <p style={{ fontSize: '12px', color: '#9ca3af' }}>Active vehicle positions & campus stop telemetry</p>
+          </div>
+        </div>
+
+        {/* Route Filter Pills */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {["ALL", "LX", "B", "A", "H", "F", "EE", "REXB"].map(route => (
+            <button
+              key={route}
+              onClick={() => setSelectedRoute(route)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                background: selectedRoute === route ? 'rgba(204,0,51,0.3)' : 'rgba(255,255,255,0.03)',
+                color: selectedRoute === route ? '#ff4d6d' : '#9ca3af',
+                border: selectedRoute === route ? '1px solid rgba(204,0,51,0.5)' : '1px solid rgba(255,255,255,0.06)'
+              }}
+            >
+              {route}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Visual Campus Corridors Graph */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        {campuses.map(c => {
+          const isSelected = selectedCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
+          const campusBuses = buses.filter(b => b.destination.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)));
+
+          return (
+            <div
+              key={c.name}
+              onClick={() => onSelectCampus(c.name)}
+              style={{
+                padding: '16px',
+                borderRadius: '12px',
+                background: isSelected ? 'rgba(204, 0, 51, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+                border: isSelected ? '1px solid rgba(204, 0, 51, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{c.name}</span>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: c.color,
+                  padding: '2px 8px',
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: '10px'
+                }}>
+                  {campusBuses.length} active buses
+                </span>
+              </div>
+              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '12px' }}>{c.desc}</p>
+              
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {campusBuses.map(b => (
+                  <span key={b.id} style={{
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#10b981',
+                    color: '#fff'
+                  }}>
+                    {b.route} ({b.eta_mins}m)
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Live Fleet Tracking List */}
+      <div style={{
+        background: 'rgba(0,0,0,0.25)',
+        borderRadius: '12px',
+        padding: '16px',
+        border: '1px solid rgba(255,255,255,0.04)'
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Navigation size={14} color="#ff3366" />
+          <span>Active Rutgers Fleet Telemetry ({filteredBuses.length} Vehicles Tracked)</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+          {filteredBuses.map(b => (
+            <div key={b.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.05)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  background: b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#10b981',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {b.route}
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>To {b.destination}</div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af' }}>{b.next_stop} • {b.speed_mph} mph</div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '14px', fontWeight: 800, color: '#38bdf8' }}>{b.eta_mins} mins</div>
+                <div style={{ fontSize: '10px', color: b.occupancy.includes('Full') ? '#f87171' : '#34d399' }}>{b.occupancy}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
