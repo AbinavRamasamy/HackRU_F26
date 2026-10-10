@@ -397,7 +397,7 @@ export function App() {
           <div
             className="glass-panel"
             style={{
-              padding: '14px 16px',
+              padding: '12px 14px',
               flex: '1 1 0',
               height: '100%',
               minHeight: 0,
@@ -485,7 +485,7 @@ export function App() {
                 </div>
               </div>
             ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {/* Day Filter Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
@@ -518,14 +518,14 @@ export function App() {
                 })
                 .map((cls, idx) => (
                   <div key={idx} style={{
-                    padding: '10px 14px',
-                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
                     background: 'rgba(255, 255, 255, 0.02)',
                     border: '1px solid rgba(255, 255, 255, 0.06)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '12px'
+                    gap: '8px'
                   }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

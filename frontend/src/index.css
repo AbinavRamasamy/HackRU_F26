@@ -105,9 +105,9 @@ button {
 }
 
 .grid-col-left {
-  flex: 0 1 500px;
+  flex: 0 1 410px;
   width: 100%;
-  max-width: 500px;
+  max-width: 410px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -117,9 +117,9 @@ button {
 }
 
 .grid-col-right {
-  flex: 0 1 400px;
+  flex: 0 1 340px;
   width: 100%;
-  max-width: 400px;
+  max-width: 340px;
   display: flex;
   flex-direction: column;
   height: 100%;

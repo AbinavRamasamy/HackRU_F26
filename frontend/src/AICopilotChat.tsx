@@ -67,7 +67,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
 
   return (
     <div className="glass-panel" style={{
-      padding: '14px 15px',
+      padding: '12px 14px',
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
@@ -75,18 +75,18 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
       boxSizing: 'border-box',
       ...style
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
         <div style={{
           background: 'rgba(204, 0, 51, 0.2)',
-          padding: '6px',
+          padding: '5px',
           borderRadius: '8px',
           color: '#ff4d6d'
         }}>
-          <Sparkles size={16} />
+          <Sparkles size={15} />
         </div>
         <div>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
-          <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Natural language routing & delay prediction</p>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Ask ScarletHop Copilot</h3>
+          <p style={{ fontSize: '10px', color: '#9ca3af', margin: 0 }}>Natural language routing & delay prediction</p>
         </div>
       </div>
 
@@ -94,11 +94,11 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
+        gap: '8px',
         flex: '1 1 0',
         minHeight: 0,
         overflowY: 'auto',
-        marginBottom: '12px',
+        marginBottom: '10px',
         paddingRight: '4px'
       }}>
         {messages.map((m, idx) => (
@@ -106,9 +106,9 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
             key={idx}
             style={{
               display: 'flex',
-              gap: '10px',
+              gap: '8px',
               alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '85%'
+              maxWidth: '92%'
             }}
           >
             {m.role === 'assistant' && (
@@ -165,15 +165,15 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Ask e.g. 'How do I get to Busch Hill Center from The Yard?'"
+          placeholder="Ask e.g. 'How do I get to Busch Hill Center?'"
           style={{
             flex: 1,
-            padding: '10px 14px',
+            padding: '8px 11px',
             borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.04)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             color: '#fff',
-            fontSize: '12px',
+            fontSize: '11.5px',
             outline: 'none'
           }}
         />
@@ -182,13 +182,13 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
           disabled={loading}
           title={loading ? "Sending..." : "Send"}
           style={{
-            width: '38px',
-            height: '38px',
-            minWidth: '38px',
+            width: '35px',
+            height: '35px',
+            minWidth: '35px',
             padding: 0,
             borderRadius: '8px',
-            background: loading 
-              ? 'rgba(204, 0, 51, 0.45)' 
+            background: loading
+              ? 'rgba(204, 0, 51, 0.45)'
               : 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
             color: '#fff',
             display: 'flex',
