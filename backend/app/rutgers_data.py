@@ -2,6 +2,8 @@
 CAMPUS_BUILDINGS = {
     # Busch Campus
     "hill center": {"code": "HILL", "campus": "Busch", "stop": "Hill Center", "coords": [40.5218, -74.4626]},
+    "hll": {"code": "HLL", "campus": "Busch", "stop": "Hill Center", "coords": [40.5218, -74.4626]},
+    "hil": {"code": "HIL", "campus": "Busch", "stop": "Hill Center", "coords": [40.5218, -74.4626]},
     "serc": {"code": "SERC", "campus": "Busch", "stop": "Science Buildings", "coords": [40.5228, -74.4638]},
     "sec": {"code": "SEC", "campus": "Busch", "stop": "Science Buildings", "coords": [40.5228, -74.4638]},
     "richard weeks hall": {"code": "WEEKS", "campus": "Busch", "stop": "Science Buildings", "coords": [40.5238, -74.4619]},
@@ -25,6 +27,8 @@ CAMPUS_BUILDINGS = {
     # College Avenue Campus
     "academic building": {"code": "AB", "campus": "College Ave", "stop": "The Yard", "coords": [40.5015, -74.4485]},
     "ab": {"code": "AB", "campus": "College Ave", "stop": "The Yard", "coords": [40.5015, -74.4485]},
+    "ci": {"code": "CI", "campus": "College Ave", "stop": "Student Center", "coords": [40.5045, -74.4505]},
+    "sc&i": {"code": "CI", "campus": "College Ave", "stop": "Student Center", "coords": [40.5045, -74.4505]},
     "murray hall": {"code": "MUR", "campus": "College Ave", "stop": "Scott Hall", "coords": [40.4996, -74.4473]},
     "scott hall": {"code": "SCOTT", "campus": "College Ave", "stop": "Scott Hall", "coords": [40.4991, -74.4478]},
     "college ave student center": {"code": "CASC", "campus": "College Ave", "stop": "Student Center", "coords": [40.5028, -74.4518]},

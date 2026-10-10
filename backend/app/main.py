@@ -150,12 +150,34 @@ async def get_live_telemetry(route: Optional[str] = None):
         "is_weekend": datetime.now().weekday() >= 5
     }
 
+from app.schedule_parser import parse_schedule_with_gemini
+from app.ics_parser import parse_ics_schedule
+
 @app.post("/api/schedule/upload")
 async def upload_schedule(file: UploadFile = File(...)):
-    """Uploads a class schedule screenshot and extracts classes using Gemini Vision OCR."""
+    """
+    Uploads a class schedule screenshot (via Gemini Vision OCR) or an .ics calendar file.
+    Extracts meetings for the current week and returns them sorted by date and time.
+    """
     contents = await file.read()
-    content_type = file.content_type or "image/png"
-    result = parse_schedule_with_gemini(contents, mime_type=content_type)
+    filename = (file.filename or "").lower()
+    content_type = (file.content_type or "").lower()
+
+    # Check if uploaded file is an iCalendar (.ics) file
+    if filename.endswith(".ics") or "calendar" in content_type:
+        try:
+            text = contents.decode("utf-8", errors="ignore")
+            result = parse_ics_schedule(text)
+            return result
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to parse .ics calendar file: {str(e)}",
+                "classes": []
+            }
+
+    # Otherwise parse as image OCR via Gemini Vision
+    result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
     return result
 
 class ChatQueryRequest(BaseModel):

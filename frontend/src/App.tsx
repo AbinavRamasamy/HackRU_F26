@@ -16,8 +16,27 @@ interface ClassItem {
   campus: string;
 }
 
+const DAY_ORDER: Record<string, number> = {
+  "M": 1, "T": 2, "W": 3, "TH": 4, "F": 5, "S": 6, "SU": 7
+};
+
+export const sortClassesByDateAndTime = (items: ClassItem[]): ClassItem[] => {
+  return [...items].sort((a, b) => {
+    const aDays = Array.isArray(a.days) ? a.days : [a.days];
+    const bDays = Array.isArray(b.days) ? b.days : [b.days];
+    const aMinDay = Math.min(...aDays.map(d => DAY_ORDER[d] || 99));
+    const bMinDay = Math.min(...bDays.map(d => DAY_ORDER[d] || 99));
+
+    if (aMinDay !== bMinDay) {
+      return aMinDay - bMinDay;
+    }
+    return (a.startTime || "00:00").localeCompare(b.startTime || "00:00");
+  });
+};
+
 export function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
 
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
@@ -175,7 +194,7 @@ export function App() {
         }
 
         if (data.classes && data.classes.length > 0) {
-          setClasses(data.classes);
+          setClasses(sortClassesByDateAndTime(data.classes));
         }
       } else {
         alert("Server returned error during schedule upload. Please verify backend is running on port 8000.");
@@ -374,8 +393,8 @@ export function App() {
                 cursor: 'pointer'
               }}>
                 <Upload size={14} />
-                {uploading ? "Analyzing..." : "Upload Schedule OCR"}
-                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                {uploading ? "Importing..." : "Upload (.ics / Image)"}
+                <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
             </div>
           </div>
@@ -406,8 +425,8 @@ export function App() {
               <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>
                 No Schedule Loaded
               </div>
-              <div style={{ fontSize: '13px', color: '#9ca3af', maxWidth: '340px', lineHeight: 1.5 }}>
-                Upload a screenshot of your WebReg, Canvas, or CSP schedule. ScarletHop will extract class locations, group meetings, and navigate you between campuses.
+              <div style={{ fontSize: '13px', color: '#9ca3af', maxWidth: '350px', lineHeight: 1.5 }}>
+                Upload an <strong>.ics calendar file</strong> (from Canvas/WebReg) or a <strong>schedule screenshot</strong>. ScarletHop groups your weekly meetings, extracts classroom locations, and orders them by date and time.
               </div>
               <label style={{
                 marginTop: '4px',
@@ -424,13 +443,43 @@ export function App() {
                 boxShadow: '0 4px 12px rgba(204, 0, 51, 0.3)'
               }}>
                 <Upload size={15} />
-                {uploading ? "Analyzing Schedule..." : "Upload Schedule OCR"}
-                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                {uploading ? "Importing Schedule..." : "Upload Schedule (.ics or Image)"}
+                <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {classes.map((cls, idx) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Day Filter Pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
+                {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
+                  <button
+                    key={day}
+                    onClick={() => setSelectedDayFilter(day)}
+                    style={{
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: selectedDayFilter === day ? '1px solid #ff3366' : '1px solid rgba(255, 255, 255, 0.1)',
+                      background: selectedDayFilter === day ? 'rgba(204, 0, 51, 0.3)' : 'rgba(255, 255, 255, 0.03)',
+                      color: selectedDayFilter === day ? '#fff' : '#9ca3af',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {day === "ALL" ? "All Week" : day}
+                  </button>
+                ))}
+              </div>
+
+              {classes
+                .filter(cls => {
+                  if (selectedDayFilter === "ALL") return true;
+                  const days = Array.isArray(cls.days) ? cls.days : [cls.days];
+                  return days.includes(selectedDayFilter);
+                })
+                .map((cls, idx) => (
                 <div key={idx} style={{
                   padding: '14px 16px',
                   borderRadius: '12px',

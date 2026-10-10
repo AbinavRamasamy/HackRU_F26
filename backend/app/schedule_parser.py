@@ -214,6 +214,13 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             else:
                 item["location"] = bldg_name
                 
+        # Order strictly by Date (earliest day of the week) and Time
+        def class_sort_key(cls_item):
+            min_day = min((DAY_ORDER.get(d, 99) for d in cls_item.get("days", [])), default=99)
+            return (min_day, cls_item.get("startTime", "00:00"))
+
+        consolidated_classes.sort(key=class_sort_key)
+
         return {"status": "success", "classes": consolidated_classes}
     except Exception as e:
         print(f"[ScheduleOCR] Gemini parsing error: {e}")
