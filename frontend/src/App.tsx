@@ -391,17 +391,18 @@ export function App() {
       {/* Main Dashboard Overhauled Grid */}
       <div className="main-dashboard-grid" style={{ marginBottom: '16px' }}>
         {/* Left Column: Schedule as base layer + Commute Planner overlayed */}
-        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 40 }}>
           {/* Card 1: Course Schedule (Previous Look - Base Layer underneath Planner) */}
           <div
             className="glass-panel"
             style={{
               padding: '16px 18px',
-              maxHeight: classes.length > 0 ? 'calc(100vh - 190px)' : undefined,
-              minHeight: classes.length > 0 ? '460px' : undefined,
+              maxHeight: classes.length > 0 ? 'clamp(360px, calc(100vh - 330px), 560px)' : undefined,
+              minHeight: classes.length > 0 ? '360px' : undefined,
               overflowY: classes.length > 0 ? 'auto' : undefined,
               paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '230px') : '16px',
-              position: 'relative'
+              position: 'relative',
+              zIndex: 1
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
@@ -570,14 +571,14 @@ export function App() {
             bottom: classes.length > 0 ? 0 : undefined,
             left: classes.length > 0 ? 0 : undefined,
             right: classes.length > 0 ? 0 : undefined,
-            zIndex: classes.length > 0 ? 15 : undefined,
-            marginTop: classes.length > 0 ? 0 : '16px',
+            zIndex: 50,
+            marginTop: classes.length > 0 ? 0 : '14px',
             padding: '14px 16px',
-            background: classes.length > 0 ? 'rgba(16, 20, 31, 0.94)' : undefined,
+            background: classes.length > 0 ? 'rgba(16, 20, 31, 0.96)' : undefined,
             backdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
             WebkitBackdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
             border: classes.length > 0 ? '1px solid rgba(255, 255, 255, 0.14)' : undefined,
-            boxShadow: classes.length > 0 ? '0 -8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(204, 0, 51, 0.15)' : undefined,
+            boxShadow: classes.length > 0 ? '0 -8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(204, 0, 51, 0.18)' : undefined,
             borderRadius: '16px',
             transition: 'all 0.25s ease'
           }}
