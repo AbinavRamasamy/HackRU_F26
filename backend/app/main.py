@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.telemetry import get_simulated_telemetry
+from app.schedule_parser import parse_schedule_with_gemini
 
 load_dotenv()
 
@@ -67,6 +68,14 @@ async def get_live_telemetry(route: Optional[str] = None):
     
     # Fallback to simulated real-time telemetry
     return {"source": "resilient_simulation", "buses": get_simulated_telemetry(route)}
+
+@app.post("/api/schedule/upload")
+async def upload_schedule(file: UploadFile = File(...)):
+    """Uploads a class schedule screenshot and extracts classes using Gemini Vision OCR."""
+    contents = await file.read()
+    content_type = file.content_type or "image/png"
+    parsed_classes = parse_schedule_with_gemini(contents, mime_type=content_type)
+    return {"status": "success", "classes": parsed_classes}
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
