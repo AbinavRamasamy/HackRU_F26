@@ -57,7 +57,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
 
         {/* Route Filter Pills */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {["ALL", "LX", "B", "A", "H", "F", "EE", "REXB"].map(route => (
+          {["ALL", "Weekend 1", "Weekend 2", "LX", "B", "A", "H", "F", "EE", "REXB"].map(route => (
             <button
               key={route}
               onClick={() => setSelectedRoute(route)}

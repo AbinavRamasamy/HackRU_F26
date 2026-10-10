@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,21 +54,89 @@ def get_buildings():
 @app.get("/api/telemetry")
 async def get_live_telemetry(route: Optional[str] = None):
     """
-    Attempts to fetch live Rutgers telemetry from transitstat.us / TripShot;
-    seamlessly falls back to the deterministic mock generator if unavailable.
+    Fetches real-time live Rutgers telemetry from store.transitstat.us/tripshot/rutgers.
+    Correctly recognizes active Weekend 1 / Weekend 2 buses on weekends and regular routes on weekdays!
     """
     try:
-        async with httpx.AsyncClient(timeout=2.5) as client:
-            resp = await client.get("https://transitstat.us/api/v1/rutgers/vehicles")
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(
+                "https://store.transitstat.us/tripshot/rutgers",
+                headers={"User-Agent": "Mozilla/5.0 (ScarletHop/1.0)"}
+            )
             if resp.status_code == 200:
-                data = resp.json()
-                if data and isinstance(data, list):
-                    return {"source": "live_transitstat", "buses": data}
-    except Exception:
-        pass
+                raw_data = resp.json()
+                trains = raw_data.get("trains", {})
+                lines = raw_data.get("lines", {})
+                stations = raw_data.get("stations", {})
+                
+                live_buses = []
+                now_ms = int(datetime.now().timestamp() * 1000)
+
+                for tid, t in trains.items():
+                    line_code = str(t.get("lineCode", ""))
+                    line_meta = lines.get(line_code, {})
+                    line_short = line_meta.get("lineNameShort") or t.get("lineCode") or "BUS"
+                    line_long = line_meta.get("lineNameLong") or line_short
+                    
+                    # Normalize route names for frontend filter matching
+                    route_display = line_short
+                    if "WKND1" in line_short.upper() or "WEEKEND 1" in line_long.upper():
+                        route_display = "Weekend 1"
+                    elif "WKND2" in line_short.upper() or "WEEKEND 2" in line_long.upper():
+                        route_display = "Weekend 2"
+
+                    if route and route.upper() != "ALL":
+                        if route.upper() not in route_display.upper() and route.upper() not in line_short.upper():
+                            continue
+
+                    # Calculate arrival ETA to next stop
+                    predictions = t.get("predictions", [])
+                    next_stop_name = "En Route"
+                    eta_mins = 5 # default fallback if no predictions
+
+                    if predictions and isinstance(predictions, list):
+                        first_pred = predictions[0]
+                        next_stop_name = first_pred.get("stationName", "Next Stop")
+                        actual_eta = first_pred.get("actualETA")
+                        if actual_eta:
+                            eta_mins = max(1, round((actual_eta - now_ms) / 60000))
+                    elif t.get("destStation"):
+                        next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
+
+                    # Occupancy
+                    extra = t.get("extra", {}) or {}
+                    load = extra.get("load")
+                    occupancy = "Seats Available"
+                    if load is not None:
+                        occupancy = f"{int(load)}% Full" if load > 40 else "Many Seats Available"
+
+                    live_buses.append({
+                        "id": str(t.get("runNumber") or tid),
+                        "route": route_display,
+                        "destination": line_long or "Campus Route",
+                        "lat": t.get("lat"),
+                        "lon": t.get("lon"),
+                        "speed_mph": round(t.get("speed") or 18),
+                        "occupancy": occupancy,
+                        "eta_mins": eta_mins,
+                        "next_stop": next_stop_name
+                    })
+
+                if live_buses:
+                    return {
+                        "source": "live_transitstat_tripshot",
+                        "buses": live_buses,
+                        "is_weekend": datetime.now().weekday() >= 5
+                    }
+    except Exception as e:
+        print(f"Transitstat live query failed: {e}")
     
-    # Fallback to simulated real-time telemetry
-    return {"source": "resilient_simulation", "buses": get_simulated_telemetry(route)}
+    # Resilient fallback with schedule awareness
+    return {
+        "source": "resilient_simulation",
+        "buses": get_simulated_telemetry(route),
+        "is_weekend": datetime.now().weekday() >= 5
+    }
 
 @app.post("/api/schedule/upload")
 async def upload_schedule(file: UploadFile = File(...)):
@@ -142,6 +211,17 @@ async def copilot_chat(req: ChatQueryRequest):
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
+    weekend = datetime.now().weekday() >= 5
+    if weekend:
+        return {
+            "origin": plan.origin_campus,
+            "destination": plan.destination_campus,
+            "recommended_routes": ["Weekend 1", "Weekend 2"],
+            "base_minutes": 15,
+            "rush_hour_minutes": 18,
+            "advice": "Rutgers runs the Weekend 1 & Weekend 2 bus loops today! Both lines circulate between all campuses (Busch, Livingston, College Ave, and Cook/Douglass)."
+        }
+
     pair = (plan.origin_campus, plan.destination_campus)
     if plan.origin_campus == plan.destination_campus:
         return {
