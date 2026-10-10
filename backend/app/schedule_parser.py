@@ -93,42 +93,11 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
     
     # Check if GEMINI_API_KEY is missing or blank
     if not api_key or api_key.strip() in ["", "your_gemini_api_key_here", "YOUR_GEMINI_API_KEY"]:
-        print("[ScheduleOCR] GEMINI_API_KEY is not set or empty in .env. Falling back to demo schedule.")
+        print("[ScheduleOCR] GEMINI_API_KEY is not set or empty in .env.")
         return {
             "status": "missing_api_key",
-            "message": "GEMINI_API_KEY is not set in .env. Please set GEMINI_API_KEY to parse your actual WebReg screenshot.",
-            "classes": [
-                {
-                    "course": "Intro to Computer Science (01:198:111)",
-                    "days": ["M", "TH"],
-                    "days_display": "M, TH",
-                    "startTime": "10:20",
-                    "endTime": "11:40",
-                    "building": "Hill Center 114",
-                    "campus": "Busch",
-                    "location": "Hill Center 114 (Busch)"
-                },
-                {
-                    "course": "Linear Algebra (01:640:250)",
-                    "days": ["M", "TH"],
-                    "days_display": "M, TH",
-                    "startTime": "12:10",
-                    "endTime": "13:30",
-                    "building": "Tillett Hall 254",
-                    "campus": "Livingston",
-                    "location": "Tillett Hall 254 (Livingston)"
-                },
-                {
-                    "course": "Data Structures (01:198:112)",
-                    "days": ["T", "F"],
-                    "days_display": "T, F",
-                    "startTime": "14:00",
-                    "endTime": "15:20",
-                    "building": "Academic Building 1180",
-                    "campus": "College Ave",
-                    "location": "Academic Building 1180 (College Ave)"
-                }
-            ]
+            "message": "GEMINI_API_KEY is not set in .env. Please set GEMINI_API_KEY in your .env file to parse schedule screenshots.",
+            "classes": []
         }
 
     try:

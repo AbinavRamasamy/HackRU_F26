@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
@@ -17,38 +17,7 @@ interface ClassItem {
 }
 
 export function App() {
-  const [classes, setClasses] = useState<ClassItem[]>([
-    {
-      course: "Intro to Computer Science (01:198:111)",
-      days: ["M", "TH"],
-      days_display: "M, TH",
-      startTime: "10:20",
-      endTime: "11:40",
-      building: "Hill Center 114",
-      location: "Hill Center 114 (Busch)",
-      campus: "Busch"
-    },
-    {
-      course: "Linear Algebra (01:640:250)",
-      days: ["M", "TH"],
-      days_display: "M, TH",
-      startTime: "12:10",
-      endTime: "13:30",
-      building: "Tillett Hall 254",
-      location: "Tillett Hall 254 (Livingston)",
-      campus: "Livingston"
-    },
-    {
-      course: "Data Structures (01:198:112)",
-      days: ["T", "F"],
-      days_display: "T, F",
-      startTime: "14:00",
-      endTime: "15:20",
-      building: "Academic Building 1180",
-      location: "Academic Building 1180 (College Ave)",
-      campus: "College Ave"
-    }
-  ]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
 
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
@@ -110,6 +79,81 @@ export function App() {
     }
   };
 
+  const handleGetToNextClass = async () => {
+    if (classes.length === 0) {
+      alert("No course schedule loaded yet! Please upload a screenshot of your WebReg, Canvas, or CSP schedule first.");
+      return;
+    }
+
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const daysArr = ["SU", "M", "T", "W", "TH", "F", "S"];
+    const currentDayCode = daysArr[now.getDay()];
+
+    const parseTimeToMins = (timeStr: string) => {
+      if (!timeStr) return 0;
+      const parts = timeStr.split(":");
+      return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || "0", 10);
+    };
+
+    // Filter classes meeting today
+    const todayClasses = classes.filter(cls => {
+      const days = Array.isArray(cls.days) ? cls.days : [cls.days];
+      return days.includes(currentDayCode);
+    });
+
+    todayClasses.sort((a, b) => parseTimeToMins(a.startTime) - parseTimeToMins(b.startTime));
+
+    // Find upcoming class today or first class overall
+    let nextClass = todayClasses.find(cls => parseTimeToMins(cls.startTime) >= currentMins);
+    if (!nextClass) {
+      nextClass = todayClasses.length > 0 ? todayClasses[0] : classes[0];
+    }
+
+    const targetCampus = nextClass.campus || "College Ave";
+
+    // Set origin based on currentLocation
+    let currentOrigin = originCampus;
+    if (currentLocation.includes("Busch")) currentOrigin = "Busch";
+    else if (currentLocation.includes("Livingston")) currentOrigin = "Livingston";
+    else if (currentLocation.includes("College")) currentOrigin = "College Ave";
+    else if (currentLocation.includes("Cook") || currentLocation.includes("Douglass")) currentOrigin = "Cook";
+
+    setOriginCampus(currentOrigin);
+    setDestCampus(targetCampus);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin_campus: currentOrigin,
+          destination_campus: targetCampus,
+          target_arrival_time: nextClass.startTime || "12:00"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPlanResult(data);
+      }
+    } catch {
+      setPlanResult({
+        origin: currentOrigin,
+        destination: targetCampus,
+        recommended_routes: currentOrigin === targetCampus ? ["Walk / Campus Loop"] : ["LX"],
+        base_minutes: currentOrigin === targetCampus ? 5 : 12,
+        rush_hour_minutes: currentOrigin === targetCampus ? 8 : 22,
+        advice: `Heading to ${nextClass.course} at ${nextClass.startTime} on ${targetCampus}.`
+      });
+    }
+
+    // Scroll to commute planner section
+    const plannerEl = document.getElementById("commute-planner-section");
+    if (plannerEl) {
+      plannerEl.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setUploading(true);
@@ -125,7 +169,7 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.status === "missing_api_key") {
-          alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend. Loaded default demo classes.");
+          alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend.");
         } else if (data.status === "error") {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
         }
@@ -287,80 +331,155 @@ export function App() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '28px', marginBottom: '56px' }}>
         {/* Card 1: Course Schedule Ingestion */}
         <div className="glass-panel" style={{ padding: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Calendar size={20} color="#ff3366" />
               <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Your Schedule</h3>
             </div>
-            <label style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              background: 'rgba(204, 0, 51, 0.15)',
-              border: '1px solid rgba(204, 0, 51, 0.4)',
-              color: '#ff4d6d',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}>
-              <Upload size={14} />
-              {uploading ? "Analyzing..." : "Upload Schedule OCR"}
-              <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-            </label>
-          </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleGetToNextClass}
+                title="Calculate best transit route to your next upcoming class"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
+                  border: '1px solid rgba(255, 51, 102, 0.4)',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(204, 0, 51, 0.35)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Navigation size={13} color="#fff" />
+                Get to Next Class
+              </button>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {classes.map((cls, idx) => (
-              <div key={idx} style={{
-                padding: '14px 16px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                display: 'flex',
-                justifyContent: 'space-between',
+              <label style={{
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '12px'
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                background: 'rgba(204, 0, 51, 0.15)',
+                border: '1px solid rgba(204, 0, 51, 0.4)',
+                color: '#ff4d6d',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer'
               }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {cls.course}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
-                    <span>
-                      <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
-                    {cls.startTime} - {cls.endTime}
-                  </div>
-                  <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '5px',
-                      background: 'rgba(204, 0, 51, 0.2)',
-                      border: '1px solid rgba(204, 0, 51, 0.45)',
-                      color: '#ff4d6d',
-                      letterSpacing: '0.5px'
-                    }}>
-                      {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+                <Upload size={14} />
+                {uploading ? "Analyzing..." : "Upload Schedule OCR"}
+                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
           </div>
+
+          {classes.length === 0 ? (
+            <div style={{
+              padding: '36px 20px',
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px dashed rgba(255, 255, 255, 0.12)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '50%',
+                background: 'rgba(204, 0, 51, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Calendar size={22} color="#ff3366" />
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>
+                No Schedule Loaded
+              </div>
+              <div style={{ fontSize: '13px', color: '#9ca3af', maxWidth: '340px', lineHeight: 1.5 }}>
+                Upload a screenshot of your WebReg, Canvas, or CSP schedule. ScarletHop will extract class locations, group meetings, and navigate you between campuses.
+              </div>
+              <label style={{
+                marginTop: '4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 18px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #cc0033 0%, #990026 100%)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(204, 0, 51, 0.3)'
+              }}>
+                <Upload size={15} />
+                {uploading ? "Analyzing Schedule..." : "Upload Schedule OCR"}
+                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {classes.map((cls, idx) => (
+                <div key={idx} style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {cls.course}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>
+                        <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
+                      {cls.startTime} - {cls.endTime}
+                    </div>
+                    <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '5px',
+                        background: 'rgba(204, 0, 51, 0.2)',
+                        border: '1px solid rgba(204, 0, 51, 0.45)',
+                        color: '#ff4d6d',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Card 2: Inter-Campus Transit Routing */}
-        <div className="glass-panel" style={{ padding: '28px' }}>
+        <div id="commute-planner-section" className="glass-panel" style={{ padding: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
             <Zap size={20} color="#ff3366" />
             <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Inter-Campus Commute Planner</h3>
