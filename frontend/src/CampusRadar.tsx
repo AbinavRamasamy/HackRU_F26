@@ -69,6 +69,21 @@ export const getRouteColor = (route: string) => {
   return "#6366f1";
 };
 
+export const getBusCurrentCampus = (b: BusLocation): string => {
+  if ((b as any).campus) return (b as any).campus;
+  if (b.lat && b.lon) {
+    if (b.lat > 40.515) return b.lon < -74.450 ? "Busch" : "Livingston";
+    if (b.lat < 40.492) return "Cook / Douglass";
+    return "College Ave";
+  }
+  const stop = (b.next_stop || b.destination || "").toLowerCase();
+  if (stop.includes("livingston") || stop.includes("plaza") || stop.includes("quads") || stop.includes("rbs")) return "Livingston";
+  if (stop.includes("busch") || stop.includes("hill") || stop.includes("arc") || stop.includes("stadium")) return "Busch";
+  if (stop.includes("cook") || stop.includes("doug") || stop.includes("red oak") || stop.includes("biel") || stop.includes("college hall")) return "Cook / Douglass";
+  if (stop.includes("college") || stop.includes("yard") || stop.includes("scott")) return "College Ave";
+  return "";
+};
+
 export const CampusRadar: React.FC<CampusRadarProps> = ({
   buses,
   selectedCampus,
@@ -223,14 +238,15 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
         {campuses.map(c => {
           const isSelected = selectedCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
           const allowedRoutes = getRoutesForCampus(c.name);
-          // Only show buses whose route serves this campus
+          // Only show buses physically operating at/near this specific campus right now
           const campusBuses = buses.filter(b => {
             if (!allowedRoutes.includes(b.route)) return false;
-            const bCampus = (b as any).campus || "";
-            const bStop = b.next_stop || "";
-            return bCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)) ||
-                   bStop.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)) ||
-                   allowedRoutes.includes(b.route);
+            if (selectedRoute !== "ALL" && b.route !== selectedRoute) return false;
+            const currentCampus = getBusCurrentCampus(b);
+            if (currentCampus) {
+              return currentCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
+            }
+            return false;
           });
 
           return (
