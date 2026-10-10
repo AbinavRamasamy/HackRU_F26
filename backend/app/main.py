@@ -56,10 +56,11 @@ async def get_live_telemetry(route: Optional[str] = None):
     Fetches real-time live Rutgers telemetry from store.transitstat.us/tripshot/rutgers.
     Correctly recognizes active Weekend 1 / Weekend 2 buses on weekends and regular routes on weekdays!
     """
+    transit_api_url = os.getenv("TRANSITSTATUS_API_URL") or "https://store.transitstat.us/tripshot/rutgers"
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:
             resp = await client.get(
-                "https://store.transitstat.us/tripshot/rutgers",
+                transit_api_url,
                 headers={"User-Agent": "Mozilla/5.0 (ScarletHop/1.0)"}
             )
             if resp.status_code == 200:
@@ -194,15 +195,16 @@ async def copilot_chat(req: ChatQueryRequest):
         try:
             from google import genai
             client = genai.Client(api_key=api_key)
+            model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
             prompt = f"""
             You are ScarletHop, an AI Rutgers University transit expert.
             The student is currently at: {req.current_campus}.
             Student's query: "{req.query}".
-            Known buses: LX (College Ave <-> Livingston), B (Busch <-> Livingston), A/H (College Ave <-> Busch), F/EE (College Ave <-> Cook/Douglass), REXB (Busch <-> Cook/Douglass), REXL (Livingston <-> Cook/Douglass).
+            Known buses: LX (College Ave <-> Livingston), B (Busch <-> Livingston), A/H (College Ave <-> Busch), F/EE (College Ave <-> Cook/Douglass), REXB (Busch <-> Cook/Douglass), REXL (Livingston <-> Cook/Douglass), Weekend 1/2 (All Campuses on Weekends).
             Provide a concise, encouraging 2-sentence response with the exact bus to catch, stop, and estimated walk/ride buffer.
             """
             response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
+                model=model_name,
                 contents=prompt
             )
             return {

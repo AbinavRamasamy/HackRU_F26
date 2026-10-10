@@ -67,9 +67,10 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
     Do not include markdown fences or explanation. Return only valid JSON.
     """
 
+    model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
     try:
         response = client.models.generate_content(
-            model='gemini-3.5-flash-lite',
+            model=model_name,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 prompt
