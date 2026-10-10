@@ -284,7 +284,7 @@ export function App() {
   };
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '16px 20px', minHeight: '100vh' }}>
+    <div style={{ width: '100%', margin: 0, padding: '16px 28px', minHeight: '100vh', boxSizing: 'border-box' }}>
       {/* Top Navbar */}
       <header style={{
         display: 'flex',
@@ -378,7 +378,7 @@ export function App() {
       </header>
 
       {/* Main Dashboard Overhauled Grid */}
-      <div className="main-dashboard-grid" style={{ gap: '16px', marginBottom: '16px' }}>
+      <div className="main-dashboard-grid" style={{ marginBottom: '16px' }}>
         {/* Left Column: 4. Schedule Widget (Top) + Planner (Middle-Bottom Left) */}
         <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Card 1: Course Schedule Ingestion */}
