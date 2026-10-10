@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Bus, AlertTriangle, ChevronUp, ChevronDown, Sparkles, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, MapPin, Copy, Check } from 'lucide-react';
+import { getRouteColor } from './CampusRadar';
 
 interface BusItem {
   id: string;
@@ -10,7 +11,10 @@ interface BusItem {
   next_stop: string;
 }
 
-interface TransitWidgetProps {
+interface TransitWidgetOverlayProps {
+  isOpen: boolean;
+  onClose: () => void;
+  triggerRef?: React.RefObject<HTMLElement | null>;
   currentCampus?: string;
   nextClass?: {
     course: string;
@@ -20,14 +24,35 @@ interface TransitWidgetProps {
   };
 }
 
-export const TransitWidget: React.FC<TransitWidgetProps> = ({
+export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
+  isOpen,
+  onClose,
+  triggerRef,
   currentCampus = "Busch Student Center",
   nextClass
 }) => {
-  const [expanded, setExpanded] = useState(false);
   const [buses, setBuses] = useState<BusItem[]>([]);
+  const [copied, setCopied] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (overlayRef.current && overlayRef.current.contains(target)) return;
+      if (triggerRef?.current && triggerRef.current.contains(target)) return;
+      onClose();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, triggerRef]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     const fetchTelemetry = async () => {
       try {
         const res = await fetch("http://localhost:8000/api/telemetry");
@@ -35,14 +60,13 @@ export const TransitWidget: React.FC<TransitWidgetProps> = ({
           const data = await res.json();
           setBuses(data.buses || []);
         } else {
-          // Fallback mock
           setBuses([
             { id: "1", route: "LX", destination: "Livingston", eta_mins: 4, occupancy: "Seats Available", next_stop: "The Yard" },
             { id: "2", route: "B", destination: "Busch", eta_mins: 8, occupancy: "Crowded", next_stop: "Hill Center" },
             { id: "3", route: "A", destination: "Busch", eta_mins: 11, occupancy: "Standing Only", next_stop: "Student Center" }
           ]);
         }
-      } catch (err) {
+      } catch {
         setBuses([
           { id: "1", route: "LX", destination: "Livingston", eta_mins: 4, occupancy: "Seats Available", next_stop: "The Yard" },
           { id: "2", route: "B", destination: "Busch", eta_mins: 8, occupancy: "Crowded", next_stop: "Hill Center" }
@@ -53,209 +77,172 @@ export const TransitWidget: React.FC<TransitWidgetProps> = ({
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isOpen]);
 
-  const primaryBus = buses[0] || {
-    route: "LX",
-    destination: "Livingston",
-    eta_mins: 4,
-    next_stop: "The Yard",
-    occupancy: "Seats Available"
+  if (!isOpen) return null;
+
+  const copyEmbedCode = () => {
+    const code = `<iframe src="${window.location.origin}?widget=only" width="380" height="480" style="border:none;border-radius:18px;box-shadow:0 12px 36px rgba(0,0,0,0.4);" title="ScarletHop Transit Widget"></iframe>`;
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '24px',
-      right: '24px',
-      zIndex: 9999,
-      maxWidth: '380px',
-      width: 'calc(100vw - 48px)'
-    }}>
-      {/* Expanded Card */}
-      {expanded && (
-        <div className="glass-panel" style={{
-          padding: '20px',
+    <div
+      ref={overlayRef}
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 10px)',
+        right: 0,
+        width: '380px',
+        maxWidth: 'calc(100vw - 32px)',
+        zIndex: 9999,
+        background: 'rgba(28, 28, 30, 0.94)',
+        backdropFilter: 'blur(32px) saturate(190%)',
+        WebkitBackdropFilter: 'blur(32px) saturate(190%)',
+        borderRadius: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        padding: '18px',
+        animation: 'fadeIn 0.2s ease-in-out'
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <Sparkles size={15} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+              Transit Glance
+            </h4>
+            <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 600 }}>● Live Telemetry</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Departing Location Pill */}
+      <div style={{
+        fontSize: '11.5px',
+        color: '#fff',
+        marginBottom: '12px',
+        padding: '7px 10px',
+        background: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: '10px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        border: '1px solid rgba(255, 255, 255, 0.08)'
+      }}>
+        <MapPin size={13} color="#FF375F" />
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          Origin: <strong>{currentCampus}</strong>
+        </span>
+      </div>
+
+      {/* Next Class Destination */}
+      {nextClass && (
+        <div style={{
+          background: 'rgba(255, 55, 95, 0.08)',
+          borderRadius: '12px',
+          padding: '10px 12px',
           marginBottom: '12px',
-          border: '1px solid rgba(204, 0, 51, 0.3)',
-          animation: 'fadeIn 0.2s ease-in-out'
+          border: '1px solid rgba(255, 55, 95, 0.25)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                background: 'rgba(204,0,51,0.2)',
-                color: '#ff4d6d',
-                padding: '6px',
-                borderRadius: '8px'
-              }}>
-                <Sparkles size={16} />
-              </div>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#f3f4f6' }}>AI Transit Copilot</span>
-            </div>
-            <span style={{
-              fontSize: '11px',
-              padding: '3px 8px',
-              background: 'rgba(16, 185, 129, 0.15)',
-              color: '#34d399',
-              borderRadius: '12px',
-              fontWeight: 600
-            }}>Live Sync</span>
+          <div style={{ fontSize: '10px', color: '#FF375F', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 700 }}>
+            Next Destination
           </div>
-
-          <div style={{
-            fontSize: '11px',
-            color: '#38bdf8',
-            marginBottom: '10px',
-            padding: '4px 8px',
-            background: 'rgba(56, 189, 248, 0.1)',
-            borderRadius: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: '1px solid rgba(56, 189, 248, 0.2)'
-          }}>
-            <MapPin size={12} color="#38bdf8" />
-            <span>Departing from: <strong>{currentCampus}</strong></span>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '1px' }}>
+            {nextClass.course}
           </div>
-
-          {nextClass && (
-            <div style={{
-              background: 'rgba(255,255,255,0.03)',
-              borderRadius: '10px',
-              padding: '12px',
-              marginBottom: '14px',
-              border: '1px solid rgba(255,255,255,0.05)'
-            }}>
-              <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Next Destination</div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff', marginTop: '2px' }}>{nextClass.course}</div>
-              <div style={{ fontSize: '12px', color: '#d1d5db', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-                <MapPin size={12} color="#cc0033" />
-                {nextClass.building} ({nextClass.campus}) at {nextClass.startTime}
-              </div>
-            </div>
-          )}
-
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af', marginBottom: '8px' }}>Incoming Campus Buses</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
-            {buses.map((bus) => (
-              <div key={bus.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 10px',
-                background: 'rgba(255,255,255,0.02)',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.04)',
-                overflow: 'hidden'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
-                  <div style={{
-                    padding: '3px 6px',
-                    minWidth: '45px',
-                    height: '26px',
-                    borderRadius: '6px',
-                    background: bus.route.includes('Weekend 1') ? '#0d9488' : bus.route.includes('Weekend 2') ? '#10b981' : bus.route === 'LX' ? '#ff5722' : bus.route === 'B' ? '#3b82f6' : '#6366f1',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: '10px',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      To {bus.destination}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {bus.next_stop} • {bus.occupancy}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{
-            marginTop: '14px',
-            fontSize: '11px',
-            color: '#fbbf24',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(245, 158, 11, 0.1)',
-            padding: '8px 10px',
-            borderRadius: '8px'
-          }}>
-            <AlertTriangle size={14} />
-            <span>Heavy traffic on Route 18. Leave 10 mins earlier.</span>
+          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.65)', marginTop: '2px' }}>
+            {nextClass.building} ({nextClass.campus}) at {nextClass.startTime}
           </div>
         </div>
       )}
 
-      {/* Floating Pill / Mini Trigger */}
-      <div 
-        onClick={() => setExpanded(!expanded)}
-        className="glass-panel"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 18px',
-          cursor: 'pointer',
-          border: '1px solid rgba(204, 0, 51, 0.5)',
-          boxShadow: '0 8px 24px rgba(204, 0, 51, 0.25)',
-          transition: 'transform 0.2s ease, border-color 0.2s ease'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            boxShadow: '0 4px 12px rgba(204, 0, 51, 0.4)'
-          }}>
-            <Bus size={20} />
+      {/* Incoming Buses List */}
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(235, 235, 245, 0.6)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+        Arriving Soon ({buses.length})
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '2px' }}>
+        {buses.length === 0 ? (
+          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.5)', textAlign: 'center', padding: '14px' }}>
+            Syncing live arrivals...
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: '#fff' }}>Route {primaryBus.route}</span>
-              <span style={{
-                fontSize: '11px',
-                background: 'rgba(204, 0, 51, 0.25)',
-                color: '#ff4d6d',
-                padding: '1px 6px',
-                borderRadius: '6px',
-                fontWeight: 700
-              }}>
-                in {primaryBus.eta_mins} mins
-              </span>
+        ) : (
+          buses.map((bus) => (
+            <div key={bus.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 10px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.06)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
+                <div style={{
+                  padding: '3px 7px',
+                  minWidth: '40px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  background: getRouteColor(bus.route),
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '10px',
+                  flexShrink: 0
+                }}>
+                  {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    To {bus.destination}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'rgba(235, 235, 245, 0.6)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {bus.next_stop} • {bus.occupancy}
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{bus.eta_mins}m</span>
+              </div>
             </div>
-            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-              Board at {primaryBus.next_stop}
-            </div>
-          </div>
-        </div>
+          ))
+        )}
+      </div>
 
-        <button style={{
-          background: 'transparent',
-          color: '#9ca3af',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          {expanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+      {/* Footer Embed Code Quick Copy */}
+      <div style={{
+        marginTop: '12px',
+        paddingTop: '10px',
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <span style={{ fontSize: '11px', color: 'rgba(235, 235, 245, 0.6)' }}>Embed in Canvas</span>
+        <button
+          onClick={copyEmbedCode}
+          className="apple-btn-secondary"
+          style={{ fontSize: '11px', padding: '4px 10px', gap: '4px' }}
+        >
+          {copied ? <Check size={11} color="#30D158" /> : <Copy size={11} />}
+          {copied ? 'Copied iFrame' : 'Copy iFrame'}
         </button>
       </div>
     </div>

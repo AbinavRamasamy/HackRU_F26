@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Send, Bot, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, ArrowUp, Bot } from 'lucide-react';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -10,32 +10,47 @@ interface Message {
 
 interface AICopilotChatProps {
   currentCampus?: string;
+  style?: React.CSSProperties;
 }
 
-export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center" }) => {
+export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center", style }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      text: `Hey! I'm your Rutgers Transit Copilot. You're currently at ${currentCampus}. Ask me anything like: 'I need to get to Tillett Hall on Livingston for my 12:10 class—what bus should I take?'`,
-      recommendedRoute: "B",
-      eta: 4
+      text: `Hello! I'm your Rutgers Transit Copilot. You're currently near ${currentCampus}. Ask me anything like: "What bus gets me to Tillett Hall on Livingston fastest right now?"`
     }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
-    const userText = input.trim();
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const quickPrompts = [
+    "Next LX to Livingston?",
+    "Is Route 18 backed up?",
+    "Fastest way to Busch ARC?"
+  ];
+
+  const handleSend = async (queryText?: string) => {
+    const textToSend = (queryText || input).trim();
+    if (!textToSend || loading) return;
+
     setInput("");
-    setMessages(prev => [...prev, { role: 'user', text: userText }]);
+    setMessages(prev => [...prev, { role: 'user', text: textToSend }]);
     setLoading(true);
 
     try {
       const res = await fetch("http://localhost:8000/api/copilot/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userText, current_campus: currentCampus })
+        body: JSON.stringify({ query: textToSend, current_campus: currentCampus })
       });
       if (res.ok) {
         const data = await res.json();
@@ -56,7 +71,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         ...prev,
         {
           role: 'assistant',
-          text: "Catch the LX at The Yard in ~4 minutes. Give yourself ~14 minutes total to account for Route 18 bridge traffic.",
+          text: "Catch the LX at The Yard in ~4 minutes. Allow ~14 minutes total travel time to account for Route 18 bridge traffic.",
           recommendedRoute: "LX",
           eta: 4
         }
@@ -67,19 +82,36 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '24px', marginTop: '32px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+    <div className="apple-panel" style={{
+      padding: '20px',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      minHeight: 0,
+      boxSizing: 'border-box',
+      ...style
+    }}>
+      {/* Siri / Apple Intelligence Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexShrink: 0 }}>
         <div style={{
-          background: 'rgba(204, 0, 51, 0.2)',
-          padding: '8px',
-          borderRadius: '10px',
-          color: '#ff4d6d'
+          width: '32px',
+          height: '32px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #FF375F 0%, #BF5AF2 50%, #0A84FF 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 0 16px rgba(191, 90, 242, 0.45)'
         }}>
-          <Sparkles size={20} />
+          <Sparkles size={16} color="#fff" />
         </div>
         <div>
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Ask ScarletHop Copilot</h3>
-          <p style={{ fontSize: '12px', color: '#9ca3af' }}>Natural language routing, rush-hour delay prediction, and walking advice</p>
+          <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+            Scarlet Copilot
+          </h3>
+          <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: 0 }}>
+            Natural language transit routing & delay prediction
+          </p>
         </div>
       </div>
 
@@ -88,119 +120,171 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
-        maxHeight: '260px',
+        flex: '1 1 0',
+        minHeight: 0,
         overflowY: 'auto',
-        marginBottom: '16px',
-        paddingRight: '6px'
+        marginBottom: '12px',
+        paddingRight: '4px'
       }}>
-        {messages.map((m, idx) => (
-          <div
-            key={idx}
-            style={{
-              display: 'flex',
-              gap: '10px',
-              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '85%'
-            }}
-          >
-            {m.role === 'assistant' && (
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: 'rgba(204,0,51,0.25)',
-                color: '#ff4d6d',
+        {messages.map((m, idx) => {
+          const isUser = m.role === 'user';
+          return (
+            <div
+              key={idx}
+              style={{
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <Bot size={16} />
-              </div>
-            )}
-
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '12px',
-              background: m.role === 'user' ? 'linear-gradient(135deg, #cc0033 0%, #800020 100%)' : 'rgba(255,255,255,0.03)',
-              border: m.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: '#fff',
-              fontSize: '13px',
-              lineHeight: 1.5
-            }}>
-              <div>{m.text}</div>
-              {m.recommendedRoute && (
+                gap: '8px',
+                alignSelf: isUser ? 'flex-end' : 'flex-start',
+                maxWidth: '88%',
+                alignItems: 'flex-end'
+              }}
+            >
+              {!isUser && (
                 <div style={{
-                  display: 'inline-flex',
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '8px',
-                  padding: '3px 8px',
-                  background: 'rgba(255,255,255,0.06)',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#38bdf8'
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginBottom: '2px'
                 }}>
-                  Recommended: Route {m.recommendedRoute} (in {m.eta} mins)
+                  <Bot size={14} color="#FF375F" />
                 </div>
               )}
-            </div>
 
-            {m.role === 'user' && (
               <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                background: 'rgba(255,255,255,0.1)',
+                padding: '10px 14px',
+                borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                background: isUser
+                  ? 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)'
+                  : 'rgba(255, 255, 255, 0.06)',
+                border: isUser ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
                 color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
+                fontSize: '13px',
+                lineHeight: 1.45,
+                boxShadow: isUser ? '0 3px 12px rgba(255, 55, 95, 0.28)' : 'none'
               }}>
-                <User size={16} />
+                <div>{m.text}</div>
+                {m.recommendedRoute && (
+                  <div style={{
+                    marginTop: '8px',
+                    paddingTop: '6px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '11px',
+                    fontWeight: 600
+                  }}>
+                    <span style={{
+                      padding: '2px 6px',
+                      borderRadius: '5px',
+                      background: '#FF5722',
+                      color: '#fff'
+                    }}>
+                      Route {m.recommendedRoute}
+                    </span>
+                    {m.eta && <span style={{ color: '#30D158' }}>Arriving ~{m.eta}m</span>}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+          );
+        })}
+
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start' }}>
+            <div style={{
+              padding: '10px 14px',
+              borderRadius: '18px',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              fontSize: '12px',
+              color: 'var(--apple-label-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span className="animate-pulse-ring" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FF375F' }} />
+              Thinking...
+            </div>
           </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Apple Siri Quick Suggestions */}
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        overflowX: 'auto',
+        paddingBottom: '8px',
+        flexShrink: 0
+      }}>
+        {quickPrompts.map((prompt, i) => (
+          <button
+            key={i}
+            onClick={() => handleSend(prompt)}
+            className="apple-btn-secondary"
+            style={{
+              padding: '4px 10px',
+              fontSize: '11.5px',
+              whiteSpace: 'nowrap',
+              borderRadius: '9999px',
+              background: 'rgba(255, 255, 255, 0.05)'
+            }}
+          >
+            {prompt}
+          </button>
         ))}
       </div>
 
-      {/* Input Field */}
-      <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Apple Messages Style Capsule Input */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: '9999px',
+        padding: '4px 6px 4px 14px',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        flexShrink: 0
+      }}>
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Ask e.g. 'How do I get to Busch Hill Center from The Yard?'"
+          placeholder="Ask Copilot about transit..."
           style={{
             flex: 1,
-            padding: '12px 16px',
-            borderRadius: '10px',
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'transparent',
+            border: 'none',
             color: '#fff',
             fontSize: '13px',
             outline: 'none'
           }}
         />
         <button
-          onClick={handleSend}
-          disabled={loading}
+          onClick={() => handleSend()}
+          disabled={!input.trim() || loading}
           style={{
-            padding: '12px 20px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: input.trim() && !loading ? '#FF375F' : 'rgba(255, 255, 255, 0.12)',
             color: '#fff',
-            fontWeight: 700,
-            fontSize: '13px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px'
+            justifyContent: 'center',
+            cursor: input.trim() && !loading ? 'pointer' : 'default',
+            transition: 'all 0.2s ease'
           }}
         >
-          {loading ? "Thinking..." : "Send"} <Send size={14} />
+          <ArrowUp size={15} strokeWidth={2.5} />
         </button>
       </div>
     </div>

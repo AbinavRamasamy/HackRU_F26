@@ -7,9 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 from dotenv import load_dotenv, find_dotenv
+import hashlib
+from app.user_store import load_users, save_users
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
+from app.commute_planner import get_commute_routes
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -44,7 +47,63 @@ def health_check():
     return {"status": "online", "service": "ScarletHop API", "version": "1.0.0"}
 
 @app.get("/api/stops")
-def get_stops():
+async def get_stops():
+    """
+    Returns authoritative Rutgers transit stops with lat/long and route associations,
+    dynamically synchronized with store.transitstat.us/tripshot/rutgers.
+    """
+    transit_api_url = os.getenv("TRANSITSTATUS_API_URL") or "https://store.transitstat.us/tripshot/rutgers"
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                transit_api_url,
+                headers={"User-Agent": "Mozilla/5.0 (ScarletHop/1.0)"}
+            )
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                stations = raw_data.get("stations", {})
+                lines = raw_data.get("lines", {})
+                
+                # Build station to routes map
+                station_routes = {}
+                for l_id, l_info in lines.items():
+                    r_name = l_info.get("lineNameShort") or l_info.get("lineNameLong")
+                    for sid in l_info.get("stations", []):
+                        station_routes.setdefault(sid, []).append(r_name)
+
+                live_stops = {}
+                for sid, s in stations.items():
+                    lat = s.get("lat")
+                    lon = s.get("lon")
+                    # Filter New Brunswick bounding box
+                    if lat and lon and 40.46 <= lat <= 40.56 and -74.50 <= lon <= -74.40:
+                        name = s.get("stationName") or f"Stop {sid}"
+                        campus = "College Ave"
+                        name_l = name.lower()
+                        if any(k in name_l for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin", "rodkin"]):
+                            campus = "Busch"
+                        elif any(k in name_l for k in ["livingston", "plaza", "quad", "arena"]):
+                            campus = "Livingston"
+                        elif any(k in name_l for k in ["college hall", "gibbons"]):
+                            campus = "Douglass"
+                        elif any(k in name_l for k in ["red oak", "lipman", "biel", "henderson", "cook"]):
+                            campus = "Cook"
+                        elif lat > 40.51:
+                            campus = "Livingston" if lon > -74.45 else "Busch"
+                        elif lat < 40.49:
+                            campus = "Cook"
+
+                        routes = station_routes.get(sid, [])
+                        live_stops[name] = {
+                            "id": sid,
+                            "campus": campus,
+                            "coords": [lat, lon],
+                            "routes": routes
+                        }
+                if live_stops:
+                    return live_stops
+    except Exception:
+        pass
     return CAMPUS_STOPS
 
 @app.get("/api/buildings")
@@ -90,19 +149,57 @@ async def get_live_telemetry(route: Optional[str] = None):
                         if route.upper() not in route_display.upper() and route.upper() not in line_short.upper():
                             continue
 
-                    # Calculate arrival ETA to next stop
+                    # Calculate real upcoming ETA and next stop from future predictions
                     predictions = t.get("predictions", [])
                     next_stop_name = "En Route"
-                    eta_mins = 5 # default fallback if no predictions
+                    eta_mins = 4
+                    dest_display = line_long or "Campus Route"
 
-                    if predictions and isinstance(predictions, list):
-                        first_pred = predictions[0]
+                    future_preds = [
+                        p for p in predictions
+                        if isinstance(p, dict) and p.get("actualETA") and p.get("actualETA") >= (now_ms - 30000)
+                    ] if isinstance(predictions, list) else []
+
+                    def get_stop_campus_name(s_name: str) -> str:
+                        sn = s_name.lower()
+                        if any(k in sn for k in ["livingston", "plaza", "quad", "rbs"]):
+                            return "Livingston"
+                        if any(k in sn for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin"]):
+                            return "Busch"
+                        if any(k in sn for k in ["cook", "doug", "red oak", "lipman", "biel", "henderson", "gibbons", "college hall"]):
+                            return "Cook / Douglass"
+                        if any(k in sn for k in ["college ave", "yard", "scott", "student center", "activities center", "socam"]):
+                            return "College Ave"
+                        return ""
+
+                    if future_preds:
+                        first_pred = future_preds[0]
                         next_stop_name = first_pred.get("stationName", "Next Stop")
                         actual_eta = first_pred.get("actualETA")
                         if actual_eta:
                             eta_mins = max(1, round((actual_eta - now_ms) / 60000))
+                        
+                        # Find upcoming target terminal or campus destination
+                        target_pred = future_preds[min(len(future_preds) - 1, 4)]
+                        target_stop = target_pred.get("stationName", "")
+                        campus_tag = get_stop_campus_name(target_stop)
+                        if campus_tag:
+                            dest_display = f"{campus_tag} ({target_stop})"
+                        elif target_stop:
+                            dest_display = target_stop
                     elif t.get("destStation"):
                         next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
+
+                    # Extract upcoming stops itinerary
+                    upcoming_stops = []
+                    if future_preds:
+                        for p in future_preds[:5]:
+                            st = p.get("stationName")
+                            if st and not any(u["station"] == st for u in upcoming_stops):
+                                upcoming_stops.append({
+                                    "station": st,
+                                    "eta_mins": max(1, round((p.get("actualETA") - now_ms) / 60000))
+                                })
 
                     # Occupancy
                     extra = t.get("extra", {}) or {}
@@ -123,17 +220,20 @@ async def get_live_telemetry(route: Optional[str] = None):
                         else:
                             bus_campus = "College Ave"
 
+                    calc_speed = round(t.get("speed")) if t.get("speed") is not None else (16 + (int(str(tid)[-1:]) % 8))
+
                     live_buses.append({
                         "id": str(t.get("runNumber") or tid),
                         "route": route_display,
-                        "destination": line_long or "Campus Route",
+                        "destination": dest_display,
                         "lat": lat,
                         "lon": lon,
                         "campus": bus_campus,
-                        "speed_mph": round(t.get("speed") or 18),
+                        "speed_mph": calc_speed,
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
-                        "next_stop": next_stop_name
+                        "next_stop": next_stop_name,
+                        "upcoming_stops": upcoming_stops
                     })
 
                 return {
@@ -246,67 +346,118 @@ async def copilot_chat(req: ChatQueryRequest):
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
-    # Check if origin and destination are identical
-    if plan.origin_campus == plan.destination_campus:
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": "Campus Walk / Internal Loop",
-            "alternative_routes": [],
-            "base_minutes": 5,
-            "rush_hour_minutes": 8,
-            "advice": f"You are already on {plan.origin_campus}! A direct 5-8 minute walk or local stop hopper is faster than waiting for an inter-campus bus."
-        }
-
-    weekend = datetime.now().weekday() >= 5
-    if weekend:
-        # On weekends, choose between Weekend 1 and Weekend 2 based on direction
-        # Weekend 1: College Ave -> Busch -> Livingston -> Cook/Douglass -> College Ave
-        # Weekend 2: College Ave -> Cook/Douglass -> Livingston -> Busch -> College Ave
-        if (plan.origin_campus == "College Ave" and plan.destination_campus in ["Busch", "Livingston"]) or \
-           (plan.origin_campus == "Busch" and plan.destination_campus == "Livingston") or \
-           (plan.origin_campus == "Livingston" and plan.destination_campus == "Cook"):
-            best_route = "Weekend 1"
-            alt_route = "Weekend 2"
-            eta = 14
-        else:
-            best_route = "Weekend 2"
-            alt_route = "Weekend 1"
-            eta = 16
-
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": best_route,
-            "alternative_routes": [alt_route],
-            "base_minutes": eta,
-            "rush_hour_minutes": eta + 3,
-            "advice": f"Take {best_route} for the fastest direct loop from {plan.origin_campus} to {plan.destination_campus}. ({alt_route} also circles here if it arrives first)."
-        }
-
-    pair = (plan.origin_campus, plan.destination_campus)
-    matrix_entry = TRANSIT_MATRIX.get(pair)
-    if not matrix_entry:
-        return {
-            "origin": plan.origin_campus,
-            "destination": plan.destination_campus,
-            "primary_route": "Transfer via College Ave (Scott Hall)",
-            "alternative_routes": [],
-            "base_minutes": 25,
-            "rush_hour_minutes": 32,
-            "advice": "No direct single bus line between these two campuses. Board a connecting bus to College Ave (Scott Hall / The Yard) and transfer."
-        }
+    routes = get_commute_routes(plan.origin_campus, plan.destination_campus, plan.target_arrival_time)
     
-    routes = matrix_entry["routes"]
-    primary = routes[0]
-    alts = routes[1:] if len(routes) > 1 else []
-
+    primary = routes[0]["name"] if routes else "Direct Route"
+    alts = [r["name"] for r in routes[1:]] if len(routes) > 1 else []
+    base_mins = routes[0]["estimated_minutes"] if routes else 10
+    rush_mins = routes[0]["rush_hour_minutes"] if routes else 15
+    
     return {
         "origin": plan.origin_campus,
         "destination": plan.destination_campus,
+        "routes": routes,
         "primary_route": primary,
         "alternative_routes": alts,
-        "base_minutes": matrix_entry["base_minutes"],
-        "rush_hour_minutes": matrix_entry["peak_minutes"],
-        "advice": f"Take the {primary} bus from {plan.origin_campus} to {plan.destination_campus}. " + (f"Alternative: {', '.join(alts)}. " if alts else "") + f"Allow ~{matrix_entry['peak_minutes']} mins during peak transitions."
+        "base_minutes": base_mins,
+        "rush_hour_minutes": rush_mins,
+        "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
+
+SPEED_OPTIONS = ["Mosey", "Wander", "Stroll", "Dash", "Zoom"]
+DISTANCE_OPTIONS = ["Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "A Mile or More"]
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    walking_speed: str
+    prefer_walking: bool
+    max_walking_distance: str
+    avoid_bad_weather: bool
+
+@app.post("/api/signup")
+def signup(req: SignupRequest):
+    username = req.username.strip().lower()
+
+    if username == "":
+        raise HTTPException(status_code=400, detail="Username can't be empty.")
+    if len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
+    if req.password.strip() == "":
+        raise HTTPException(status_code=400, detail="Password can't be empty.")
+    if req.walking_speed not in SPEED_OPTIONS:
+        raise HTTPException(status_code=400, detail="Invalid walking speed.")
+    if req.max_walking_distance not in DISTANCE_OPTIONS:
+        raise HTTPException(status_code=400, detail="Invalid walking distance.")
+
+    users = load_users()
+
+    if username in users:
+        raise HTTPException(status_code=409, detail="Username already in use.")
+
+    hashed_password = hashlib.sha256(req.password.strip().encode()).hexdigest()
+
+    users[username] = {
+        "password": hashed_password,
+        "walking_speed": req.walking_speed,
+        "prefer_walking": req.prefer_walking,
+        "max_walking_distance": req.max_walking_distance,
+        "avoid_bad_weather": req.avoid_bad_weather,
+    }
+    save_users(users)
+
+    return {"status": "success", "username": username}
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    username = req.username.strip().lower()
+    users = load_users()
+
+    if username not in users:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    hashed_password = hashlib.sha256(req.password.strip().encode()).hexdigest()
+
+    if users[username]["password"] != hashed_password:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    return {"status": "success", "username": username}
+
+#endpoint: POST /api/schedule/upload
+#   receives: a file AND a username
+@app.post("/api/schedule/upload")
+async def upload_schedule(file: UploadFile = File(...), username: str = Form(...))
+#   1. Clean the username (same cleanup you do in signup and login)
+    username = username.strip().lower()
+#   2. Load all users from the file
+#      If the username is not one of them:
+#          stop and send back a "user not found" error
+    if username not in load_users:
+        raise HTTPException(status_code= 404, detail = "User not Found.")
+    contents = await file.read()
+    # 3. Read the uploaded file's contents
+    filename = (file.filename or "").lower()
+    content_type = (file.content_type or "").lower()
+#   4. Decide which scanner to use:
+#      If it's an .ics file:
+#          run the .ics scanner
+#          (if that crashes, send back an error with empty classes)
+    if filenames.endwith(".ics") or "calander" in conent_type:
+
+#      Otherwise:
+    else:
+        result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
+#   5. Look at the scanner's result:
+#      If its status says it worked:
+        if results.get("status") == "success" :
+            #load the users AGAIN (fresh copy)
+            users = load_users
+            #put the result's classes list inside that user's data
+            users[username]["classes"] = result["classes"]
+            #save all users back to the file
+            save_users(users)
+#   6. Send the scanner's result back to the website
+    return results
