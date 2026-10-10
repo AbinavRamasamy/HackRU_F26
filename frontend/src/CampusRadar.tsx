@@ -33,9 +33,22 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
     { name: "Cook / Douglass", desc: "College Hall, Red Oak Lane, Biel Rd", color: "#10b981" }
   ];
 
-  const filteredBuses = selectedRoute === "ALL" 
-    ? buses 
-    : buses.filter(b => b.route === selectedRoute);
+  // Filter by both route and selected campus
+  const filteredBuses = buses.filter(b => {
+    // Route filter
+    if (selectedRoute !== "ALL" && b.route !== selectedRoute) {
+      return false;
+    }
+    // Campus filter (if a campus card is selected)
+    if (selectedCampus && selectedCampus !== "ALL") {
+      const bCampus = (b as any).campus || "";
+      const bStop = b.next_stop || "";
+      const match = bCampus.toLowerCase().includes(selectedCampus.toLowerCase().slice(0, 4)) ||
+                    bStop.toLowerCase().includes(selectedCampus.toLowerCase().slice(0, 4));
+      if (!match) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="glass-panel" style={{ padding: '28px', marginTop: '32px' }}>
@@ -50,8 +63,28 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
             <Compass size={22} />
           </div>
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Live Rutgers Transit Radar</h3>
-            <p style={{ fontSize: '12px', color: '#9ca3af' }}>Active vehicle positions & campus stop telemetry</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Live Rutgers Transit Radar</h3>
+              {selectedCampus && selectedCampus !== "ALL" && (
+                <button
+                  onClick={() => onSelectCampus("ALL")}
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: 'rgba(204, 0, 51, 0.2)',
+                    color: '#ff4d6d',
+                    border: '1px solid rgba(204, 0, 51, 0.4)',
+                    fontWeight: 700
+                  }}
+                >
+                  Filtered: {selectedCampus} ✕
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize: '12px', color: '#9ca3af' }}>
+              Click any campus card below to isolate buses operating on that campus
+            </p>
           </div>
         </div>
 
