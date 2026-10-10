@@ -284,34 +284,34 @@ export function App() {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '24px 20px', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '16px 20px', minHeight: '100vh' }}>
       {/* Top Navbar */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '28px',
+        marginBottom: '14px',
         position: 'relative'
       }}>
         {/* 1. Logo (Top Left) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 0', justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 0', justifyContent: 'flex-start' }}>
           <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '12px',
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
             background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(204, 0, 51, 0.4)'
+            boxShadow: '0 4px 12px rgba(204, 0, 51, 0.35)'
           }}>
-            <Bus size={24} color="#fff" />
+            <Bus size={20} color="#fff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px', color: '#fff', margin: 0 }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.5px', color: '#fff', margin: 0 }}>
               Scarlet<span style={{ color: '#ff3366' }}>Hop</span>
             </h1>
-            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Predictive Rutgers Transit Copilot</p>
+            <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Predictive Rutgers Transit Copilot</p>
           </div>
         </div>
 
@@ -323,20 +323,20 @@ export function App() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              padding: '8px 20px',
-              borderRadius: '24px',
+              gap: '6px',
+              fontSize: '12px',
+              padding: '6px 16px',
+              borderRadius: '20px',
               background: showWidgetOverlay ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
               border: showWidgetOverlay ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
               color: '#f3f4f6',
               fontWeight: 600,
               cursor: 'pointer',
-              boxShadow: showWidgetOverlay ? '0 0 16px rgba(255, 255, 255, 0.15)' : 'none',
+              boxShadow: showWidgetOverlay ? '0 0 14px rgba(255, 255, 255, 0.12)' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
-            <Code size={15} color="#ff4d6d" />
+            <Code size={13} color="#ff4d6d" />
             Transit Widget
           </button>
 
@@ -355,10 +355,10 @@ export function App() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '8px',
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: '20px',
+              gap: '6px',
+              fontSize: '11px',
+              padding: '6px 12px',
+              borderRadius: '16px',
               background: 'rgba(16, 185, 129, 0.12)',
               border: '1px solid rgba(16, 185, 129, 0.3)',
               color: '#34d399',
@@ -366,11 +366,11 @@ export function App() {
             }}
           >
             <span style={{
-              width: '7px',
-              height: '7px',
+              width: '6px',
+              height: '6px',
               borderRadius: '50%',
               background: '#34d399',
-              boxShadow: '0 0 8px #34d399'
+              boxShadow: '0 0 6px #34d399'
             }} />
             Transitstat.us (TripShot Live)
           </div>
@@ -378,109 +378,89 @@ export function App() {
       </header>
 
       {/* Main Dashboard Overhauled Grid */}
-      <div className="main-dashboard-grid">
+      <div className="main-dashboard-grid" style={{ gap: '16px', marginBottom: '16px' }}>
         {/* Left Column: 4. Schedule Widget (Top) + Planner (Middle-Bottom Left) */}
-        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Card 1: Course Schedule Ingestion */}
-          <div className="glass-panel" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={20} color="#ff3366" />
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Your Schedule</h3>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                onClick={handleGetToNextClass}
-                title="Calculate best transit route to your next upcoming class"
-                style={{
+          <div className="glass-panel" style={{ padding: '16px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={18} color="#ff3366" />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Your Schedule</h3>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleGetToNextClass}
+                  title="Calculate best transit route to your next upcoming class"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
+                    border: '1px solid rgba(255, 51, 102, 0.4)',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(204, 0, 51, 0.3)'
+                  }}
+                >
+                  <Navigation size={12} color="#fff" />
+                  Get to Next Class
+                </button>
+
+                <label style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
-                  border: '1px solid rgba(255, 51, 102, 0.4)',
-                  color: '#fff',
-                  fontSize: '12px',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  background: 'rgba(204, 0, 51, 0.15)',
+                  border: '1px solid rgba(204, 0, 51, 0.4)',
+                  color: '#ff4d6d',
+                  fontSize: '11px',
                   fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(204, 0, 51, 0.35)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Navigation size={13} color="#fff" />
-                Get to Next Class
-              </button>
-
-              <label style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                background: 'rgba(204, 0, 51, 0.15)',
-                border: '1px solid rgba(204, 0, 51, 0.4)',
-                color: '#ff4d6d',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}>
-                <Upload size={14} />
-                {uploading ? "Importing..." : "Upload (.ics / Image)"}
-                <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-              </label>
+                  cursor: 'pointer'
+                }}>
+                  <Upload size={12} />
+                  {uploading ? "Importing..." : "Upload (.ics / Image)"}
+                  <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
             </div>
-          </div>
 
-          {classes.length === 0 ? (
-            <div style={{
-              padding: '36px 20px',
-              borderRadius: '12px',
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px dashed rgba(255, 255, 255, 0.12)',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
+            {classes.length === 0 ? (
               <div style={{
-                width: '46px',
-                height: '46px',
-                borderRadius: '50%',
-                background: 'rgba(204, 0, 51, 0.12)',
+                padding: '12px 14px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px dashed rgba(255, 255, 255, 0.12)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                gap: '12px'
               }}>
-                <Calendar size={22} color="#ff3366" />
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'rgba(204, 0, 51, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Calendar size={16} color="#ff3366" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>No Schedule Loaded</div>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: 1.3 }}>
+                    Upload an <strong>.ics calendar</strong> or <strong>screenshot</strong> to auto-route between classes.
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>
-                No Schedule Loaded
-              </div>
-              <div style={{ fontSize: '13px', color: '#9ca3af', maxWidth: '350px', lineHeight: 1.5 }}>
-                Upload an <strong>.ics calendar file</strong> (from Canvas/WebReg) or a <strong>schedule screenshot</strong>. ScarletHop groups your weekly meetings, extracts classroom locations, and orders them by date and time.
-              </div>
-              <label style={{
-                marginTop: '4px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 18px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #cc0033 0%, #990026 100%)',
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(204, 0, 51, 0.3)'
-              }}>
-                <Upload size={15} />
-                {uploading ? "Importing Schedule..." : "Upload Schedule (.ics or Image)"}
-                <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-              </label>
-            </div>
-          ) : (
+            ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {/* Day Filter Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
@@ -561,16 +541,16 @@ export function App() {
         </div>
 
         {/* Card 2: Inter-Campus Transit Routing */}
-        <div id="commute-planner-section" className="glass-panel" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-            <Zap size={20} color="#ff3366" />
-            <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Inter-Campus Commute Planner</h3>
+        <div id="commute-planner-section" className="glass-panel" style={{ padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <Zap size={18} color="#ff3366" />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Inter-Campus Commute Planner</h3>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <label style={{ fontSize: '12px', color: '#9ca3af' }}>Origin Campus</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', color: '#9ca3af' }}>Origin Campus</label>
                 {geoStatus === "granted" ? (
                   <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
@@ -583,16 +563,16 @@ export function App() {
                       background: 'none',
                       border: 'none',
                       color: '#ff4d6d',
-                      fontSize: '11px',
+                      fontSize: '10px',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '3px',
                       padding: 0
                     }}
                   >
-                    <LocateFixed size={11} /> Use My Location
+                    <LocateFixed size={10} /> Use My Location
                   </button>
                 )}
               </div>
@@ -601,12 +581,12 @@ export function App() {
                 onChange={(e) => setOriginCampus(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   color: '#fff',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   outline: 'none'
                 }}
               >
@@ -618,18 +598,18 @@ export function App() {
             </div>
 
             <div>
-              <label style={{ fontSize: '12px', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>Destination Campus</label>
+              <label style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>Destination Campus</label>
               <select
                 value={destCampus}
                 onChange={(e) => setDestCampus(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                   color: '#fff',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   outline: 'none'
                 }}
               >
@@ -645,21 +625,21 @@ export function App() {
             onClick={handleCalculateRoute}
             style={{
               width: '100%',
-              padding: '12px',
+              padding: '9px 12px',
               borderRadius: '8px',
               background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
               color: '#fff',
               fontWeight: 700,
-              fontSize: '14px',
-              boxShadow: '0 4px 16px rgba(204, 0, 51, 0.35)',
+              fontSize: '13px',
+              boxShadow: '0 3px 12px rgba(204, 0, 51, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              marginBottom: '20px'
+              gap: '6px',
+              marginBottom: '10px'
             }}
           >
-            Compute Smart Route <ArrowRight size={16} />
+            Compute Smart Route <ArrowRight size={14} />
           </button>
 
           {planResult && (

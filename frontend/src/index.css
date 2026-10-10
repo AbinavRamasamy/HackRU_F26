@@ -81,8 +81,8 @@ button {
 /* Upper Dashboard 2-Column Grid (Left: Schedule & Planner, Right: Copilot) */
 .main-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(380px, 1.12fr) minmax(360px, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(340px, 1.12fr) minmax(320px, 1fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -94,7 +94,8 @@ button {
 
 /* Bottom Floating Radar Widget */
 .bottom-floating-radar-widget {
-  max-width: 1400px;
-  margin: 32px auto 0;
+  max-width: 1280px;
+  margin: 14px auto 0;
   width: 100%;
 }
+

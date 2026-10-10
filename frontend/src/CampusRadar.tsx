@@ -56,39 +56,39 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   });
 
   const floatingWidgetStyle: React.CSSProperties = isFloatingWidget ? {
-    borderRadius: '24px',
+    borderRadius: '20px',
     background: 'rgba(18, 20, 29, 0.88)',
     backdropFilter: 'blur(24px)',
     WebkitBackdropFilter: 'blur(24px)',
     border: '1px solid rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(204, 0, 51, 0.14)',
-    padding: '26px'
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(204, 0, 51, 0.12)',
+    padding: '16px 20px'
   } : {
-    padding: '24px'
+    padding: '16px 20px'
   };
 
   return (
     <div className="glass-panel" style={{ ...floatingWidgetStyle, ...style }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
             background: 'rgba(204, 0, 51, 0.2)',
-            padding: '8px',
-            borderRadius: '10px',
+            padding: '6px',
+            borderRadius: '8px',
             color: '#ff4d6d'
           }}>
-            <Compass size={22} />
+            <Compass size={18} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#fff' }}>Live Rutgers Transit Radar</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Live Rutgers Transit Radar</h3>
               {selectedCampus && selectedCampus !== "ALL" && (
                 <button
                   onClick={() => onSelectCampus("ALL")}
                   style={{
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
+                    fontSize: '10px',
+                    padding: '2px 7px',
+                    borderRadius: '10px',
                     background: 'rgba(204, 0, 51, 0.2)',
                     color: '#ff4d6d',
                     border: '1px solid rgba(204, 0, 51, 0.4)',
@@ -99,8 +99,8 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                 </button>
               )}
             </div>
-            <p style={{ fontSize: '12px', color: '#9ca3af' }}>
-              Click any campus card below to isolate buses operating on that campus
+            <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>
+              Click any campus card to isolate buses operating on that campus
             </p>
           </div>
         </div>
@@ -159,9 +159,9 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           {/* Visual Campus Corridors Graph */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px',
-        marginBottom: '24px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '10px',
+        marginBottom: '12px'
       }}>
         {campuses.map(c => {
           const isSelected = selectedCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
@@ -178,8 +178,8 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
               key={c.name}
               onClick={() => onSelectCampus(c.name)}
               style={{
-                padding: '16px',
-                borderRadius: '12px',
+                padding: '10px 12px',
+                borderRadius: '10px',
                 background: isSelected ? 'rgba(204, 0, 51, 0.15)' : 'rgba(255, 255, 255, 0.02)',
                 border: isSelected ? '1px solid rgba(204, 0, 51, 0.6)' : '1px solid rgba(255, 255, 255, 0.05)',
                 cursor: 'pointer',
@@ -187,28 +187,28 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                 position: 'relative'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{c.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{c.name}</span>
                 <span style={{
-                  fontSize: '11px',
+                  fontSize: '10px',
                   fontWeight: 700,
                   color: campusBuses.length > 0 ? c.color : '#9ca3af',
-                  padding: '2px 8px',
+                  padding: '2px 6px',
                   background: campusBuses.length > 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
-                  borderRadius: '10px'
+                  borderRadius: '8px'
                 }}>
-                  {campusBuses.length} active buses
+                  {campusBuses.length} buses
                 </span>
               </div>
-              <p style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '12px' }}>{c.desc}</p>
+              <p style={{ fontSize: '10px', color: '#9ca3af', marginBottom: '8px', lineHeight: 1.3 }}>{c.desc}</p>
               
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                 {campusBuses.length > 0 ? (
                   campusBuses.map(b => (
                     <span key={b.id} style={{
-                      fontSize: '10px',
+                      fontSize: '9px',
                       fontWeight: 800,
-                      padding: '2px 6px',
+                      padding: '2px 5px',
                       borderRadius: '4px',
                       background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
                       color: '#fff'
@@ -217,7 +217,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                     </span>
                   ))
                 ) : (
-                  <span style={{ fontSize: '10px', color: '#6b7280', fontStyle: 'italic' }}>
+                  <span style={{ fontSize: '9px', color: '#6b7280', fontStyle: 'italic' }}>
                     Circulating nearby
                   </span>
                 )}
@@ -230,37 +230,37 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
       {/* Live Fleet Tracking List */}
       <div style={{
         background: 'rgba(0,0,0,0.25)',
-        borderRadius: '12px',
-        padding: '16px',
+        borderRadius: '10px',
+        padding: '10px 12px',
         border: '1px solid rgba(255,255,255,0.04)'
       }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Navigation size={14} color="#ff3366" />
+        <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Navigation size={13} color="#ff3366" />
           <span>Active Rutgers Fleet Telemetry ({filteredBuses.length} Vehicles Tracked)</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
           {filteredBuses.map(b => (
             <div key={b.id} style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '12px 14px',
-              borderRadius: '10px',
+              padding: '8px 10px',
+              borderRadius: '8px',
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.06)',
               overflow: 'hidden'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '8px' }}>
                 <div style={{
-                  padding: '4px 8px',
-                  minWidth: '50px',
-                  height: '32px',
-                  borderRadius: '6px',
+                  padding: '3px 6px',
+                  minWidth: '44px',
+                  height: '26px',
+                  borderRadius: '5px',
                   background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
                   color: '#fff',
                   fontWeight: 800,
-                  fontSize: '11px',
+                  fontSize: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -271,7 +271,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     color: '#fff',
                     whiteSpace: 'nowrap',
@@ -281,12 +281,12 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                     To {b.destination}
                   </div>
                   <div style={{
-                    fontSize: '11px',
+                    fontSize: '10px',
                     color: '#9ca3af',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    marginTop: '2px'
+                    marginTop: '1px'
                   }}>
                     {b.next_stop} • {b.speed_mph} mph
                   </div>
@@ -294,8 +294,8 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
               </div>
 
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8' }}>{b.eta_mins} mins</div>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: b.occupancy.includes('Full') ? '#f87171' : '#34d399' }}>{b.occupancy}</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>{b.eta_mins} mins</div>
+                <div style={{ fontSize: '9px', fontWeight: 600, color: b.occupancy.includes('Full') ? '#f87171' : '#34d399' }}>{b.occupancy}</div>
               </div>
             </div>
           ))}
