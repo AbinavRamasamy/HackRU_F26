@@ -45,10 +45,10 @@ export interface TransitMapProps {
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
-  "Busch": { lat: 40.5233, lon: -74.4586, name: "Busch Campus", desc: "Busch Student Center, Hill Center, Science Bldg, ARC" },
-  "Livingston": { lat: 40.5241, lon: -74.4357, name: "Livingston Campus", desc: "Livingston Plaza, Student Center, Quads" },
-  "College Ave": { lat: 40.5028, lon: -74.4518, name: "College Avenue Campus", desc: "College Ave Student Center, The Yard, SAC, SoCam" },
-  "Cook": { lat: 40.4851, lon: -74.4376, name: "Cook / Douglass Campus", desc: "College Hall, Red Oak Lane, Biel, Gibbons" }
+  "Busch": { lat: 40.5238, lon: -74.45826, name: "Busch Campus", desc: "Busch Student Center, Hill Center, Science Bldg, ARC" },
+  "Livingston": { lat: 40.524, lon: -74.43663, name: "Livingston Campus", desc: "Livingston Plaza, Student Center, Quads" },
+  "College Ave": { lat: 40.50366, lon: -74.4524, name: "College Avenue Campus", desc: "College Ave Student Center, The Yard, SAC, SoCam" },
+  "Cook": { lat: 40.48551, lon: -74.4372, name: "Cook / Douglass Campus", desc: "College Hall, Red Oak Lane, Biel, Gibbons" }
 };
 
 // Normalized key getter

@@ -19,145 +19,208 @@ export interface LandmarkLocation {
   code?: string;
 }
 
-// Major Rutgers University Bus Stops with real GPS coordinates (Authoritative 17 stops)
+// Major Rutgers University Bus Stops with real GPS coordinates from transitstat.us/rutgers
 export const RUTGERS_BUS_STOPS: BusStop[] = [
   // College Avenue
   {
     name: "College Avenue Student Center",
     campus: "College Ave",
-    lat: 40.5028,
-    lon: -74.4518,
-    routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE"]
+    lat: 40.50366,
+    lon: -74.4524,
+    routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "EE"]
   },
   {
     name: "The Yard",
     campus: "College Ave",
-    lat: 40.5015,
-    lon: -74.4485,
-    routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE"]
+    lat: 40.49957,
+    lon: -74.44824,
+    routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE", "Knightsbridge"]
   },
   {
     name: "Student Activities Center",
     campus: "College Ave",
-    lat: 40.4990,
-    lon: -74.4445,
+    lat: 40.50391,
+    lon: -74.44882,
     routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE"]
+  },
+  {
+    name: "Student Activities Center (NB)",
+    campus: "College Ave",
+    lat: 40.50391,
+    lon: -74.44882,
+    routes: ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE"]
+  },
+  {
+    name: "Student Activities Center (SB)",
+    campus: "College Ave",
+    lat: 40.50425,
+    lon: -74.44974,
+    routes: ["Weekend 1"]
   },
   {
     name: "SoCam Apts",
     campus: "College Ave",
-    lat: 40.4918,
-    lon: -74.4436,
-    routes: ["F", "EE"]
+    lat: 40.49186,
+    lon: -74.44309,
+    routes: ["Weekend 1", "Weekend 2", "EE", "F"]
+  },
+  {
+    name: "SoCam Apts (NB)",
+    campus: "College Ave",
+    lat: 40.49224,
+    lon: -74.44267,
+    routes: ["Weekend 1", "EE"]
+  },
+  {
+    name: "SoCam Apts (SB)",
+    campus: "College Ave",
+    lat: 40.49186,
+    lon: -74.44309,
+    routes: ["Weekend 2", "EE"]
   },
 
   // Busch
   {
     name: "Busch Student Center",
     campus: "Busch",
-    lat: 40.5233,
-    lon: -74.4586,
-    routes: ["Weekend 1", "Weekend 2", "A", "B", "H", "REXB"]
+    lat: 40.5238,
+    lon: -74.45826,
+    routes: ["Weekend 1", "Weekend 2", "A", "B", "BL", "H"]
   },
   {
     name: "Hill Center",
     campus: "Busch",
-    lat: 40.5218,
-    lon: -74.4626,
-    routes: ["Weekend 1", "Weekend 2", "A", "B", "H", "REXB"]
+    lat: 40.52192,
+    lon: -74.4633,
+    routes: ["Weekend 1", "Weekend 2", "A", "B", "BL", "C", "H", "REXB"]
+  },
+  {
+    name: "Hill Center (NB)",
+    campus: "Busch",
+    lat: 40.52192,
+    lon: -74.4633,
+    routes: ["Weekend 1", "A", "B", "BL", "C", "REXB"]
+  },
+  {
+    name: "Hill Center (SB)",
+    campus: "Busch",
+    lat: 40.52193,
+    lon: -74.46331,
+    routes: ["Weekend 2", "C", "H", "REXB"]
   },
   {
     name: "Science Building",
     campus: "Busch",
-    lat: 40.5230,
-    lon: -74.4635,
-    routes: ["A", "B", "H", "REXB"]
+    lat: 40.52394,
+    lon: -74.46422,
+    routes: ["Weekend 1", "A", "BL"]
   },
   {
     name: "Allison Road Classrooms",
     campus: "Busch",
-    lat: 40.5242,
-    lon: -74.4646,
-    routes: ["Weekend 1", "Weekend 2", "A", "B", "H", "REXB"]
+    lat: 40.52356,
+    lon: -74.46519,
+    routes: ["Weekend 2", "B", "C", "H", "REXB"]
+  },
+  {
+    name: "Stadium West Lot",
+    campus: "Busch",
+    lat: 40.51456,
+    lon: -74.46615,
+    routes: ["A", "BL", "C", "H"]
+  },
+  {
+    name: "Werblin Recreation Center",
+    campus: "Busch",
+    lat: 40.51864,
+    lon: -74.45985,
+    routes: ["A", "H"]
   },
 
   // Livingston
   {
     name: "Livingston Plaza",
     campus: "Livingston",
-    lat: 40.5273,
-    lon: -74.4398,
+    lat: 40.52511,
+    lon: -74.43858,
     routes: ["Weekend 1", "Weekend 2", "B", "LX", "REXL"]
   },
   {
     name: "Livingston Student Center",
     campus: "Livingston",
-    lat: 40.5241,
-    lon: -74.4357,
-    routes: ["Weekend 1", "Weekend 2", "B", "LX", "REXL"]
+    lat: 40.524,
+    lon: -74.43663,
+    routes: ["Weekend 1", "Weekend 2", "B", "BL", "LX", "REXL"]
   },
   {
     name: "Quads",
     campus: "Livingston",
-    lat: 40.5214,
-    lon: -74.4348,
-    routes: ["B", "LX"]
+    lat: 40.51986,
+    lon: -74.43357,
+    routes: ["Weekend 1", "Weekend 2", "B", "BL", "LX"]
+  },
+  {
+    name: "Jersey Mike's Arena",
+    campus: "Livingston",
+    lat: 40.52435,
+    lon: -74.44064,
+    routes: ["BL"]
   },
 
   // Cook / Douglass
   {
     name: "College Hall",
     campus: "Douglass",
-    lat: 40.4851,
-    lon: -74.4376,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE", "REXB", "REXL"]
+    lat: 40.48551,
+    lon: -74.4372,
+    routes: ["Weekend 1", "Weekend 2", "EE", "F", "REXB", "REXL"]
   },
   {
     name: "Red Oak Lane",
     campus: "Cook",
-    lat: 40.4815,
-    lon: -74.4348,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE", "REXB", "REXL"]
+    lat: 40.48299,
+    lon: -74.43753,
+    routes: ["Weekend 1", "Weekend 2", "EE", "F", "REXB", "REXL"]
   },
   {
     name: "Lipman Hall",
     campus: "Cook",
-    lat: 40.4835,
-    lon: -74.4365,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE"]
+    lat: 40.48129,
+    lon: -74.43627,
+    routes: ["Weekend 1", "Weekend 2", "EE", "F", "REXB", "REXL"]
   },
   {
     name: "Biel Road",
     campus: "Cook",
-    lat: 40.4802,
-    lon: -74.4312,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE", "REXB", "REXL"]
+    lat: 40.48,
+    lon: -74.43252,
+    routes: ["Weekend 1", "Weekend 2", "EE"]
   },
   {
     name: "Henderson",
     campus: "Cook",
-    lat: 40.4780,
-    lon: -74.4360,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE"]
+    lat: 40.48095,
+    lon: -74.42872,
+    routes: ["Weekend 1", "Weekend 2", "EE"]
   },
   {
     name: "Gibbons",
     campus: "Douglass",
-    lat: 40.4770,
-    lon: -74.4370,
-    routes: ["Weekend 1", "Weekend 2", "F", "EE"]
+    lat: 40.48523,
+    lon: -74.43194,
+    routes: ["Weekend 1", "Weekend 2", "EE"]
   }
 ];
 
-// Campus Buildings with exact GPS coordinates
+// Campus Buildings with exact GPS coordinates (mapped with transitstat.us authoritative coordinates)
 export const RUTGERS_BUILDINGS: LandmarkLocation[] = [
   // College Ave
-  { name: "College Avenue Student Center", code: "CASC", campus: "College Ave", lat: 40.5028, lon: -74.4518 },
-  { name: "College Ave Student Center", code: "CASC", campus: "College Ave", lat: 40.5028, lon: -74.4518 },
-  { name: "The Yard", code: "YARD", campus: "College Ave", lat: 40.5015, lon: -74.4485 },
-  { name: "Academic Building", code: "AB", campus: "College Ave", lat: 40.5015, lon: -74.4485 },
-  { name: "Student Activities Center", code: "SAC", campus: "College Ave", lat: 40.4990, lon: -74.4445 },
-  { name: "SoCam Apts", code: "SOCAM", campus: "College Ave", lat: 40.4918, lon: -74.4436 },
+  { name: "College Avenue Student Center", code: "CASC", campus: "College Ave", lat: 40.50366, lon: -74.4524 },
+  { name: "College Ave Student Center", code: "CASC", campus: "College Ave", lat: 40.50366, lon: -74.4524 },
+  { name: "The Yard", code: "YARD", campus: "College Ave", lat: 40.49957, lon: -74.44824 },
+  { name: "Academic Building", code: "AB", campus: "College Ave", lat: 40.49957, lon: -74.44824 },
+  { name: "Student Activities Center", code: "SAC", campus: "College Ave", lat: 40.50391, lon: -74.44882 },
+  { name: "SoCam Apts", code: "SOCAM", campus: "College Ave", lat: 40.49186, lon: -74.44309 },
   { name: "Scott Hall", code: "SCOTT", campus: "College Ave", lat: 40.4991, lon: -74.4478 },
   { name: "Murray Hall", code: "MUR", campus: "College Ave", lat: 40.4996, lon: -74.4473 },
   { name: "Voorhees Hall", code: "VWH", campus: "College Ave", lat: 40.4998, lon: -74.4468 },
@@ -165,36 +228,36 @@ export const RUTGERS_BUILDINGS: LandmarkLocation[] = [
   { name: "School of Communication and Information", code: "CI", campus: "College Ave", lat: 40.5045, lon: -74.4505 },
 
   // Busch
-  { name: "Busch Student Center", code: "BSC", campus: "Busch", lat: 40.5233, lon: -74.4586 },
-  { name: "Hill Center", code: "HILL", campus: "Busch", lat: 40.5218, lon: -74.4626 },
-  { name: "Science Building", code: "SEC", campus: "Busch", lat: 40.5230, lon: -74.4635 },
-  { name: "Allison Road Classrooms", code: "ARC", campus: "Busch", lat: 40.5242, lon: -74.4646 },
+  { name: "Busch Student Center", code: "BSC", campus: "Busch", lat: 40.5238, lon: -74.45826 },
+  { name: "Hill Center", code: "HILL", campus: "Busch", lat: 40.52192, lon: -74.4633 },
+  { name: "Science Building", code: "SEC", campus: "Busch", lat: 40.52394, lon: -74.46422 },
+  { name: "Allison Road Classrooms", code: "ARC", campus: "Busch", lat: 40.52356, lon: -74.46519 },
   { name: "Science & Engineering Resource Center", code: "SERC", campus: "Busch", lat: 40.5228, lon: -74.4638 },
   { name: "Richard Weeks Hall of Engineering", code: "WEEKS", campus: "Busch", lat: 40.5238, lon: -74.4619 },
+  { name: "Stadium West Lot", code: "STAD", campus: "Busch", lat: 40.51456, lon: -74.46615 },
+  { name: "Werblin Recreation Center", code: "WERB", campus: "Busch", lat: 40.51864, lon: -74.45985 },
 
   // Livingston
-  { name: "Livingston Plaza", code: "PLAZA", campus: "Livingston", lat: 40.5273, lon: -74.4398 },
-  { name: "Livingston Student Center", code: "LSC", campus: "Livingston", lat: 40.5241, lon: -74.4357 },
-  { name: "Rutgers Business School", code: "RBS", campus: "Livingston", lat: 40.5273, lon: -74.4398 },
+  { name: "Livingston Plaza", code: "PLAZA", campus: "Livingston", lat: 40.52511, lon: -74.43858 },
+  { name: "Livingston Student Center", code: "LSC", campus: "Livingston", lat: 40.524, lon: -74.43663 },
+  { name: "Rutgers Business School", code: "RBS", campus: "Livingston", lat: 40.52511, lon: -74.43858 },
   { name: "Tillett Hall", code: "TIL", campus: "Livingston", lat: 40.5255, lon: -74.4371 },
   { name: "Beck Hall", code: "BECK", campus: "Livingston", lat: 40.5248, lon: -74.4385 },
   { name: "Lucy Stone Hall", code: "LSH", campus: "Livingston", lat: 40.5238, lon: -74.4365 },
-  { name: "Quads", code: "QUADS", campus: "Livingston", lat: 40.5214, lon: -74.4348 },
-  { name: "Livingston Quads", code: "QUADS", campus: "Livingston", lat: 40.5214, lon: -74.4348 },
-  { name: "Quad Three Residence Hall", code: "QUAD3", campus: "Livingston", lat: 40.5214, lon: -74.4348 },
-  { name: "Quad Two Residence Hall", code: "QUAD2", campus: "Livingston", lat: 40.5214, lon: -74.4348 },
-  { name: "Quad One Residence Hall", code: "QUAD1", campus: "Livingston", lat: 40.5214, lon: -74.4348 },
+  { name: "Quads", code: "QUADS", campus: "Livingston", lat: 40.51986, lon: -74.43357 },
+  { name: "Livingston Quads", code: "QUADS", campus: "Livingston", lat: 40.51986, lon: -74.43357 },
+  { name: "Jersey Mike's Arena", code: "JMA", campus: "Livingston", lat: 40.52435, lon: -74.44064 },
   { name: "Livingston Apartments", code: "LYN", campus: "Livingston", lat: 40.5252, lon: -74.4362 },
 
   // Cook / Douglass
-  { name: "College Hall", code: "CH", campus: "Douglass", lat: 40.4851, lon: -74.4376 },
-  { name: "Red Oak Lane", code: "RO", campus: "Cook", lat: 40.4815, lon: -74.4348 },
-  { name: "Lipman Hall", code: "LIP", campus: "Cook", lat: 40.4835, lon: -74.4365 },
-  { name: "Biel Road", code: "BIEL", campus: "Cook", lat: 40.4802, lon: -74.4312 },
-  { name: "Henderson", code: "HEND", campus: "Cook", lat: 40.4780, lon: -74.4360 },
-  { name: "Gibbons", code: "GIBB", campus: "Douglass", lat: 40.4770, lon: -74.4370 },
-  { name: "Cook Student Center", code: "CSC", campus: "Cook", lat: 40.4802, lon: -74.4312 },
-  { name: "Hickman Hall", code: "HICK", campus: "Douglass", lat: 40.4851, lon: -74.4376 },
+  { name: "College Hall", code: "CH", campus: "Douglass", lat: 40.48551, lon: -74.4372 },
+  { name: "Red Oak Lane", code: "RO", campus: "Cook", lat: 40.48299, lon: -74.43753 },
+  { name: "Lipman Hall", code: "LIP", campus: "Cook", lat: 40.48129, lon: -74.43627 },
+  { name: "Biel Road", code: "BIEL", campus: "Cook", lat: 40.48, lon: -74.43252 },
+  { name: "Henderson", code: "HEND", campus: "Cook", lat: 40.48095, lon: -74.42872 },
+  { name: "Gibbons", code: "GIBB", campus: "Douglass", lat: 40.48523, lon: -74.43194 },
+  { name: "Cook Student Center", code: "CSC", campus: "Cook", lat: 40.48, lon: -74.43252 },
+  { name: "Hickman Hall", code: "HICK", campus: "Douglass", lat: 40.48551, lon: -74.4372 },
   { name: "Loree Gym", code: "LOREE", campus: "Douglass", lat: 40.4842, lon: -74.4368 },
   { name: "Food Sciences Building", code: "FOOD", campus: "Cook", lat: 40.4796, lon: -74.4287 }
 ];
@@ -256,17 +319,17 @@ export function resolveLocationCoords(
 
   // 3. Fallback to campus default transit center
   if (q.includes('bus') || fallbackCampus.toLowerCase().includes('bus')) {
-    return { lat: 40.5233, lon: -74.4586, name: "Busch Student Center", campus: "Busch" };
+    return { lat: 40.5238, lon: -74.45826, name: "Busch Student Center", campus: "Busch" };
   }
   if (q.includes('liv') || fallbackCampus.toLowerCase().includes('liv')) {
-    return { lat: 40.5241, lon: -74.4357, name: "Livingston Student Center", campus: "Livingston" };
+    return { lat: 40.524, lon: -74.43663, name: "Livingston Student Center", campus: "Livingston" };
   }
   if (q.includes('cook') || q.includes('doug') || fallbackCampus.toLowerCase().includes('cook') || fallbackCampus.toLowerCase().includes('doug')) {
-    return { lat: 40.4851, lon: -74.4376, name: "College Hall", campus: "Douglass" };
+    return { lat: 40.48551, lon: -74.4372, name: "College Hall", campus: "Douglass" };
   }
 
   // Default: College Ave Student Center on College Ave
-  return { lat: 40.5028, lon: -74.4518, name: "College Ave Student Center", campus: "College Ave" };
+  return { lat: 40.50366, lon: -74.4524, name: "College Ave Student Center", campus: "College Ave" };
 }
 
 /**
