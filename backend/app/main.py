@@ -132,6 +132,17 @@ async def get_live_telemetry(route: Optional[str] = None):
                     elif t.get("destStation"):
                         next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
 
+                    # Extract upcoming stops itinerary
+                    upcoming_stops = []
+                    if future_preds:
+                        for p in future_preds[:5]:
+                            st = p.get("stationName")
+                            if st and not any(u["station"] == st for u in upcoming_stops):
+                                upcoming_stops.append({
+                                    "station": st,
+                                    "eta_mins": max(1, round((p.get("actualETA") - now_ms) / 60000))
+                                })
+
                     # Occupancy
                     extra = t.get("extra", {}) or {}
                     load = extra.get("load")
@@ -163,7 +174,8 @@ async def get_live_telemetry(route: Optional[str] = None):
                         "speed_mph": calc_speed,
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
-                        "next_stop": next_stop_name
+                        "next_stop": next_stop_name,
+                        "upcoming_stops": upcoming_stops
                     })
 
                 return {

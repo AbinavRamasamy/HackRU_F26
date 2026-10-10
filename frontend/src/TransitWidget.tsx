@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, Sparkles, MapPin, Copy, Check } from 'lucide-react';
+import { Sparkles, MapPin, Copy, Check } from 'lucide-react';
+import { getRouteColor } from './CampusRadar';
 
 interface BusItem {
   id: string;
@@ -34,17 +35,12 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
   const [copied, setCopied] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click, ignoring clicks on the trigger button so toggling works naturally
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (overlayRef.current && overlayRef.current.contains(target)) {
-        return;
-      }
-      if (triggerRef?.current && triggerRef.current.contains(target)) {
-        return;
-      }
+      if (overlayRef.current && overlayRef.current.contains(target)) return;
+      if (triggerRef?.current && triggerRef.current.contains(target)) return;
       onClose();
     };
 
@@ -54,7 +50,6 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
     };
   }, [isOpen, onClose, triggerRef]);
 
-  // Fetch telemetry
   useEffect(() => {
     if (!isOpen) return;
 
@@ -87,7 +82,7 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
   if (!isOpen) return null;
 
   const copyEmbedCode = () => {
-    const code = `<iframe src="${window.location.origin}?widget=only" width="380" height="480" style="border:none;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.4);" title="ScarletHop Transit Widget"></iframe>`;
+    const code = `<iframe src="${window.location.origin}?widget=only" width="380" height="480" style="border:none;border-radius:18px;box-shadow:0 12px 36px rgba(0,0,0,0.4);" title="ScarletHop Transit Widget"></iframe>`;
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -98,216 +93,156 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       ref={overlayRef}
       style={{
         position: 'absolute',
-        top: 'calc(100% + 12px)',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '420px',
+        top: 'calc(100% + 10px)',
+        right: 0,
+        width: '380px',
         maxWidth: 'calc(100vw - 32px)',
         zIndex: 9999,
-        background: '#161922',
-        borderRadius: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.14)',
-        boxShadow: '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-        padding: '22px',
+        background: 'rgba(28, 28, 30, 0.94)',
+        backdropFilter: 'blur(32px) saturate(190%)',
+        WebkitBackdropFilter: 'blur(32px) saturate(190%)',
+        borderRadius: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        padding: '18px',
         animation: 'fadeIn 0.2s ease-in-out'
       }}
     >
-      {/* Upward Notch pointing directly up to the button, matching status-bar menu popovers */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '-7px',
-          left: '50%',
-          marginLeft: '-7px',
-          width: '14px',
-          height: '14px',
-          background: '#161922',
-          borderLeft: '1px solid rgba(255, 255, 255, 0.14)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.14)',
-          transform: 'rotate(45deg)',
-          zIndex: 10
-        }}
-      />
-
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{
-            background: 'rgba(204, 0, 51, 0.2)',
-            color: '#ff4d6d',
-            padding: '7px',
-            borderRadius: '10px',
+            width: '28px',
+            height: '28px',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)',
+            color: '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <Sparkles size={17} />
+            <Sparkles size={15} />
           </div>
           <div>
-            <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#f3f4f6', margin: 0 }}>Rutgers Transit Glance</h4>
-            <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 600 }}>● Live Telemetry Active</span>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+              Transit Glance
+            </h4>
+            <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 600 }}>● Live Telemetry</span>
           </div>
         </div>
       </div>
 
       {/* Departing Location Pill */}
       <div style={{
-        fontSize: '12px',
-        color: '#38bdf8',
-        marginBottom: '14px',
-        padding: '8px 12px',
-        background: 'rgba(56, 189, 248, 0.1)',
-        borderRadius: '8px',
+        fontSize: '11.5px',
+        color: '#fff',
+        marginBottom: '12px',
+        padding: '7px 10px',
+        background: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: '10px',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        border: '1px solid rgba(56, 189, 248, 0.2)'
+        gap: '6px',
+        border: '1px solid rgba(255, 255, 255, 0.08)'
       }}>
-        <MapPin size={14} color="#38bdf8" />
+        <MapPin size={13} color="#FF375F" />
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          Current Origin: <strong>{currentCampus}</strong>
+          Origin: <strong>{currentCampus}</strong>
         </span>
       </div>
 
       {/* Next Class Destination */}
       {nextClass && (
         <div style={{
-          background: 'rgba(255, 255, 255, 0.04)',
-          borderRadius: '10px',
-          padding: '14px',
-          marginBottom: '14px',
-          border: '1px solid rgba(255, 255, 255, 0.06)'
+          background: 'rgba(255, 55, 95, 0.08)',
+          borderRadius: '12px',
+          padding: '10px 12px',
+          marginBottom: '12px',
+          border: '1px solid rgba(255, 55, 95, 0.25)'
         }}>
-          <div style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
+          <div style={{ fontSize: '10px', color: '#FF375F', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 700 }}>
             Next Destination
           </div>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', marginTop: '2px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '1px' }}>
             {nextClass.course}
           </div>
-          <div style={{ fontSize: '12px', color: '#d1d5db', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}>
-            <MapPin size={12} color="#cc0033" />
+          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.65)', marginTop: '2px' }}>
             {nextClass.building} ({nextClass.campus}) at {nextClass.startTime}
           </div>
         </div>
       )}
 
       {/* Incoming Buses List */}
-      <div style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        Incoming Buses ({buses.length})
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(235, 235, 245, 0.6)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+        Arriving Soon ({buses.length})
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '250px', overflowY: 'auto', paddingRight: '2px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '2px' }}>
         {buses.length === 0 ? (
-          <div style={{ fontSize: '12px', color: '#9ca3af', textAlign: 'center', padding: '16px' }}>
+          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.5)', textAlign: 'center', padding: '14px' }}>
             Syncing live arrivals...
           </div>
         ) : (
-          buses.map((bus) => {
-            const isWeekend1 = bus.route.includes('Weekend 1');
-            const isWeekend2 = bus.route.includes('Weekend 2');
-            const isLX = bus.route === 'LX';
-            const isB = bus.route === 'B';
-
-            const badgeBg = isWeekend1
-              ? '#0d9488'
-              : isWeekend2
-              ? '#10b981'
-              : isLX
-              ? '#cc0033'
-              : isB
-              ? '#2563eb'
-              : '#7c3aed';
-
-            return (
-              <div key={bus.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '11px 14px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                overflow: 'hidden'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '10px' }}>
-                  <div style={{
-                    padding: '4px 8px',
-                    minWidth: '58px',
-                    height: '28px',
-                    borderRadius: '7px',
-                    background: badgeBg,
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 800,
-                    fontSize: '11px',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#f3f4f6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      To {bus.destination}
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {bus.next_stop} • {bus.occupancy}
-                    </div>
-                  </div>
+          buses.map((bus) => (
+            <div key={bus.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 10px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.06)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
+                <div style={{
+                  padding: '3px 7px',
+                  minWidth: '40px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  background: getRouteColor(bus.route),
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '10px',
+                  flexShrink: 0
+                }}>
+                  {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#38bdf8' }}>{bus.eta_mins}m</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    To {bus.destination}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'rgba(235, 235, 245, 0.6)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {bus.next_stop} • {bus.occupancy}
+                  </div>
                 </div>
               </div>
-            );
-          })
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{bus.eta_mins}m</span>
+              </div>
+            </div>
+          ))
         )}
-      </div>
-
-      {/* Traffic Alert */}
-      <div style={{
-        marginTop: '14px',
-        fontSize: '11px',
-        color: '#fbbf24',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        background: 'rgba(245, 158, 11, 0.1)',
-        padding: '9px 12px',
-        borderRadius: '8px'
-      }}>
-        <AlertTriangle size={14} />
-        <span>Peak campus headways active. Allow +5 mins.</span>
       </div>
 
       {/* Footer Embed Code Quick Copy */}
       <div style={{
-        marginTop: '14px',
-        paddingTop: '12px',
+        marginTop: '12px',
+        paddingTop: '10px',
         borderTop: '1px solid rgba(255, 255, 255, 0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <span style={{ fontSize: '11px', color: '#9ca3af' }}>Embed in Canvas / Notion</span>
+        <span style={{ fontSize: '11px', color: 'rgba(235, 235, 245, 0.6)' }}>Embed in Canvas</span>
         <button
           onClick={copyEmbedCode}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '11px',
-            padding: '5px 12px',
-            borderRadius: '6px',
-            background: copied ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-            border: copied ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.12)',
-            color: copied ? '#34d399' : '#f3f4f6',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
+          className="apple-btn-secondary"
+          style={{ fontSize: '11px', padding: '4px 10px', gap: '4px' }}
         >
-          {copied ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
-          {copied ? 'Copied iFrame!' : 'Copy iFrame'}
+          {copied ? <Check size={11} color="#30D158" /> : <Copy size={11} />}
+          {copied ? 'Copied iFrame' : 'Copy iFrame'}
         </button>
       </div>
     </div>
