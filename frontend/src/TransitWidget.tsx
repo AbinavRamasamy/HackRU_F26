@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, Sparkles, MapPin, X, Copy, Check } from 'lucide-react';
+import { AlertTriangle, Sparkles, MapPin, Copy, Check } from 'lucide-react';
 
 interface BusItem {
   id: string;
@@ -13,6 +13,7 @@ interface BusItem {
 interface TransitWidgetOverlayProps {
   isOpen: boolean;
   onClose: () => void;
+  triggerRef?: React.RefObject<HTMLElement | null>;
   currentCampus?: string;
   nextClass?: {
     course: string;
@@ -25,6 +26,7 @@ interface TransitWidgetOverlayProps {
 export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
   isOpen,
   onClose,
+  triggerRef,
   currentCampus = "Busch Student Center",
   nextClass
 }) => {
@@ -32,24 +34,25 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
   const [copied, setCopied] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click, ignoring clicks on the trigger button so toggling works naturally
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        onClose();
+      const target = e.target as Node;
+      if (overlayRef.current && overlayRef.current.contains(target)) {
+        return;
       }
+      if (triggerRef?.current && triggerRef.current.contains(target)) {
+        return;
+      }
+      onClose();
     };
-    // Delay slightly to prevent the toggle button click from triggering close immediately
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 50);
 
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, triggerRef]);
 
   // Fetch telemetry
   useEffect(() => {
@@ -143,25 +146,6 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
             <span style={{ fontSize: '10px', color: '#34d399', fontWeight: 600 }}>● Live Telemetry Active</span>
           </div>
         </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: 'none',
-            color: '#9ca3af',
-            width: '26px',
-            height: '26px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'background 0.2s ease'
-          }}
-        >
-          <X size={14} />
-        </button>
       </div>
 
       {/* Departing Location Pill */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation, LocateFixed, RefreshCw } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
@@ -46,6 +46,7 @@ export function App() {
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [showWidgetOverlay, setShowWidgetOverlay] = useState(false);
+  const widgetTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
 
   const requestLocationPermission = (isManual = false) => {
@@ -401,6 +402,7 @@ export function App() {
 
           <div style={{ position: 'relative' }}>
             <button
+              ref={widgetTriggerRef}
               onClick={() => setShowWidgetOverlay(prev => !prev)}
               style={{
                 display: 'inline-flex',
@@ -425,6 +427,7 @@ export function App() {
             <TransitWidget 
               isOpen={showWidgetOverlay}
               onClose={() => setShowWidgetOverlay(false)}
+              triggerRef={widgetTriggerRef}
               currentCampus={currentLocation}
               nextClass={classes[0]}
             />
