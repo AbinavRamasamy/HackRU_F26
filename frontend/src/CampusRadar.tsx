@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigation, Compass, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface BusLocation {
@@ -21,6 +21,54 @@ interface CampusRadarProps {
   isFloatingWidget?: boolean;
 }
 
+// Complete Rutgers New Brunswick Bus Fleet
+export const ALL_RUTGERS_ROUTES = [
+  "Weekend 1",
+  "Weekend 2",
+  "LX",
+  "B",
+  "A",
+  "H",
+  "F",
+  "EE",
+  "REXB",
+  "REXL",
+  "C"
+];
+
+// Mapping of which bus routes serve which campus
+export const CAMPUS_SERVICED_ROUTES: Record<string, string[]> = {
+  "College Ave": ["Weekend 1", "Weekend 2", "LX", "A", "H", "F", "EE"],
+  "Livingston": ["Weekend 1", "Weekend 2", "LX", "B", "REXL"],
+  "Busch": ["Weekend 1", "Weekend 2", "B", "A", "H", "REXB", "C"],
+  "Cook / Douglass": ["Weekend 1", "Weekend 2", "F", "EE", "REXB", "REXL"]
+};
+
+export const getRoutesForCampus = (campus: string): string[] => {
+  if (!campus || campus === "ALL") return ALL_RUTGERS_ROUTES;
+  const c = campus.toLowerCase();
+  if (c.includes("col")) return CAMPUS_SERVICED_ROUTES["College Ave"];
+  if (c.includes("liv")) return CAMPUS_SERVICED_ROUTES["Livingston"];
+  if (c.includes("bus")) return CAMPUS_SERVICED_ROUTES["Busch"];
+  if (c.includes("cook") || c.includes("doug")) return CAMPUS_SERVICED_ROUTES["Cook / Douglass"];
+  return ALL_RUTGERS_ROUTES;
+};
+
+export const getRouteColor = (route: string) => {
+  if (route.includes("Weekend 1")) return "#0d9488";
+  if (route.includes("Weekend 2")) return "#059669";
+  if (route === "LX") return "#ff5722";
+  if (route === "B") return "#3b82f6";
+  if (route === "A") return "#ef4444";
+  if (route === "H") return "#f59e0b";
+  if (route === "F") return "#8b5cf6";
+  if (route === "EE") return "#ec4899";
+  if (route === "REXB") return "#0284c7";
+  if (route === "REXL") return "#10b981";
+  if (route === "C") return "#64748b";
+  return "#6366f1";
+};
+
 export const CampusRadar: React.FC<CampusRadarProps> = ({
   buses,
   selectedCampus,
@@ -31,6 +79,16 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
   const [minimized, setMinimized] = useState(false);
 
+  // Available route pills dynamically based on selected campus filter
+  const availableRoutes = ["ALL", ...getRoutesForCampus(selectedCampus)];
+
+  // Reset selectedRoute if currently selected route is not valid for newly filtered campus
+  useEffect(() => {
+    if (selectedRoute !== "ALL" && !availableRoutes.includes(selectedRoute)) {
+      setSelectedRoute("ALL");
+    }
+  }, [selectedCampus]);
+
   const campuses = [
     { name: "College Ave", desc: "The Yard, Scott Hall, Student Center", color: "#cc0033" },
     { name: "Livingston", desc: "LSC, Plaza, Quads, RBS", color: "#ff5722" },
@@ -40,17 +98,16 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
 
   // Filter by both route and selected campus
   const filteredBuses = buses.filter(b => {
-    // Route filter
+    // Route filter pill
     if (selectedRoute !== "ALL" && b.route !== selectedRoute) {
       return false;
     }
-    // Campus filter (if a campus card is selected)
+    // Campus filter: only show buses whose route serves this campus
     if (selectedCampus && selectedCampus !== "ALL") {
-      const bCampus = (b as any).campus || "";
-      const bStop = b.next_stop || "";
-      const match = bCampus.toLowerCase().includes(selectedCampus.toLowerCase().slice(0, 4)) ||
-                    bStop.toLowerCase().includes(selectedCampus.toLowerCase().slice(0, 4));
-      if (!match) return false;
+      const allowedRoutes = getRoutesForCampus(selectedCampus);
+      if (!allowedRoutes.includes(b.route)) {
+        return false;
+      }
     }
     return true;
   });
@@ -105,9 +162,9 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           </div>
         </div>
 
-        {/* Route Filter Pills & Minimize Toggle */}
+        {/* Route Filter Pills (Dynamically filtered by selected campus) & Minimize Toggle */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {["ALL", "Weekend 1", "Weekend 2", "LX", "B", "A", "H", "F", "EE", "REXB"].map(route => (
+          {availableRoutes.map(route => (
             <button
               key={route}
               onClick={() => setSelectedRoute(route)}
@@ -165,12 +222,15 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
       }}>
         {campuses.map(c => {
           const isSelected = selectedCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
-          // Filter buses that are either tagged with this campus or have next stop on this campus
+          const allowedRoutes = getRoutesForCampus(c.name);
+          // Only show buses whose route serves this campus
           const campusBuses = buses.filter(b => {
+            if (!allowedRoutes.includes(b.route)) return false;
             const bCampus = (b as any).campus || "";
             const bStop = b.next_stop || "";
             return bCampus.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)) ||
-                   bStop.toLowerCase().includes(c.name.toLowerCase().slice(0, 4));
+                   bStop.toLowerCase().includes(c.name.toLowerCase().slice(0, 4)) ||
+                   allowedRoutes.includes(b.route);
           });
 
           return (
@@ -210,7 +270,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                       fontWeight: 800,
                       padding: '2px 5px',
                       borderRadius: '4px',
-                      background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
+                      background: getRouteColor(b.route),
                       color: '#fff'
                     }}>
                       {b.route === 'Weekend 1' ? 'WKND 1' : b.route === 'Weekend 2' ? 'WKND 2' : b.route} ({b.eta_mins}m)
@@ -264,7 +324,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
                   minWidth: '44px',
                   height: '26px',
                   borderRadius: '5px',
-                  background: b.route.includes('Weekend 1') ? '#0d9488' : b.route.includes('Weekend 2') ? '#10b981' : b.route === 'LX' ? '#ff5722' : b.route === 'B' ? '#3b82f6' : '#6366f1',
+                  background: getRouteColor(b.route),
                   color: '#fff',
                   fontWeight: 800,
                   fontSize: '10px',

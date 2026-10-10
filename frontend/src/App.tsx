@@ -81,18 +81,26 @@ export function App() {
         const res = await fetch("http://localhost:8000/api/telemetry");
         if (res.ok) {
           const data = await res.json();
-          setBuses(data.buses || []);
+          if (data.buses && data.buses.length > 0) {
+            setBuses(data.buses);
+            return;
+          }
         }
       } catch {
-        // Fallback
-        setBuses([
-          { id: "bus-101", route: "LX", destination: "Livingston", lat: 40.5050, lon: -74.4500, speed_mph: 22, occupancy: "Standing Room Only", eta_mins: 3, next_stop: "The Yard" },
-          { id: "bus-102", route: "LX", destination: "College Ave", lat: 40.5220, lon: -74.4360, speed_mph: 18, occupancy: "Seats Available", eta_mins: 7, next_stop: "Livingston Plaza" },
-          { id: "bus-201", route: "B", destination: "Busch", lat: 40.5245, lon: -74.4420, speed_mph: 26, occupancy: "Seats Available", eta_mins: 4, next_stop: "Hill Center" },
-          { id: "bus-301", route: "A", destination: "Busch", lat: 40.5100, lon: -74.4550, speed_mph: 15, occupancy: "Many Seats Available", eta_mins: 5, next_stop: "Busch Student Center" },
-          { id: "bus-401", route: "F", destination: "Cook/Douglass", lat: 40.4950, lon: -74.4440, speed_mph: 12, occupancy: "Full", eta_mins: 8, next_stop: "College Hall" }
-        ]);
+        // Fallback to simulated fleet
       }
+      // Fallback Rutgers fleet
+      setBuses([
+        { id: "bus-101", route: "LX", destination: "Livingston", campus: "College Ave", lat: 40.5050, lon: -74.4500, speed_mph: 22, occupancy: "Standing Room Only", eta_mins: 3, next_stop: "The Yard" },
+        { id: "bus-102", route: "LX", destination: "College Ave", campus: "Livingston", lat: 40.5220, lon: -74.4360, speed_mph: 18, occupancy: "Seats Available", eta_mins: 7, next_stop: "Livingston Plaza" },
+        { id: "bus-201", route: "B", destination: "Busch", campus: "Livingston", lat: 40.5245, lon: -74.4420, speed_mph: 26, occupancy: "Seats Available", eta_mins: 4, next_stop: "Hill Center" },
+        { id: "bus-301", route: "A", destination: "Busch", campus: "College Ave", lat: 40.5100, lon: -74.4550, speed_mph: 15, occupancy: "Many Seats Available", eta_mins: 5, next_stop: "Busch Student Center" },
+        { id: "bus-302", route: "H", destination: "Busch", campus: "College Ave", lat: 40.5030, lon: -74.4480, speed_mph: 19, occupancy: "Seats Available", eta_mins: 6, next_stop: "Stadium West Lot" },
+        { id: "bus-401", route: "F", destination: "Cook/Douglass", campus: "College Ave", lat: 40.4950, lon: -74.4440, speed_mph: 12, occupancy: "Full", eta_mins: 8, next_stop: "College Hall" },
+        { id: "bus-402", route: "EE", destination: "Cook/Douglass", campus: "College Ave", lat: 40.4920, lon: -74.4420, speed_mph: 14, occupancy: "Seats Available", eta_mins: 5, next_stop: "George St & Paterson" },
+        { id: "bus-501", route: "REXB", destination: "Cook/Douglass", campus: "Busch", lat: 40.5180, lon: -74.4600, speed_mph: 32, occupancy: "Seats Available", eta_mins: 9, next_stop: "Red Oak Lane" },
+        { id: "bus-502", route: "REXL", destination: "Cook/Douglass", campus: "Livingston", lat: 40.5210, lon: -74.4350, speed_mph: 30, occupancy: "Seats Available", eta_mins: 11, next_stop: "Lipman Hall" }
+      ]);
     };
     fetchBuses();
     const interval = setInterval(fetchBuses, 12000);
