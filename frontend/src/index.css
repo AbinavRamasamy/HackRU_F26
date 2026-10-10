@@ -121,8 +121,12 @@ button {
 .bottom-floating-radar-widget {
   width: 100%;
   margin-top: auto;
-  padding-top: 20px;
+  padding-top: 14px;
+  position: sticky;
+  bottom: 12px;
+  z-index: 30;
 }
+
 
 
 

@@ -38,7 +38,7 @@ export function App() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
   const [expandedRoutes, setExpandedRoutes] = useState<boolean>(false);
-  const [schedulePositionBelow, setSchedulePositionBelow] = useState<boolean>(true);
+  const [plannerMinimized, setPlannerMinimized] = useState<boolean>(false);
 
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
@@ -390,10 +390,20 @@ export function App() {
 
       {/* Main Dashboard Overhauled Grid */}
       <div className="main-dashboard-grid" style={{ marginBottom: '16px' }}>
-        {/* Left Column: 4. Schedule Widget (Top) + Planner (Middle-Bottom Left) */}
-        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Card 1: Course Schedule Ingestion */}
-          <div className="glass-panel" style={{ padding: '16px 18px' }}>
+        {/* Left Column: Schedule as base layer + Commute Planner overlayed */}
+        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {/* Card 1: Course Schedule (Previous Look - Base Layer underneath Planner) */}
+          <div
+            className="glass-panel"
+            style={{
+              padding: '16px 18px',
+              maxHeight: classes.length > 0 ? 'calc(100vh - 190px)' : undefined,
+              minHeight: classes.length > 0 ? '460px' : undefined,
+              overflowY: classes.length > 0 ? 'auto' : undefined,
+              paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '230px') : '16px',
+              position: 'relative'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Calendar size={18} color="#ff3366" />
@@ -471,97 +481,8 @@ export function App() {
                   </div>
                 </div>
               </div>
-            ) : schedulePositionBelow ? (
-              <div style={{
-                padding: '10px 12px',
-                borderRadius: '8px',
-                background: 'rgba(204, 0, 51, 0.08)',
-                border: '1px solid rgba(204, 0, 51, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '6px',
-                    background: 'rgba(204, 0, 51, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Calendar size={15} color="#ff3366" />
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {classes.length} Classes Active
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#9ca3af', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Next: {classes[0]?.course} ({classes[0]?.startTime || 'TBD'})
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
-                    onClick={() => {
-                      const el = document.getElementById("full-schedule-section");
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#38bdf8',
-                      background: 'rgba(56, 189, 248, 0.1)',
-                      border: '1px solid rgba(56, 189, 248, 0.25)',
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Schedule Below ↓
-                  </button>
-                  <button
-                    onClick={() => setSchedulePositionBelow(false)}
-                    title="Display full schedule inside this sidebar card"
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      color: '#9ca3af',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      padding: '3px 6px',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Inline
-                  </button>
-                </div>
-              </div>
             ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>Schedule displayed inline</span>
-                <button
-                  onClick={() => setSchedulePositionBelow(true)}
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    color: '#38bdf8',
-                    background: 'rgba(56, 189, 248, 0.1)',
-                    border: '1px solid rgba(56, 189, 248, 0.2)',
-                    padding: '2px 7px',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Move Below Radar ↓
-                </button>
-              </div>
               {/* Day Filter Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingBottom: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
@@ -640,12 +561,57 @@ export function App() {
           )}
         </div>
 
-        {/* Card 2: Inter-Campus Transit Routing */}
-        <div id="commute-planner-section" className="glass-panel" style={{ padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <Zap size={18} color="#ff3366" />
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Inter-Campus Commute Planner</h3>
+        {/* Card 2: Inter-Campus Transit Routing - OVERLAYED ON TOP of the schedule */}
+        <div
+          id="commute-planner-section"
+          className="glass-panel"
+          style={{
+            position: classes.length > 0 ? 'absolute' : 'relative',
+            bottom: classes.length > 0 ? 0 : undefined,
+            left: classes.length > 0 ? 0 : undefined,
+            right: classes.length > 0 ? 0 : undefined,
+            zIndex: classes.length > 0 ? 15 : undefined,
+            marginTop: classes.length > 0 ? 0 : '16px',
+            padding: '14px 16px',
+            background: classes.length > 0 ? 'rgba(16, 20, 31, 0.94)' : undefined,
+            backdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
+            WebkitBackdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
+            border: classes.length > 0 ? '1px solid rgba(255, 255, 255, 0.14)' : undefined,
+            boxShadow: classes.length > 0 ? '0 -8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(204, 0, 51, 0.15)' : undefined,
+            borderRadius: '16px',
+            transition: 'all 0.25s ease'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: plannerMinimized ? 0 : '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={17} color="#ff3366" />
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#fff', margin: 0 }}>Inter-Campus Commute Planner</h3>
+            </div>
+            {classes.length > 0 && (
+              <button
+                onClick={() => setPlannerMinimized(prev => !prev)}
+                title={plannerMinimized ? "Expand Commute Planner" : "Minimize to reveal schedule underneath"}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#e5e7eb',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                {plannerMinimized ? <>Expand <ChevronUp size={12} /></> : <>Minimize <ChevronDown size={12} /></>}
+              </button>
+            )}
           </div>
+
+          {!plannerMinimized && (
+            <>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <div>
@@ -921,6 +887,8 @@ export function App() {
               </div>
             );
           })()}
+          </>
+          )}
         </div>
       </div>
       {/* End of Left Column (Schedule & Planner) */}
@@ -932,7 +900,7 @@ export function App() {
     </div>
     {/* End of Upper 2-Column Dashboard Grid */}
 
-    {/* 6. Rutgers Live Transit Radar: Bottom Middle Floating Widget */}
+    {/* 6. Rutgers Live Transit Radar: Bottom Floating HUD Overlay */}
     <div className="bottom-floating-radar-widget">
       <CampusRadar
         buses={buses}
@@ -941,102 +909,6 @@ export function App() {
         isFloatingWidget={true}
       />
     </div>
-
-    {/* 7. Schedule Section: placed UNDER Live Rutgers Transit Radar and Commute Planner cards */}
-    {classes.length > 0 && schedulePositionBelow && (
-      <div id="full-schedule-section" className="glass-panel" style={{ width: '100%', marginTop: '16px', padding: '16px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={18} color="#ff3366" />
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', margin: 0 }}>Your Course Schedule</h3>
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>{classes.length} classes loaded • Auto-synchronized with Rutgers Transit</p>
-            </div>
-          </div>
-
-          {/* Day Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '11px', color: '#9ca3af', marginRight: '4px' }}>Filter Day:</span>
-            {["ALL", "M", "T", "W", "TH", "F"].map((day) => (
-              <button
-                key={day}
-                onClick={() => setSelectedDayFilter(day)}
-                style={{
-                  padding: '3px 9px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  border: selectedDayFilter === day ? '1px solid #ff3366' : '1px solid rgba(255, 255, 255, 0.1)',
-                  background: selectedDayFilter === day ? 'rgba(204, 0, 51, 0.3)' : 'rgba(255, 255, 255, 0.03)',
-                  color: selectedDayFilter === day ? '#fff' : '#9ca3af',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {day === "ALL" ? "All Week" : day}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Classes grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '10px'
-        }}>
-          {classes
-            .filter(cls => {
-              if (selectedDayFilter === "ALL") return true;
-              const days = Array.isArray(cls.days) ? cls.days : [cls.days];
-              return days.includes(selectedDayFilter);
-            })
-            .map((cls, idx) => (
-              <div key={idx} style={{
-                padding: '12px 14px',
-                borderRadius: '10px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '10px'
-              }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {cls.course}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {cls.location || cls.building || "Campus Classroom"} ({cls.campus})
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
-                    {cls.startTime} - {cls.endTime}
-                  </div>
-                  <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      background: 'rgba(204, 0, 51, 0.2)',
-                      border: '1px solid rgba(204, 0, 51, 0.45)',
-                      color: '#ff4d6d'
-                    }}>
-                      {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
-    )}
 
     </div>
   );
