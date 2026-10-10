@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2 } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
 import { AICopilotChat } from './AICopilotChat';
@@ -340,6 +340,10 @@ export function App() {
       setUploading(false);
       e.target.value = "";
     }
+  };
+
+  const handleDeleteClass = (targetClass: ClassItem) => {
+    setClasses(prev => prev.filter(c => c !== targetClass));
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
@@ -968,11 +972,27 @@ export function App() {
                     Course Schedule
                   </h2>
                 </div>
-                <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
-                  <Upload size={11} />
-                  {uploading ? "Importing..." : "Import"}
-                  <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {classes.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Clear all classes from your schedule?")) {
+                          setClasses([]);
+                        }
+                      }}
+                      className="apple-btn-secondary"
+                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
+                      title="Clear all imported classes"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
+                    <Upload size={11} />
+                    {uploading ? "Importing..." : "Import"}
+                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
               </div>
 
               {/* Apple Day Segmented Control */}
@@ -1045,14 +1065,34 @@ export function App() {
                           <div style={{ fontSize: '11px', fontWeight: 700, color: '#0A84FF', fontVariantNumeric: 'tabular-nums' }}>
                             {cls.startTime} - {cls.endTime}
                           </div>
-                          <button
-                            onClick={() => handleGetToNextClass(cls)}
-                            className="apple-btn-secondary"
-                            style={{ padding: '3px 8px', fontSize: '10.5px', marginTop: '3px' }}
-                            title="Calculate transit & start map navigation to this class"
-                          >
-                            Route ➔
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => handleGetToNextClass(cls)}
+                              className="apple-btn-secondary"
+                              style={{ padding: '3px 8px', fontSize: '10.5px' }}
+                              title="Calculate transit & start map navigation to this class"
+                            >
+                              Route ➔
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClass(cls);
+                              }}
+                              className="apple-icon-btn"
+                              style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '6px',
+                                background: 'rgba(255, 69, 58, 0.12)',
+                                border: '1px solid rgba(255, 69, 58, 0.25)',
+                                color: '#FF453A'
+                              }}
+                              title={`Delete ${cls.course} from schedule`}
+                            >
+                              <Trash2 size={11} color="#FF453A" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
