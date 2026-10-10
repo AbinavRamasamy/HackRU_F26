@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation, LocateFixed, RefreshCw } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation, LocateFixed } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
@@ -309,97 +309,6 @@ export function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          {/* Live GPS / Location Pill */}
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '12px',
-            padding: '5px 12px',
-            borderRadius: '20px',
-            background: geoStatus === 'granted' 
-              ? 'rgba(16, 185, 129, 0.12)' 
-              : geoStatus === 'requesting'
-              ? 'rgba(234, 179, 8, 0.12)'
-              : 'rgba(204, 0, 51, 0.15)',
-            border: geoStatus === 'granted'
-              ? '1px solid rgba(16, 185, 129, 0.35)'
-              : geoStatus === 'requesting'
-              ? '1px solid rgba(234, 179, 8, 0.35)'
-              : '1px solid rgba(204, 0, 51, 0.35)',
-            color: geoStatus === 'granted' ? '#10b981' : geoStatus === 'requesting' ? '#fbbf24' : '#ff4d6d',
-            fontWeight: 700
-          }}>
-            {geoStatus === 'granted' ? (
-              <span style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 8px #10b981',
-                display: 'inline-block'
-              }} />
-            ) : (
-              <LocateFixed size={14} color={geoStatus === 'requesting' ? '#fbbf24' : '#ff3366'} />
-            )}
-
-            <span>{geoStatus === 'granted' ? 'Live GPS:' : 'Location:'}</span>
-
-            {geoStatus === 'requesting' ? (
-              <span style={{ color: '#fbbf24', fontStyle: 'italic' }}>Acquiring GPS...</span>
-            ) : (
-              <select
-                value={currentLocation}
-                onChange={(e) => {
-                  setCurrentLocation(e.target.value);
-                  if (e.target.value.includes("Busch")) setOriginCampus("Busch");
-                  else if (e.target.value.includes("Livingston")) setOriginCampus("Livingston");
-                  else if (e.target.value.includes("College")) setOriginCampus("College Ave");
-                  else setOriginCampus("Cook");
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  outline: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                {resolvedGeo && (
-                  <option value={resolvedGeo.locationName} style={{ background: '#161922' }}>
-                    {resolvedGeo.locationName} ({resolvedGeo.distanceMiles})
-                  </option>
-                )}
-                <option value="Busch Student Center" style={{ background: '#161922' }}>Busch Student Center</option>
-                <option value="Hill Center (Busch)" style={{ background: '#161922' }}>Hill Center (Busch)</option>
-                <option value="The Yard (College Ave)" style={{ background: '#161922' }}>The Yard (College Ave)</option>
-                <option value="Livingston Student Center" style={{ background: '#161922' }}>Livingston Student Center</option>
-                <option value="College Hall (Douglass)" style={{ background: '#161922' }}>College Hall (Douglass)</option>
-              </select>
-            )}
-
-            {/* Quick re-sync GPS button */}
-            <button
-              onClick={() => requestLocationPermission(true)}
-              title={geoStatus === 'granted' ? "Re-sync live GPS location" : "Request location permission"}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: geoStatus === 'granted' ? '#10b981' : '#ff4d6d',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '2px',
-                marginLeft: '2px',
-                opacity: 0.85
-              }}
-            >
-              <RefreshCw size={12} />
-            </button>
-          </div>
-
           <div style={{ position: 'relative' }}>
             <button
               ref={widgetTriggerRef}
@@ -424,7 +333,7 @@ export function App() {
               Transit Widget
             </button>
 
-            <TransitWidget 
+            <TransitWidget
               isOpen={showWidgetOverlay}
               onClose={() => setShowWidgetOverlay(false)}
               triggerRef={widgetTriggerRef}
@@ -476,7 +385,7 @@ export function App() {
           <Sparkles size={16} /> Powered by Multimodal AI & Live Rutgers Feeds
         </div>
         <h2 style={{ fontSize: '42px', fontWeight: 800, letterSpacing: '-1px', lineHeight: 1.2, marginBottom: '16px' }}>
-          Never Miss A Class Across the <span className="scarlet-gradient-text">Rutgers Banks</span>
+          Never Miss A Class <span className="scarlet-gradient-text">Across Rutgers</span>
         </h2>
         <p style={{ fontSize: '16px', color: '#9ca3af', maxWidth: '640px', margin: '0 auto' }}>
           Upload your course schedule or inspect real-time inter-campus bus routes. Our AI handles the walking buffers, Route 18 congestion, and tight transfers.
@@ -617,49 +526,49 @@ export function App() {
                   return days.includes(selectedDayFilter);
                 })
                 .map((cls, idx) => (
-                <div key={idx} style={{
-                  padding: '14px 16px',
-                  borderRadius: '12px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {cls.course}
+                  <div key={idx} style={{
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {cls.course}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
+                        <span>
+                          <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
-                      <span>
-                        <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
-                      {cls.startTime} - {cls.endTime}
-                    </div>
-                    <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderRadius: '5px',
-                        background: 'rgba(204, 0, 51, 0.2)',
-                        border: '1px solid rgba(204, 0, 51, 0.45)',
-                        color: '#ff4d6d',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
-                      </span>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
+                        {cls.startTime} - {cls.endTime}
+                      </div>
+                      <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '5px',
+                          background: 'rgba(204, 0, 51, 0.2)',
+                          border: '1px solid rgba(204, 0, 51, 0.45)',
+                          color: '#ff4d6d',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </div>
@@ -700,8 +609,8 @@ export function App() {
                   </button>
                 )}
               </div>
-              <select 
-                value={originCampus} 
+              <select
+                value={originCampus}
                 onChange={(e) => setOriginCampus(e.target.value)}
                 style={{
                   width: '100%',
@@ -723,8 +632,8 @@ export function App() {
 
             <div>
               <label style={{ fontSize: '12px', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>Destination Campus</label>
-              <select 
-                value={destCampus} 
+              <select
+                value={destCampus}
                 onChange={(e) => setDestCampus(e.target.value)}
                 style={{
                   width: '100%',
@@ -807,12 +716,12 @@ export function App() {
                   const badgeBg = isWeekend
                     ? '#0d9488'
                     : isBikeOrWalk
-                    ? '#10b981'
-                    : isTransfer
-                    ? '#2563eb'
-                    : isShuttle
-                    ? '#7c3aed'
-                    : '#cc0033';
+                      ? '#10b981'
+                      : isTransfer
+                        ? '#2563eb'
+                        : isShuttle
+                          ? '#7c3aed'
+                          : '#cc0033';
 
                   return (
                     <div
@@ -895,7 +804,7 @@ export function App() {
       </div>
 
       {/* Campus Radar & Fleet Visualizer */}
-      <CampusRadar 
+      <CampusRadar
         buses={buses}
         selectedCampus={originCampus}
         onSelectCampus={(c) => setOriginCampus(c)}
