@@ -106,8 +106,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
                     "endTime": "11:40",
                     "building": "Hill Center 114",
                     "campus": "Busch",
-                    "location": "Hill Center 114 (Busch)",
-                    "closest_stop": "Hill Center"
+                    "location": "Hill Center 114 (Busch)"
                 },
                 {
                     "course": "Linear Algebra (01:640:250)",
@@ -117,8 +116,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
                     "endTime": "13:30",
                     "building": "Tillett Hall 254",
                     "campus": "Livingston",
-                    "location": "Tillett Hall 254 (Livingston)",
-                    "closest_stop": "Livingston Student Center"
+                    "location": "Tillett Hall 254 (Livingston)"
                 },
                 {
                     "course": "Data Structures (01:198:112)",
@@ -128,8 +126,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
                     "endTime": "15:20",
                     "building": "Academic Building 1180",
                     "campus": "College Ave",
-                    "location": "Academic Building 1180 (College Ave)",
-                    "closest_stop": "The Yard"
+                    "location": "Academic Building 1180 (College Ave)"
                 }
             ]
         }
@@ -237,10 +234,8 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             
             if matched_building:
                 item["campus"] = matched_building["campus"]
-                item["closest_stop"] = matched_building["stop"]
             else:
                 item["campus"] = "College Ave" # Default if unmapped
-                item["closest_stop"] = "Student Center"
 
             # Ensure clear, prominent location string
             bldg_name = item.get("building", "")

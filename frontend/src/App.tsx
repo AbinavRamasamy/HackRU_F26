@@ -14,7 +14,6 @@ interface ClassItem {
   building: string;
   location?: string;
   campus: string;
-  closest_stop?: string;
 }
 
 export function App() {
@@ -27,8 +26,7 @@ export function App() {
       endTime: "11:40",
       building: "Hill Center 114",
       location: "Hill Center 114 (Busch)",
-      campus: "Busch",
-      closest_stop: "Hill Center"
+      campus: "Busch"
     },
     {
       course: "Linear Algebra (01:640:250)",
@@ -38,8 +36,7 @@ export function App() {
       endTime: "13:30",
       building: "Tillett Hall 254",
       location: "Tillett Hall 254 (Livingston)",
-      campus: "Livingston",
-      closest_stop: "Livingston Student Center"
+      campus: "Livingston"
     },
     {
       course: "Data Structures (01:198:112)",
@@ -49,8 +46,7 @@ export function App() {
       endTime: "15:20",
       building: "Academic Building 1180",
       location: "Academic Building 1180 (College Ave)",
-      campus: "College Ave",
-      closest_stop: "The Yard"
+      campus: "College Ave"
     }
   ]);
 
@@ -331,23 +327,11 @@ export function App() {
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {cls.course}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
                     <span>
                       <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
                     </span>
-                    {cls.closest_stop && (
-                      <span style={{
-                        fontSize: '11px',
-                        color: '#9ca3af',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
-                      }}>
-                        Stop: {cls.closest_stop}
-                      </span>
-                    )}
                   </div>
                 </div>
 
