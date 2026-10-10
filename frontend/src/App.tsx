@@ -48,6 +48,7 @@ export function App() {
 
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
+  const [currentLocation, setCurrentLocation] = useState("Busch Student Center");
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
@@ -156,7 +157,48 @@ export function App() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            padding: '4px 10px',
+            borderRadius: '20px',
+            background: 'rgba(204, 0, 51, 0.15)',
+            border: '1px solid rgba(204, 0, 51, 0.35)',
+            color: '#ff4d6d',
+            fontWeight: 700
+          }}>
+            <MapPin size={13} color="#ff3366" />
+            <span>At:</span>
+            <select
+              value={currentLocation}
+              onChange={(e) => {
+                setCurrentLocation(e.target.value);
+                if (e.target.value.includes("Busch")) setOriginCampus("Busch");
+                else if (e.target.value.includes("Livingston")) setOriginCampus("Livingston");
+                else if (e.target.value.includes("College")) setOriginCampus("College Ave");
+                else setOriginCampus("Cook");
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 700,
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="Busch Student Center" style={{ background: '#161922' }}>Busch Student Center</option>
+              <option value="Hill Center (Busch)" style={{ background: '#161922' }}>Hill Center (Busch)</option>
+              <option value="The Yard (College Ave)" style={{ background: '#161922' }}>The Yard (College Ave)</option>
+              <option value="Livingston Student Center" style={{ background: '#161922' }}>Livingston Student Center</option>
+              <option value="College Hall (Douglass)" style={{ background: '#161922' }}>College Hall (Douglass)</option>
+            </select>
+          </div>
+
           <button
             onClick={() => setShowEmbedModal(true)}
             style={{
@@ -391,11 +433,11 @@ export function App() {
       />
 
       {/* AI Copilot Chat Assistant */}
-      <AICopilotChat />
+      <AICopilotChat currentCampus={currentLocation} />
 
       {/* Embed Floating Widget */}
       <TransitWidget 
-        currentCampus="College Ave"
+        currentCampus={currentLocation}
         nextClass={classes[1]}
       />
 

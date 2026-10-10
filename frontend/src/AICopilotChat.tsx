@@ -8,12 +8,16 @@ interface Message {
   eta?: number;
 }
 
-export const AICopilotChat: React.FC = () => {
+interface AICopilotChatProps {
+  currentCampus?: string;
+}
+
+export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center" }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      text: "Hey! I'm your Rutgers Transit Copilot. Ask me anything like: 'I need to get to Tillett Hall for my 12:10 class from College Ave—what bus should I take?'",
-      recommendedRoute: "LX",
+      text: `Hey! I'm your Rutgers Transit Copilot. You're currently at ${currentCampus}. Ask me anything like: 'I need to get to Tillett Hall on Livingston for my 12:10 class—what bus should I take?'`,
+      recommendedRoute: "B",
       eta: 4
     }
   ]);
@@ -31,7 +35,7 @@ export const AICopilotChat: React.FC = () => {
       const res = await fetch("http://localhost:8000/api/copilot/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userText, current_campus: "College Ave" })
+        body: JSON.stringify({ query: userText, current_campus: currentCampus })
       });
       if (res.ok) {
         const data = await res.json();

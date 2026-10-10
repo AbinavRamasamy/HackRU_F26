@@ -21,7 +21,7 @@ interface TransitWidgetProps {
 }
 
 export const TransitWidget: React.FC<TransitWidgetProps> = ({
-  currentCampus: _currentCampus = "College Ave",
+  currentCampus = "Busch Student Center",
   nextClass
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -100,6 +100,22 @@ export const TransitWidget: React.FC<TransitWidgetProps> = ({
               borderRadius: '12px',
               fontWeight: 600
             }}>Live Sync</span>
+          </div>
+
+          <div style={{
+            fontSize: '11px',
+            color: '#38bdf8',
+            marginBottom: '10px',
+            padding: '4px 8px',
+            background: 'rgba(56, 189, 248, 0.1)',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            border: '1px solid rgba(56, 189, 248, 0.2)'
+          }}>
+            <MapPin size={12} color="#38bdf8" />
+            <span>Departing from: <strong>{currentCampus}</strong></span>
           </div>
 
           {nextClass && (
