@@ -120,14 +120,25 @@ export function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.status === "missing_api_key") {
+          alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend. Loaded default demo classes.");
+        } else if (data.status === "error") {
+          alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
+        }
+
         if (data.classes && data.classes.length > 0) {
           setClasses(data.classes);
         }
+      } else {
+        alert("Server returned error during schedule upload. Please verify backend is running on port 8000.");
       }
     } catch (err) {
       console.error("Upload error:", err);
+      alert("Could not connect to backend server at http://localhost:8000/api/schedule/upload.");
     } finally {
       setUploading(false);
+      // Reset input value so user can re-upload same file if needed
+      e.target.value = "";
     }
   };
 

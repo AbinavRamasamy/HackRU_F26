@@ -6,12 +6,13 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
 
-load_dotenv()
+# Find and load .env in root or backend directory
+load_dotenv(find_dotenv())
 
 app = FastAPI(
     title="ScarletHop Transit Intelligence API",
@@ -154,8 +155,8 @@ async def upload_schedule(file: UploadFile = File(...)):
     """Uploads a class schedule screenshot and extracts classes using Gemini Vision OCR."""
     contents = await file.read()
     content_type = file.content_type or "image/png"
-    parsed_classes = parse_schedule_with_gemini(contents, mime_type=content_type)
-    return {"status": "success", "classes": parsed_classes}
+    result = parse_schedule_with_gemini(contents, mime_type=content_type)
+    return result
 
 class ChatQueryRequest(BaseModel):
     query: str

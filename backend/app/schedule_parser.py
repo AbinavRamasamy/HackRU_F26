@@ -7,68 +7,74 @@ from google.genai import types
 
 from app.rutgers_data import CAMPUS_BUILDINGS
 
-def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png") -> List[Dict[str, Any]]:
+def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png") -> Dict[str, Any]:
     """
     Uses Gemini Vision API to parse Rutgers Course Schedule screenshots (WebReg, Canvas, CSP).
     Extracts course code, title, days of the week, meeting times, and classroom buildings.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     
-    # Fallback mock data if GEMINI_API_KEY is not configured yet
-    if not api_key or api_key == "YOUR_GEMINI_API_KEY":
-        return [
-            {
-                "course": "Intro to Computer Science (01:198:111)",
-                "days": ["M", "TH"],
-                "startTime": "10:20",
-                "endTime": "11:40",
-                "building": "Hill Center 114",
-                "campus": "Busch",
-                "closest_stop": "Hill Center"
-            },
-            {
-                "course": "Linear Algebra (01:640:250)",
-                "days": ["M", "TH"],
-                "startTime": "12:10",
-                "endTime": "13:30",
-                "building": "Tillett Hall 254",
-                "campus": "Livingston",
-                "closest_stop": "Livingston Student Center"
-            },
-            {
-                "course": "Data Structures (01:198:112)",
-                "days": ["T", "F"],
-                "startTime": "14:00",
-                "endTime": "15:20",
-                "building": "Academic Building 1180",
-                "campus": "College Ave",
-                "closest_stop": "The Yard"
-            }
-        ]
+    # Check if GEMINI_API_KEY is missing or blank
+    if not api_key or api_key.strip() in ["", "your_gemini_api_key_here", "YOUR_GEMINI_API_KEY"]:
+        print("[ScheduleOCR] GEMINI_API_KEY is not set or empty in .env. Falling back to demo schedule.")
+        return {
+            "status": "missing_api_key",
+            "message": "GEMINI_API_KEY is not set in .env. Please set GEMINI_API_KEY to parse your actual WebReg screenshot.",
+            "classes": [
+                {
+                    "course": "Intro to Computer Science (01:198:111)",
+                    "days": ["M", "TH"],
+                    "startTime": "10:20",
+                    "endTime": "11:40",
+                    "building": "Hill Center 114",
+                    "campus": "Busch",
+                    "closest_stop": "Hill Center"
+                },
+                {
+                    "course": "Linear Algebra (01:640:250)",
+                    "days": ["M", "TH"],
+                    "startTime": "12:10",
+                    "endTime": "13:30",
+                    "building": "Tillett Hall 254",
+                    "campus": "Livingston",
+                    "closest_stop": "Livingston Student Center"
+                },
+                {
+                    "course": "Data Structures (01:198:112)",
+                    "days": ["T", "F"],
+                    "startTime": "14:00",
+                    "endTime": "15:20",
+                    "building": "Academic Building 1180",
+                    "campus": "College Ave",
+                    "closest_stop": "The Yard"
+                }
+            ]
+        }
 
-    client = genai.Client(api_key=api_key)
-    
-    prompt = """
-    You are an expert Rutgers University academic assistant.
-    Analyze this schedule image (from Rutgers WebReg, Canvas, or Course Schedule Planner) and extract all scheduled class meetings.
-    
-    Return a strictly valid JSON array of objects with the following schema:
-    [
-      {
-        "course": "string (e.g. Intro to CS)",
-        "days": ["M", "T", "W", "TH", "F"],
-        "startTime": "HH:MM in 24-hour format (e.g. 10:20)",
-        "endTime": "HH:MM in 24-hour format (e.g. 11:40)",
-        "building": "string (building name or code, e.g. Hill Center, Tillett, Academic Building)",
-        "room": "string (e.g. 114)"
-      }
-    ]
-    
-    Do not include markdown fences or explanation. Return only valid JSON.
-    """
-
-    model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
     try:
+        client = genai.Client(api_key=api_key.strip())
+        model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+        print(f"[ScheduleOCR] Analyzing image with Gemini model: {model_name}...")
+
+        prompt = """
+        You are an expert Rutgers University academic assistant.
+        Analyze this schedule image (from Rutgers WebReg, Canvas, or Course Schedule Planner) and extract all scheduled class meetings.
+        
+        Return a strictly valid JSON array of objects with the following schema:
+        [
+          {
+            "course": "string (e.g. Intro to CS)",
+            "days": ["M", "T", "W", "TH", "F"],
+            "startTime": "HH:MM in 24-hour format (e.g. 10:20)",
+            "endTime": "HH:MM in 24-hour format (e.g. 11:40)",
+            "building": "string (building name or code, e.g. Hill Center, Tillett, Academic Building)",
+            "room": "string (e.g. 114)"
+          }
+        ]
+        
+        Do not include markdown fences or explanation. Return only valid JSON.
+        """
+
         response = client.models.generate_content(
             model=model_name,
             contents=[
@@ -77,6 +83,8 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             ]
         )
         text = response.text.strip()
+        print(f"[ScheduleOCR] Gemini response text preview: {text[:150]}")
+
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
@@ -102,18 +110,11 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
                 item["campus"] = "College Ave" # Default if unmapped
                 item["closest_stop"] = "Student Center"
                 
-        return parsed
+        return {"status": "success", "classes": parsed}
     except Exception as e:
-        print(f"Gemini parsing failed or errored: {e}")
-        # Return sensible fallback if parsing encounters an error
-        return [
-            {
-                "course": "Sample Fall 2026 Class",
-                "days": ["M", "W"],
-                "startTime": "10:20",
-                "endTime": "11:40",
-                "building": "Hill Center",
-                "campus": "Busch",
-                "closest_stop": "Hill Center"
-            }
-        ]
+        print(f"[ScheduleOCR] Gemini parsing error: {e}")
+        return {
+            "status": "error",
+            "message": f"Gemini Vision parsing failed: {str(e)}",
+            "classes": []
+        }
