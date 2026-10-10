@@ -392,16 +392,15 @@ export function App() {
       <div className="main-dashboard-grid" style={{ marginBottom: '12px' }}>
         {/* Left Column: Schedule as base layer + Commute Planner overlayed */}
         <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 40 }}>
-          {/* Card 1: Course Schedule (Previous Look - Base Layer underneath Planner) */}
+          {/* Card 1: Course Schedule */}
           <div
             className="glass-panel"
             style={{
-              padding: '14px 16px',
-              flex: '1 1 auto',
-              height: classes.length > 0 ? '100%' : 'auto',
-              maxHeight: classes.length > 0 ? 'calc(100vh - 350px)' : undefined,
+              padding: '12px 14px',
+              flex: '0 0 auto',
+              height: classes.length > 0 ? '185px' : 'auto',
+              maxHeight: classes.length > 0 ? '185px' : undefined,
               overflowY: classes.length > 0 ? 'auto' : undefined,
-              paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '230px') : '14px',
               position: 'relative',
               zIndex: 1
             }}
@@ -517,21 +516,21 @@ export function App() {
                 })
                 .map((cls, idx) => (
                   <div key={idx} style={{
-                    padding: '14px 16px',
-                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
                     background: 'rgba(255, 255, 255, 0.02)',
                     border: '1px solid rgba(255, 255, 255, 0.06)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '12px'
+                    gap: '10px'
                   }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {cls.course}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <div style={{ fontSize: '11px', color: '#d1d5db', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <MapPin size={12} color="#ef4444" style={{ flexShrink: 0 }} />
                         <span>
                           <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
                         </span>
@@ -539,19 +538,18 @@ export function App() {
                     </div>
 
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#38bdf8' }}>
                         {cls.startTime} - {cls.endTime}
                       </div>
-                      <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <div style={{ marginTop: '2px', display: 'flex', justifyContent: 'flex-end' }}>
                         <span style={{
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '5px',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
                           background: 'rgba(204, 0, 51, 0.2)',
                           border: '1px solid rgba(204, 0, 51, 0.45)',
-                          color: '#ff4d6d',
-                          letterSpacing: '0.5px'
+                          color: '#ff4d6d'
                         }}>
                           {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
                         </span>
@@ -568,18 +566,15 @@ export function App() {
           id="commute-planner-section"
           className="glass-panel"
           style={{
-            position: classes.length > 0 ? 'absolute' : 'relative',
-            bottom: classes.length > 0 ? 0 : undefined,
-            left: classes.length > 0 ? 0 : undefined,
-            right: classes.length > 0 ? 0 : undefined,
-            zIndex: 50,
-            marginTop: classes.length > 0 ? 0 : 'auto',
-            padding: '13px 15px',
-            background: classes.length > 0 ? 'rgba(16, 20, 31, 0.96)' : undefined,
-            backdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
-            WebkitBackdropFilter: classes.length > 0 ? 'blur(24px)' : undefined,
-            border: classes.length > 0 ? '1px solid rgba(255, 255, 255, 0.14)' : undefined,
-            boxShadow: classes.length > 0 ? '0 -8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(204, 0, 51, 0.18)' : undefined,
+            position: 'relative',
+            zIndex: 40,
+            marginTop: classes.length > 0 ? '-14px' : '8px',
+            padding: '12px 14px',
+            background: 'rgba(16, 20, 31, 0.96)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(204, 0, 51, 0.18)',
             borderRadius: '16px',
             transition: 'all 0.25s ease'
           }}
