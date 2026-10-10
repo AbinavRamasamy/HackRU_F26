@@ -71,8 +71,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      minHeight: '380px',
-      maxHeight: '410px',
+      minHeight: 0,
       boxSizing: 'border-box',
       ...style
     }}>
@@ -96,9 +95,8 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        flex: 1,
-        minHeight: '210px',
-        maxHeight: '260px',
+        flex: '1 1 0',
+        minHeight: 0,
         overflowY: 'auto',
         marginBottom: '12px',
         paddingRight: '4px'

@@ -290,11 +290,12 @@ export function App() {
       width: '100%',
       margin: 0,
       padding: '12px 24px 12px',
-      minHeight: '100vh',
+      height: '100vh',
+      maxHeight: '100vh',
       boxSizing: 'border-box',
       display: 'flex',
       flexDirection: 'column',
-      flex: 1
+      overflow: 'hidden'
     }}>
       {/* Top Navbar */}
       <header style={{
@@ -389,19 +390,19 @@ export function App() {
       </header>
 
       {/* Main Dashboard Overhauled Grid */}
-      <div className="main-dashboard-grid" style={{ marginBottom: '12px' }}>
+      <div className="main-dashboard-grid" style={{ marginBottom: '10px' }}>
         {/* Left Column: Schedule as base layer + Commute Planner overlayed */}
-        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 40 }}>
+        <div className="grid-col-left" style={{ display: 'flex', flexDirection: 'column', position: 'relative', height: '100%', minHeight: 0, zIndex: 40 }}>
           {/* Card 1: Course Schedule */}
           <div
             className="glass-panel"
             style={{
               padding: '14px 16px',
-              flex: '0 0 auto',
-              height: classes.length > 0 ? '250px' : 'auto',
-              maxHeight: classes.length > 0 ? '250px' : undefined,
-              overflowY: classes.length > 0 ? 'auto' : undefined,
-              paddingBottom: classes.length > 0 ? (plannerMinimized ? '45px' : '75px') : '14px',
+              flex: '1 1 0',
+              height: '100%',
+              minHeight: 0,
+              overflowY: 'auto',
+              paddingBottom: classes.length > 0 ? (plannerMinimized ? '55px' : '220px') : '14px',
               position: 'relative',
               zIndex: 1
             }}
@@ -567,9 +568,14 @@ export function App() {
           id="commute-planner-section"
           className="glass-panel"
           style={{
-            position: 'relative',
+            position: classes.length > 0 ? 'absolute' : 'relative',
+            bottom: classes.length > 0 ? 0 : undefined,
+            left: classes.length > 0 ? 0 : undefined,
+            right: classes.length > 0 ? 0 : undefined,
             zIndex: 40,
-            marginTop: classes.length > 0 ? '-14px' : '8px',
+            marginTop: classes.length > 0 ? 0 : 'auto',
+            maxHeight: classes.length > 0 ? (plannerMinimized ? 'auto' : 'calc(100% - 60px)') : undefined,
+            overflowY: 'auto',
             padding: '12px 14px',
             background: 'rgba(16, 20, 31, 0.96)',
             backdropFilter: 'blur(24px)',
@@ -867,7 +873,7 @@ export function App() {
       {/* End of Left Column (Schedule & Planner) */}
 
       {/* Right Column: 5. Ask ScarletHop Copilot in Right Side */}
-      <div className="grid-col-right" style={{ position: 'sticky', top: '24px' }}>
+      <div className="grid-col-right" style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <AICopilotChat currentCampus={currentLocation} />
       </div>
     </div>

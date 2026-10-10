@@ -45,9 +45,18 @@ body {
 }
 
 #root {
+  height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+@media (max-height: 550px) {
+  #root {
+    height: auto;
+    overflow-y: auto;
+  }
 }
 
 button {
@@ -89,9 +98,9 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: stretch;
-  gap: 32px;
+  gap: 28px;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
 }
 
@@ -134,10 +143,9 @@ button {
 /* Bottom Floating Radar Widget: Always Aligned to the Bottom & Stacked Above */
 .bottom-floating-radar-widget {
   width: 100%;
-  margin-top: auto;
-  padding-top: 10px;
-  position: sticky;
-  bottom: 0;
+  margin-top: 0;
+  padding-top: 0;
+  position: relative;
   z-index: 60;
   flex-shrink: 0;
 }
