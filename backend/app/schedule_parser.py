@@ -69,7 +69,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.5-flash-lite',
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                 prompt

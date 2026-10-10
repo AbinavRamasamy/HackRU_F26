@@ -202,7 +202,7 @@ async def copilot_chat(req: ChatQueryRequest):
             Provide a concise, encouraging 2-sentence response with the exact bus to catch, stop, and estimated walk/ride buffer.
             """
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.5-flash-lite',
                 contents=prompt
             )
             return {
