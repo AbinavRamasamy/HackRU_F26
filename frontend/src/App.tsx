@@ -141,7 +141,6 @@ export function App() {
             type: "Bike / E-Scooter",
             estimated_minutes: 12,
             rush_hour_minutes: 14,
-            badge: "Active Commute",
             description: "Paved bike trail connecting campuses, bypassing highway bottleneck."
           },
           {
@@ -149,7 +148,6 @@ export function App() {
             type: "Transfer Route",
             estimated_minutes: 24,
             rush_hour_minutes: 32,
-            badge: "Transfer Connection",
             description: "Connecting transit loop through Scott Hall / The Yard."
           }
         ],
@@ -239,7 +237,6 @@ export function App() {
             type: "Bike / E-Scooter",
             estimated_minutes: isSame ? 3 : 15,
             rush_hour_minutes: isSame ? 4 : 16,
-            badge: "Active Commute",
             description: "Bike or e-scooter across dedicated campus trails."
           }
         ],
@@ -850,15 +847,16 @@ export function App() {
                                     {route.name}
                                   </span>
 
-                                  {route.badge && (
+                                  {/* Only render primary recommendation badge for #1 route, removing extra badges like Transfer Connection */}
+                                  {isTop && route.badge && !route.badge.toLowerCase().includes('transfer') && (
                                     <span style={{
                                       fontSize: '11px',
                                       fontWeight: 700,
                                       padding: '4px 9px',
                                       borderRadius: '6px',
-                                      background: isTop ? 'rgba(255, 77, 109, 0.22)' : 'rgba(255, 255, 255, 0.1)',
-                                      color: isTop ? '#ff4d6d' : '#f3f4f6',
-                                      border: isTop ? '1px solid rgba(255, 77, 109, 0.45)' : '1px solid rgba(255, 255, 255, 0.14)',
+                                      background: 'rgba(255, 77, 109, 0.22)',
+                                      color: '#ff4d6d',
+                                      border: '1px solid rgba(255, 77, 109, 0.45)',
                                       whiteSpace: 'nowrap',
                                       flexShrink: 0,
                                       display: 'inline-flex',
