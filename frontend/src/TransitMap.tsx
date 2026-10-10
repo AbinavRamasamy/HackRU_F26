@@ -26,6 +26,7 @@ import {
   getRouteColorInfo,
   getStopShortCode,
   getStopsForRoute,
+  RUTGERS_BUS_STOPS,
   type BusStop
 } from './transitDirectory';
 
@@ -176,7 +177,8 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const [liveRoute, setLiveRoute] = useState<LiveRouteResult | null>(null);
   const [isRoutingLoading, setIsRoutingLoading] = useState<boolean>(false);
   const [currentZoom, setCurrentZoom] = useState<number>(13);
-  const isZoomedOut = currentZoom < 14.75;
+  const currentZoomThreshold = 12.8;
+  const isZoomedOut = currentZoom < currentZoomThreshold;
 
   // 1. DYNAMIC NEAREST-STOP CALCULATION (ZERO HARDCODING):
   // Dynamically resolve exact coordinates for current location and target location/building
@@ -651,6 +653,133 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           });
           markersGroup.addLayer(L.marker([destTarget.lat, destTarget.lon], { icon: destBuildingIcon }));
         }
+
+        // Render all other network stops in RUTGERS_BUS_STOPS so stops like Quads, Science Building, etc. are always present
+        const renderedStopNames = new Set([
+          boardingStop.name.toLowerCase(),
+          dropoffStop.name.toLowerCase(),
+          ...routeStops.map(s => s.name.toLowerCase())
+        ]);
+
+        RUTGERS_BUS_STOPS.forEach((st) => {
+          if (renderedStopNames.has(st.name.toLowerCase())) return;
+          if (st.name.includes('(SB)') || st.name.includes('(NB)')) return;
+
+          const code = getStopShortCode(st.name);
+          const otherStopIcon = L.divIcon({
+            className: 'apple-stop-network-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 2.5px;
+                padding: 2px 5.5px;
+                background: rgba(28, 28, 30, 0.88);
+                backdrop-filter: blur(14px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 9999px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="font-size: 8.5px;">🚏</span>
+                <span style="font-size: 9px; font-weight: 600; color: rgba(235, 235, 245, 0.85); font-family: -apple-system, sans-serif;">
+                  ${code}
+                </span>
+              </div>
+            `,
+            iconSize: [50, 20],
+            iconAnchor: [25, 10]
+          });
+
+          const oMarker = L.marker([st.lat, st.lon], { icon: otherStopIcon });
+          oMarker.on('click', () => {
+            if (onSelectTargetLocation) onSelectTargetLocation(st.name);
+          });
+          oMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">${st.campus} Campus</div>
+              <div style="font-size: 9.5px; color: #888; margin-top: 1px;">Routes: ${st.routes.join(', ')}</div>
+              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                margin-top: 6px;
+                width: 100%;
+                padding: 4px 8px;
+                background: #0A84FF;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              ">
+                Route to this Stop ➔
+              </button>
+            </div>
+          `);
+          markersGroup.addLayer(oMarker);
+        });
+      } else {
+        // No active route selected: render all Rutgers bus stops (Quads, Science Building, BSC, LSC, The Yard, etc.)
+        RUTGERS_BUS_STOPS.forEach((st) => {
+          if (st.name.includes('(SB)') || st.name.includes('(NB)')) return;
+
+          const code = getStopShortCode(st.name);
+          const stopGlyphIcon = L.divIcon({
+            className: 'apple-stop-glyph-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                padding: 2.5px 6px;
+                background: rgba(28, 28, 30, 0.92);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.22);
+                border-radius: 9999px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="font-size: 9.5px;">🚏</span>
+                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.9); font-family: -apple-system, sans-serif;">
+                  ${code}
+                </span>
+              </div>
+            `,
+            iconSize: [52, 22],
+            iconAnchor: [26, 11]
+          });
+
+          const sMarker = L.marker([st.lat, st.lon], { icon: stopGlyphIcon });
+          sMarker.on('click', () => {
+            if (onSelectTargetLocation) onSelectTargetLocation(st.name);
+          });
+          sMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">${st.campus} Campus</div>
+              <div style="font-size: 9.5px; color: #888; margin-top: 1px;">Routes: ${st.routes.join(', ')}</div>
+              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                margin-top: 6px;
+                width: 100%;
+                padding: 4px 8px;
+                background: #0A84FF;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              ">
+                Route to this Stop ➔
+              </button>
+            </div>
+          `);
+          markersGroup.addLayer(sMarker);
+        });
       }
     }
 

@@ -429,7 +429,7 @@ export function getStopShortCode(stopName: string): string {
   if (s.includes("cook student") || s.includes("csc")) return "CSC";
   if (s.includes("allison road") || s.includes("arc")) return "ARC";
   if (s.includes("hill center") || s.includes("hill")) return "HILL";
-  if (s.includes("science")) return "SEC";
+  if (s.includes("science")) return "SCIENCE";
   if (s.includes("the yard") || s.includes("yard")) return "YARD";
   if (s.includes("student activities") || s.includes("sac")) return "SAC";
   if (s.includes("socam")) return "SOCAM";
@@ -452,9 +452,11 @@ export function getStopShortCode(stopName: string): string {
 export const ROUTE_STOP_SEQUENCES: Record<string, string[]> = {
   "Weekend 1": [
     "Busch Student Center",
-    "Allison Road Classrooms",
+    "Science Building",
     "Hill Center",
+    "Allison Road Classrooms",
     "Livingston Student Center",
+    "Quads",
     "Livingston Plaza",
     "College Hall",
     "Red Oak Lane",
@@ -469,6 +471,7 @@ export const ROUTE_STOP_SEQUENCES: Record<string, string[]> = {
   "Weekend 2": [
     "Busch Student Center",
     "Hill Center",
+    "Science Building",
     "Allison Road Classrooms",
     "College Avenue Student Center",
     "The Yard",
@@ -480,6 +483,7 @@ export const ROUTE_STOP_SEQUENCES: Record<string, string[]> = {
     "Henderson",
     "Gibbons",
     "Livingston Student Center",
+    "Quads",
     "Livingston Plaza"
   ],
   "LX": [
