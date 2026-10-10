@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Send, Bot, User } from 'lucide-react';
+import { Sparkles, Send, Bot, User, MoreHorizontal } from 'lucide-react';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -67,7 +67,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
 
   return (
     <div className="glass-panel" style={{
-      padding: '16px 18px',
+      padding: '14px 15px',
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
@@ -180,22 +180,32 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         <button
           onClick={handleSend}
           disabled={loading}
+          title={loading ? "Sending..." : "Send"}
           style={{
-            padding: '10px 16px',
+            width: '38px',
+            height: '38px',
+            minWidth: '38px',
+            padding: 0,
             borderRadius: '8px',
-            background: 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
+            background: loading 
+              ? 'rgba(204, 0, 51, 0.45)' 
+              : 'linear-gradient(135deg, #cc0033 0%, #a00028 100%)',
             color: '#fff',
-            fontWeight: 700,
-            fontSize: '12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
+            justifyContent: 'center',
             border: 'none',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(204, 0, 51, 0.35)'
+            cursor: loading ? 'not-allowed' : 'pointer',
+            boxShadow: '0 2px 8px rgba(204, 0, 51, 0.35)',
+            transition: 'all 0.2s ease',
+            opacity: loading ? 0.8 : 1
           }}
         >
-          {loading ? "..." : "Send"} <Send size={13} />
+          {loading ? (
+            <MoreHorizontal size={17} style={{ animation: 'pulse-ring 1.4s infinite ease-in-out' }} />
+          ) : (
+            <Send size={15} />
+          )}
         </button>
       </div>
     </div>
