@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation } from 'lucide-react';
+import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigation, LocateFixed, RefreshCw } from 'lucide-react';
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
 import { WidgetEmbedModal } from './WidgetEmbedModal';
+import { requestBrowserLocation, type ResolvedLocation } from './geolocation';
 
 interface ClassItem {
   course: string;
@@ -41,10 +42,36 @@ export function App() {
   const [originCampus, setOriginCampus] = useState("Busch");
   const [destCampus, setDestCampus] = useState("Livingston");
   const [currentLocation, setCurrentLocation] = useState("Busch Student Center");
+  const [geoStatus, setGeoStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
+  const [resolvedGeo, setResolvedGeo] = useState<ResolvedLocation | null>(null);
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [showEmbedModal, setShowEmbedModal] = useState(false);
   const [buses, setBuses] = useState<any[]>([]);
+
+  const requestLocationPermission = (isManual = false) => {
+    setGeoStatus("requesting");
+    requestBrowserLocation(
+      (loc) => {
+        setGeoStatus("granted");
+        setResolvedGeo(loc);
+        setCurrentLocation(loc.locationName);
+        setOriginCampus(loc.campus);
+      },
+      (err) => {
+        console.warn("Geolocation request failed or denied:", err);
+        setGeoStatus("denied");
+        if (isManual) {
+          alert("Location permission was not granted or is unavailable in your browser. You can select your campus location manually from the dropdown.");
+        }
+      }
+    );
+  };
+
+  useEffect(() => {
+    // Automatically request location permission on page load
+    requestLocationPermission(false);
+  }, []);
 
   useEffect(() => {
     const fetchBuses = async () => {
@@ -157,9 +184,11 @@ export function App() {
 
     const targetCampus = nextClass.campus || "College Ave";
 
-    // Set origin based on currentLocation
+    // Set origin based on live GPS location if available, otherwise current selection
     let currentOrigin = originCampus;
-    if (currentLocation.includes("Busch")) currentOrigin = "Busch";
+    if (resolvedGeo) {
+      currentOrigin = resolvedGeo.campus;
+    } else if (currentLocation.includes("Busch")) currentOrigin = "Busch";
     else if (currentLocation.includes("Livingston")) currentOrigin = "Livingston";
     else if (currentLocation.includes("College")) currentOrigin = "College Ave";
     else if (currentLocation.includes("Cook") || currentLocation.includes("Douglass")) currentOrigin = "Cook";
@@ -279,46 +308,96 @@ export function App() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Live GPS / Location Pill */}
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             fontSize: '12px',
-            padding: '4px 10px',
+            padding: '5px 12px',
             borderRadius: '20px',
-            background: 'rgba(204, 0, 51, 0.15)',
-            border: '1px solid rgba(204, 0, 51, 0.35)',
-            color: '#ff4d6d',
+            background: geoStatus === 'granted' 
+              ? 'rgba(16, 185, 129, 0.12)' 
+              : geoStatus === 'requesting'
+              ? 'rgba(234, 179, 8, 0.12)'
+              : 'rgba(204, 0, 51, 0.15)',
+            border: geoStatus === 'granted'
+              ? '1px solid rgba(16, 185, 129, 0.35)'
+              : geoStatus === 'requesting'
+              ? '1px solid rgba(234, 179, 8, 0.35)'
+              : '1px solid rgba(204, 0, 51, 0.35)',
+            color: geoStatus === 'granted' ? '#10b981' : geoStatus === 'requesting' ? '#fbbf24' : '#ff4d6d',
             fontWeight: 700
           }}>
-            <MapPin size={13} color="#ff3366" />
-            <span>At:</span>
-            <select
-              value={currentLocation}
-              onChange={(e) => {
-                setCurrentLocation(e.target.value);
-                if (e.target.value.includes("Busch")) setOriginCampus("Busch");
-                else if (e.target.value.includes("Livingston")) setOriginCampus("Livingston");
-                else if (e.target.value.includes("College")) setOriginCampus("College Ave");
-                else setOriginCampus("Cook");
-              }}
+            {geoStatus === 'granted' ? (
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#10b981',
+                boxShadow: '0 0 8px #10b981',
+                display: 'inline-block'
+              }} />
+            ) : (
+              <LocateFixed size={14} color={geoStatus === 'requesting' ? '#fbbf24' : '#ff3366'} />
+            )}
+
+            <span>{geoStatus === 'granted' ? 'Live GPS:' : 'Location:'}</span>
+
+            {geoStatus === 'requesting' ? (
+              <span style={{ color: '#fbbf24', fontStyle: 'italic' }}>Acquiring GPS...</span>
+            ) : (
+              <select
+                value={currentLocation}
+                onChange={(e) => {
+                  setCurrentLocation(e.target.value);
+                  if (e.target.value.includes("Busch")) setOriginCampus("Busch");
+                  else if (e.target.value.includes("Livingston")) setOriginCampus("Livingston");
+                  else if (e.target.value.includes("College")) setOriginCampus("College Ave");
+                  else setOriginCampus("Cook");
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {resolvedGeo && (
+                  <option value={resolvedGeo.locationName} style={{ background: '#161922' }}>
+                    {resolvedGeo.locationName} ({resolvedGeo.distanceMiles})
+                  </option>
+                )}
+                <option value="Busch Student Center" style={{ background: '#161922' }}>Busch Student Center</option>
+                <option value="Hill Center (Busch)" style={{ background: '#161922' }}>Hill Center (Busch)</option>
+                <option value="The Yard (College Ave)" style={{ background: '#161922' }}>The Yard (College Ave)</option>
+                <option value="Livingston Student Center" style={{ background: '#161922' }}>Livingston Student Center</option>
+                <option value="College Hall (Douglass)" style={{ background: '#161922' }}>College Hall (Douglass)</option>
+              </select>
+            )}
+
+            {/* Quick re-sync GPS button */}
+            <button
+              onClick={() => requestLocationPermission(true)}
+              title={geoStatus === 'granted' ? "Re-sync live GPS location" : "Request location permission"}
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#fff',
-                fontSize: '12px',
-                fontWeight: 700,
-                outline: 'none',
-                cursor: 'pointer'
+                color: geoStatus === 'granted' ? '#10b981' : '#ff4d6d',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '2px',
+                marginLeft: '2px',
+                opacity: 0.85
               }}
             >
-              <option value="Busch Student Center" style={{ background: '#161922' }}>Busch Student Center</option>
-              <option value="Hill Center (Busch)" style={{ background: '#161922' }}>Hill Center (Busch)</option>
-              <option value="The Yard (College Ave)" style={{ background: '#161922' }}>The Yard (College Ave)</option>
-              <option value="Livingston Student Center" style={{ background: '#161922' }}>Livingston Student Center</option>
-              <option value="College Hall (Douglass)" style={{ background: '#161922' }}>College Hall (Douglass)</option>
-            </select>
+              <RefreshCw size={12} />
+            </button>
           </div>
 
           <button
@@ -581,7 +660,33 @@ export function App() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
             <div>
-              <label style={{ fontSize: '12px', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>Origin Campus</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '12px', color: '#9ca3af' }}>Origin Campus</label>
+                {geoStatus === "granted" ? (
+                  <span style={{ fontSize: '10px', color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                    Live GPS ({resolvedGeo?.distanceMiles})
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => requestLocationPermission(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ff4d6d',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: 0
+                    }}
+                  >
+                    <LocateFixed size={11} /> Use My Location
+                  </button>
+                )}
+              </div>
               <select 
                 value={originCampus} 
                 onChange={(e) => setOriginCampus(e.target.value)}
