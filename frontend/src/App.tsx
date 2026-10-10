@@ -3,7 +3,6 @@ import { Bus, Upload, Calendar, ArrowRight, Zap, Sparkles, MapPin, Code, Navigat
 import { TransitWidget } from './TransitWidget';
 import { CampusRadar } from './CampusRadar';
 import { AICopilotChat } from './AICopilotChat';
-import { WidgetEmbedModal } from './WidgetEmbedModal';
 import { requestBrowserLocation, type ResolvedLocation } from './geolocation';
 
 interface ClassItem {
@@ -46,7 +45,7 @@ export function App() {
   const [resolvedGeo, setResolvedGeo] = useState<ResolvedLocation | null>(null);
   const [planResult, setPlanResult] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
-  const [showEmbedModal, setShowEmbedModal] = useState(false);
+  const [showWidgetOverlay, setShowWidgetOverlay] = useState(false);
   const [buses, setBuses] = useState<any[]>([]);
 
   const requestLocationPermission = (isManual = false) => {
@@ -400,25 +399,36 @@ export function App() {
             </button>
           </div>
 
-          <button
-            onClick={() => setShowEmbedModal(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '12px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#f3f4f6',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <Code size={13} color="#ff4d6d" />
-            Embed Widget
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowWidgetOverlay(prev => !prev)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                background: showWidgetOverlay ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                border: showWidgetOverlay ? '1px solid rgba(255, 255, 255, 0.35)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#f3f4f6',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: showWidgetOverlay ? '0 0 14px rgba(255, 255, 255, 0.12)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Code size={13} color="#ff4d6d" />
+              Transit Widget
+            </button>
+
+            <TransitWidget 
+              isOpen={showWidgetOverlay}
+              onClose={() => setShowWidgetOverlay(false)}
+              currentCampus={currentLocation}
+              nextClass={classes[0]}
+            />
+          </div>
 
           <div
             style={{
@@ -891,17 +901,6 @@ export function App() {
       {/* AI Copilot Chat Assistant */}
       <AICopilotChat currentCampus={currentLocation} />
 
-      {/* Embed Floating Widget */}
-      <TransitWidget 
-        currentCampus={currentLocation}
-        nextClass={classes[1]}
-      />
-
-      {/* Embed Code Modal */}
-      <WidgetEmbedModal 
-        isOpen={showEmbedModal}
-        onClose={() => setShowEmbedModal(false)}
-      />
     </div>
   );
 }
