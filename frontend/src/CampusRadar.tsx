@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Compass, Navigation, Bus, ChevronDown, RotateCcw } from 'lucide-react';
 
 export interface UpcomingStop {
@@ -61,19 +61,10 @@ export const getRoutesForCampus = (campus: string): string[] => {
   return ALL_RUTGERS_ROUTES;
 };
 
+import { getRouteColorInfo } from './transitDirectory';
+
 export const getRouteColor = (route: string) => {
-  if (route.includes("Weekend 1")) return "#0D9488";
-  if (route.includes("Weekend 2")) return "#059669";
-  if (route === "LX") return "#FF5722";
-  if (route === "B") return "#0A84FF";
-  if (route === "A") return "#30D158";
-  if (route === "H") return "#FF9F0A";
-  if (route === "F") return "#BF5AF2";
-  if (route === "EE") return "#FF375F";
-  if (route === "REXB") return "#64D2FF";
-  if (route === "REXL") return "#34D399";
-  if (route === "C") return "#8E8E93";
-  return "#0A84FF";
+  return getRouteColorInfo(route).bg;
 };
 
 export const getBusCurrentCampus = (b: BusLocation): string => {
@@ -98,42 +89,6 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   style
 }) => {
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
-  const [expandedBusId, setExpandedBusId] = useState<string | null>(null);
-  const dragStartYRef = useRef<{ [key: string]: number }>({});
-  const isDraggingRef = useRef<{ [key: string]: boolean }>({});
-
-  const handleCardPointerDown = (id: string, e: React.PointerEvent) => {
-    dragStartYRef.current[id] = e.clientY;
-    isDraggingRef.current[id] = false;
-  };
-
-  const handleCardPointerMove = (id: string, e: React.PointerEvent) => {
-    if (dragStartYRef.current[id] !== undefined) {
-      const deltaY = e.clientY - dragStartYRef.current[id];
-      if (Math.abs(deltaY) > 6) {
-        isDraggingRef.current[id] = true;
-      }
-    }
-  };
-
-  const handleCardPointerUp = (id: string, e: React.PointerEvent) => {
-    const startY = dragStartYRef.current[id];
-    if (startY !== undefined) {
-      const deltaY = e.clientY - startY;
-      // If user dragged down (> 12px), expand!
-      if (deltaY > 12) {
-        setExpandedBusId(id);
-      } else if (deltaY < -12) {
-        // If user dragged up (> 12px), collapse!
-        setExpandedBusId(prev => (prev === id ? null : prev));
-      } else {
-        // Click / tap toggle
-        setExpandedBusId(prev => (prev === id ? null : id));
-      }
-      delete dragStartYRef.current[id];
-      delete isDraggingRef.current[id];
-    }
-  };
 
   // Active routes from telemetry
   const activeWorkingRoutes = Array.from(new Set(buses.map(b => b.route).filter(Boolean)));
@@ -149,10 +104,10 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   const activeSelectedRoute = availableRoutes.includes(selectedRoute) ? selectedRoute : "ALL";
 
   const campuses = [
-    { name: "College Ave", desc: "The Yard, Scott Hall, SAC", color: "#FF375F" },
-    { name: "Livingston", desc: "Student Center, Plaza, RBS", color: "#FF5722" },
-    { name: "Busch", desc: "Hill Center, ARC, Stadium", color: "#0A84FF" },
-    { name: "Cook / Douglass", desc: "Red Oak Lane, Biel, Lipman", color: "#30D158" }
+    { name: "College Ave", desc: "The Yard, SAC, SoCam, CASC", color: "#FF375F" },
+    { name: "Livingston", desc: "Plaza, Student Center, Quads", color: "#FF5722" },
+    { name: "Busch", desc: "BSC, Hill Center, Science, ARC", color: "#0A84FF" },
+    { name: "Cook / Douglass", desc: "College Hall, Red Oak, Biel, Gibbons", color: "#30D158" }
   ];
 
   // Filtered bus list
@@ -398,13 +353,13 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           </span>
         </div>
 
-        {/* Scrollable Vehicle List with Liquid Glass Physics */}
+        {/* Scrollable Vehicle List */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
           gridAutoRows: 'max-content',
           alignContent: 'start',
-          gap: '12px',
+          gap: '10px',
           overflowY: 'auto',
           flex: '1 1 0',
           paddingRight: '4px',
@@ -414,288 +369,109 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
             const isFull = b.occupancy.toLowerCase().includes('full');
             const isCrowded = b.occupancy.toLowerCase().includes('standing') || b.occupancy.toLowerCase().includes('crowded');
             const statusColor = isFull ? '#FF453A' : isCrowded ? '#FF9F0A' : '#30D158';
-            const isExpanded = expandedBusId === b.id;
+            const statusBg = isFull ? 'rgba(255, 69, 58, 0.12)' : isCrowded ? 'rgba(255, 159, 10, 0.12)' : 'rgba(48, 209, 88, 0.12)';
+            const statusBorder = isFull ? 'rgba(255, 69, 58, 0.25)' : isCrowded ? 'rgba(255, 159, 10, 0.25)' : 'rgba(48, 209, 88, 0.25)';
+            const routeName = b.route === "Weekend 1" ? "WKND 1" : b.route === "Weekend 2" ? "WKND 2" : b.route;
 
             return (
               <div
                 key={b.id}
-                className={`liquid-glass-card ${isExpanded ? 'is-expanded' : ''}`}
-                onPointerDown={(e) => handleCardPointerDown(b.id, e)}
-                onPointerMove={(e) => handleCardPointerMove(b.id, e)}
-                onPointerUp={(e) => handleCardPointerUp(b.id, e)}
+                className="apple-transit-card"
                 style={{
-                  position: 'relative',
-                  cursor: 'grab'
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
-                {/* Fluid Specular Sheen (dynamic glass refraction gloss) */}
-                <div className="liquid-specular-gloss" />
-
-                {/* Iridescent Chromatic Border Glow */}
-                <div className="liquid-chromatic-glow" />
-
-                {/* Fluid Grab Handle Indicator */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingBottom: '6px',
-                  cursor: 'grab'
-                }}>
-                  <div
-                    className="liquid-grab-pill"
-                    title="Drag down or tap to expand full route itinerary"
-                  />
-                </div>
-
-                {/* Card Primary Header */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '10px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                    {/* Apple Route Badge Squircle */}
-                    <div style={{
-                      padding: '4px 8px',
-                      minWidth: '42px',
-                      height: '26px',
-                      borderRadius: '7px',
-                      background: getRouteColor(b.route),
-                      color: '#fff',
-                      fontWeight: 700,
-                      fontSize: '11px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow: `0 2px 8px ${getRouteColor(b.route)}55`
-                    }}>
-                      {b.route === "Weekend 1" ? "WKND 1" : b.route === "Weekend 2" ? "WKND 2" : b.route}
-                    </div>
-
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{
-                        fontSize: '12.5px',
-                        fontWeight: 650,
-                        color: '#fff',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        letterSpacing: '-0.01em'
-                      }}>
-                        To {b.destination}
-                      </div>
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'var(--apple-label-secondary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        marginTop: '1px'
-                      }}>
-                        <span>Unit #{b.id.slice(-4)}</span>
-                        <span>•</span>
-                        <span style={{
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {b.next_stop}
-                        </span>
-                      </div>
-                    </div>
+                {/* 1. Route Name & Time to Next Location */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{
+                    padding: '3px 8px',
+                    borderRadius: '7px',
+                    background: getRouteColor(b.route),
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                    letterSpacing: '-0.01em',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: `0 2px 6px ${getRouteColor(b.route)}44`
+                  }}>
+                    {routeName}
                   </div>
 
-                  {/* Right: ETA & Status Dot */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      color: '#fff',
-                      fontVariantNumeric: 'tabular-nums',
-                      letterSpacing: '-0.02em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      gap: '1px'
-                    }}>
-                      <span>{b.eta_mins}</span>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)' }}>m</span>
-                    </div>
-                    <div style={{
-                      fontSize: '10.5px',
-                      fontWeight: 500,
-                      color: statusColor,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      gap: '4px'
-                    }}>
-                      <span
-                        className="liquid-beacon-dot"
-                        style={{
-                          width: '5.5px',
-                          height: '5.5px',
-                          borderRadius: '50%',
-                          background: statusColor,
-                          boxShadow: `0 0 6px ${statusColor}`
-                        }}
-                      />
-                      {b.occupancy}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Fluid Route Transit Track (Visual Progression Bar) */}
-                <div style={{
-                  marginTop: '9px',
-                  padding: '6px 9px',
-                  borderRadius: '9px',
-                  background: 'rgba(0, 0, 0, 0.28)',
-                  border: '1px solid rgba(255, 255, 255, 0.04)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px'
-                }}>
                   <div style={{
                     display: 'flex',
+                    alignItems: 'baseline',
+                    gap: '2px',
+                    fontVariantNumeric: 'tabular-nums'
+                  }}>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>
+                      {b.eta_mins}
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)' }}>
+                      min
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Current / Next Location */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    color: '#fff',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    letterSpacing: '-0.01em'
+                  }}>
+                    {b.next_stop || b.destination}
+                  </div>
+                  {b.destination && b.destination !== b.next_stop && (
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--apple-label-secondary)',
+                      marginTop: '2px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      To {b.destination}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Seat Availability */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px',
                     fontSize: '10.5px',
-                    color: 'var(--apple-label-secondary)'
+                    fontWeight: 600,
+                    color: statusColor,
+                    background: statusBg,
+                    border: `1px solid ${statusBorder}`,
+                    padding: '2px 8px',
+                    borderRadius: '9999px'
                   }}>
-                    <Navigation size={11} color="#FF375F" />
-                    <span>{b.speed_mph} mph</span>
-                  </div>
-
-                  <div style={{
-                    flex: 1,
-                    height: '3px',
-                    borderRadius: '2px',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    maxWidth: '90px'
-                  }}>
-                    <div className="liquid-route-flow" style={{ width: '100%', height: '100%' }} />
-                  </div>
-
-                  <div style={{
-                    fontSize: '10.5px',
-                    fontWeight: 500,
-                    color: isExpanded ? '#FF375F' : 'var(--apple-label-tertiary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '2px'
-                  }}>
-                    <span>{isExpanded ? 'Expanded' : 'Pull or tap'}</span>
-                    <ChevronDown size={11} style={{
-                      transform: isExpanded ? 'rotate(180deg)' : 'none',
-                      transition: 'transform 0.22s ease'
+                    <span style={{
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: statusColor,
+                      boxShadow: `0 0 5px ${statusColor}`
                     }} />
-                  </div>
+                    {b.occupancy}
+                  </span>
                 </div>
-
-                {/* EXPANDED LIQUID GLASS MULTI-STOP ITINERARY ACCORDION */}
-                {isExpanded && (
-                  <div style={{
-                    marginTop: '11px',
-                    paddingTop: '11px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                    animation: 'apple-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}>
-                    <div style={{
-                      fontSize: '10.5px',
-                      fontWeight: 650,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      color: 'var(--apple-label-secondary)',
-                      marginBottom: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span>Upcoming Route Stations</span>
-                      <span style={{ fontSize: '10px', color: 'var(--apple-label-tertiary)' }}>Live GPS</span>
-                    </div>
-
-                    {/* Multi-stop upcoming itinerary timeline */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      {b.upcoming_stops && b.upcoming_stops.length > 0 ? (
-                        b.upcoming_stops.map((stop, sIdx) => (
-                          <div
-                            key={sIdx}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '5px 8px',
-                              borderRadius: '7px',
-                              background: sIdx === 0 ? 'rgba(255, 55, 95, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                              border: sIdx === 0 ? '1px solid rgba(255, 55, 95, 0.25)' : '1px solid rgba(255, 255, 255, 0.04)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, flex: 1 }}>
-                              <div style={{
-                                width: '5px',
-                                height: '5px',
-                                borderRadius: '50%',
-                                background: sIdx === 0 ? '#FF375F' : 'rgba(255, 255, 255, 0.3)',
-                                boxShadow: sIdx === 0 ? '0 0 5px #FF375F' : 'none'
-                              }} />
-                              <span style={{
-                                fontSize: '11px',
-                                fontWeight: sIdx === 0 ? 600 : 400,
-                                color: sIdx === 0 ? '#fff' : 'var(--apple-label-secondary)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}>
-                                {stop.station}
-                              </span>
-                            </div>
-                            <div style={{
-                              fontSize: '11px',
-                              fontWeight: 650,
-                              color: sIdx === 0 ? '#FF375F' : 'var(--apple-label-secondary)',
-                              fontVariantNumeric: 'tabular-nums',
-                              marginLeft: '8px'
-                            }}>
-                              {stop.eta_mins}m
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div style={{
-                          fontSize: '11px',
-                          color: 'var(--apple-label-secondary)',
-                          padding: '6px 8px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          borderRadius: '7px'
-                        }}>
-                          Next: <strong>{b.next_stop}</strong> • Dest: <strong>{b.destination}</strong>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Telemetry Footer */}
-                    <div style={{
-                      marginTop: '9px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: '9.5px',
-                      color: 'var(--apple-label-tertiary)',
-                      padding: '0 2px'
-                    }}>
-                      <span>GPS: {b.lat ? `${b.lat.toFixed(4)}, ${b.lon.toFixed(4)}` : 'Live'}</span>
-                      <span>Drag up or tap to close</span>
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}

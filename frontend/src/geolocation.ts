@@ -13,24 +13,28 @@ export interface ResolvedLocation {
 export const RUTGERS_LANDMARKS = [
   // Busch
   { name: "Busch Student Center", campus: "Busch" as const, lat: 40.5233, lon: -74.4586 },
-  { name: "Hill Center (Busch)", campus: "Busch" as const, lat: 40.5218, lon: -74.4626 },
-  { name: "Allison Road Classrooms (Busch)", campus: "Busch" as const, lat: 40.5242, lon: -74.4646 },
-  { name: "Science & Engineering (Busch)", campus: "Busch" as const, lat: 40.5228, lon: -74.4638 },
+  { name: "Hill Center", campus: "Busch" as const, lat: 40.5218, lon: -74.4626 },
+  { name: "Science Building", campus: "Busch" as const, lat: 40.5230, lon: -74.4635 },
+  { name: "Allison Road Classrooms", campus: "Busch" as const, lat: 40.5242, lon: -74.4646 },
 
   // Livingston
+  { name: "Livingston Plaza", campus: "Livingston" as const, lat: 40.5273, lon: -74.4398 },
   { name: "Livingston Student Center", campus: "Livingston" as const, lat: 40.5241, lon: -74.4357 },
-  { name: "Livingston Plaza / RBS", campus: "Livingston" as const, lat: 40.5273, lon: -74.4398 },
-  { name: "Tillett Hall (Livingston)", campus: "Livingston" as const, lat: 40.5255, lon: -74.4371 },
+  { name: "Quads", campus: "Livingston" as const, lat: 40.5214, lon: -74.4348 },
 
   // College Ave
-  { name: "The Yard (College Ave)", campus: "College Ave" as const, lat: 40.5015, lon: -74.4485 },
-  { name: "College Ave Student Center", campus: "College Ave" as const, lat: 40.5028, lon: -74.4518 },
-  { name: "Scott Hall (College Ave)", campus: "College Ave" as const, lat: 40.4991, lon: -74.4478 },
+  { name: "College Avenue Student Center", campus: "College Ave" as const, lat: 40.5028, lon: -74.4518 },
+  { name: "The Yard", campus: "College Ave" as const, lat: 40.5015, lon: -74.4485 },
+  { name: "Student Activities Center", campus: "College Ave" as const, lat: 40.4990, lon: -74.4445 },
+  { name: "SoCam Apts", campus: "College Ave" as const, lat: 40.4918, lon: -74.4436 },
 
   // Cook / Douglass
-  { name: "College Hall (Douglass)", campus: "Cook" as const, lat: 40.4851, lon: -74.4376 },
-  { name: "Cook Student Center", campus: "Cook" as const, lat: 40.4802, lon: -74.4312 },
-  { name: "Red Oak Lane (Cook)", campus: "Cook" as const, lat: 40.4815, lon: -74.4348 }
+  { name: "College Hall", campus: "Cook" as const, lat: 40.4851, lon: -74.4376 },
+  { name: "Red Oak Lane", campus: "Cook" as const, lat: 40.4815, lon: -74.4348 },
+  { name: "Lipman Hall", campus: "Cook" as const, lat: 40.4835, lon: -74.4365 },
+  { name: "Biel Road", campus: "Cook" as const, lat: 40.4802, lon: -74.4312 },
+  { name: "Henderson", campus: "Cook" as const, lat: 40.4780, lon: -74.4360 },
+  { name: "Gibbons", campus: "Cook" as const, lat: 40.4770, lon: -74.4370 }
 ];
 
 export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {

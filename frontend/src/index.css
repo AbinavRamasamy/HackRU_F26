@@ -340,140 +340,81 @@ button:active {
   }
 }
 
-/* ========================================================
-   LIQUID GLASS MATERIAL & FLUID DRAG/EXPAND QUIRKS
-   ======================================================== */
-
-.liquid-glass-shell {
-  background: rgba(20, 20, 24, 0.72);
-  backdrop-filter: blur(48px) saturate(220%) contrast(105%);
-  -webkit-backdrop-filter: blur(48px) saturate(220%) contrast(105%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.45),
-    0 24px 60px rgba(0, 0, 0, 0.65);
-  border-radius: 22px;
+/* Apple Transit Live Vehicle Card */
+.apple-transit-card {
   position: relative;
-  overflow: hidden;
-  transition: all 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.liquid-glass-card {
-  position: relative;
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 4px 18px rgba(0, 0, 0, 0.35);
-  padding: 13px 15px;
-  cursor: grab;
-  user-select: none;
-  touch-action: pan-y;
-  transition:
-    transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 8px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 
-.liquid-glass-card:hover {
+.apple-transit-card:hover {
   background: rgba(255, 255, 255, 0.075);
-  border-color: rgba(255, 255, 255, 0.22);
-  transform: translateY(-2px) scale(1.008);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 12px 30px rgba(0, 0, 0, 0.5),
-    0 0 18px rgba(255, 55, 95, 0.15);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 20px rgba(0, 0, 0, 0.45);
 }
 
-.liquid-glass-card:active {
-  cursor: grabbing;
-  transform: scale(0.985);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 3px 10px rgba(0, 0, 0, 0.45);
+/* Google Maps Tiles Styling */
+.google-maps-dark-tiles {
+  filter: invert(90%) hue-rotate(180deg) brightness(85%) contrast(110%);
 }
 
-.liquid-glass-card.is-expanded {
-  background: rgba(32, 32, 40, 0.88);
-  border-color: rgba(255, 55, 95, 0.45);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 20px 50px rgba(0, 0, 0, 0.8),
-    0 0 30px rgba(255, 55, 95, 0.22);
-  transform: scale(1.01);
+.google-maps-standard-tiles {
+  filter: none;
 }
 
-/* Fluid Grab Handle Indicator */
-.liquid-grab-pill {
-  width: 36px;
-  height: 4px;
+/* Dark Frosted Glass Map Overlay Buttons */
+.apple-btn-dark-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 13px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.25);
-  margin: 0 auto;
-  cursor: grab;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(28, 28, 30, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.liquid-grab-pill:hover,
-.liquid-glass-card:hover .liquid-grab-pill {
-  background: rgba(255, 255, 255, 0.55);
-  width: 48px;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+.apple-btn-dark-glass:hover {
+  background: rgba(44, 44, 46, 0.98);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.75);
+  color: #FFFFFF;
 }
 
-/* Fluid Liquid Specular Sheen (Dynamic glass gloss) */
-.liquid-specular-gloss {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 45%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0) 100%);
-  pointer-events: none;
-  border-top-left-radius: inherit;
-  border-top-right-radius: inherit;
+/* Dark Theme for Leaflet Controls */
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
 }
 
-/* Iridescent Chromatic Edge Border */
-.liquid-chromatic-glow {
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 55, 95, 0.2) 30%, rgba(10, 132, 255, 0.2) 70%, rgba(255, 255, 255, 0.08) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  padding: 1px;
-  opacity: 0.6;
+.leaflet-bar a {
+  background-color: rgba(28, 28, 30, 0.92) !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-/* Liquid Pulsing Beacon */
-@keyframes liquid-beacon {
-  0% { transform: scale(0.9); opacity: 0.9; }
-  50% { transform: scale(1.3); opacity: 0.35; }
-  100% { transform: scale(0.9); opacity: 0.9; }
+.leaflet-bar a:hover {
+  background-color: rgba(44, 44, 46, 0.98) !important;
+  color: #ffffff !important;
 }
-
-.liquid-beacon-dot {
-  animation: liquid-beacon 2s infinite ease-in-out;
-}
-
-/* Fluid Live Route Track Progress Shimmer */
-@keyframes track-flow {
-  0% { background-position: -150% 0; }
-  100% { background-position: 150% 0; }
-}
-
-.liquid-route-flow {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 55, 95, 0.7) 50%, rgba(255, 255, 255, 0.1) 100%);
-  background-size: 200% 100%;
-  animation: track-flow 2.4s infinite linear;
-}
-
