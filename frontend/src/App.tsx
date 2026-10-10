@@ -416,17 +416,17 @@ export function App() {
                 <label style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  padding: '5px 10px',
-                  borderRadius: '6px',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '7px',
                   background: 'rgba(204, 0, 51, 0.15)',
                   border: '1px solid rgba(204, 0, 51, 0.4)',
                   color: '#ff4d6d',
-                  fontSize: '11px',
+                  fontSize: '11.5px',
                   fontWeight: 700,
                   cursor: 'pointer'
                 }}>
-                  <Upload size={12} />
+                  <Upload size={13} />
                   {uploading ? "Importing..." : "Upload (.ics / Image)"}
                   <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
@@ -523,10 +523,10 @@ export function App() {
                         </div>
                         <div style={{ marginTop: '3px', display: 'flex', justifyContent: 'flex-end' }}>
                           <span style={{
-                            fontSize: '10px',
+                            fontSize: '11px',
                             fontWeight: 800,
-                            padding: '2px 7px',
-                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            borderRadius: '5px',
                             background: 'rgba(204, 0, 51, 0.2)',
                             border: '1px solid rgba(204, 0, 51, 0.45)',
                             color: '#ff4d6d'
@@ -577,20 +577,20 @@ export function App() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      padding: '3px 8px',
+                      gap: '5px',
+                      padding: '5px 10px',
                       borderRadius: '6px',
                       background: 'linear-gradient(135deg, #cc0033 0%, #800020 100%)',
                       border: '1px solid rgba(255, 51, 102, 0.4)',
                       color: '#fff',
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 700,
                       cursor: 'pointer',
                       boxShadow: '0 2px 6px rgba(204, 0, 51, 0.3)',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    <Navigation size={11} color="#fff" />
+                    <Navigation size={12} color="#fff" />
                     Get Next Class
                   </button>
                 )}
@@ -601,19 +601,19 @@ export function App() {
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      padding: '3px 8px',
+                      gap: '5px',
+                      padding: '5px 10px',
                       borderRadius: '6px',
                       background: 'rgba(255, 255, 255, 0.06)',
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       color: '#e5e7eb',
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 700,
                       cursor: 'pointer',
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    {plannerMinimized ? <>Expand <ChevronUp size={12} /></> : <>Minimize <ChevronDown size={12} /></>}
+                    {plannerMinimized ? <>Expand <ChevronUp size={13} /></> : <>Minimize <ChevronDown size={13} /></>}
                   </button>
                 )}
               </div>
@@ -807,38 +807,43 @@ export function App() {
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
                                   <span style={{
-                                    fontSize: '10px',
+                                    fontSize: '11px',
                                     fontWeight: 800,
                                     color: isTop ? '#ff4d6d' : '#9ca3af',
-                                    minWidth: '18px',
+                                    minWidth: '20px',
                                     flexShrink: 0
                                   }}>
                                     #{idx + 1}
                                   </span>
 
                                   <span style={{
-                                    fontSize: '12px',
+                                    fontSize: '12.5px',
                                     fontWeight: 800,
                                     color: '#fff',
-                                    padding: '2px 7px',
-                                    borderRadius: '5px',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
                                     background: badgeBg,
                                     whiteSpace: 'nowrap',
-                                    flexShrink: 0
+                                    flexShrink: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center'
                                   }}>
                                     {route.name}
                                   </span>
 
                                   {route.badge && (
                                     <span style={{
-                                      fontSize: '9px',
+                                      fontSize: '11px',
                                       fontWeight: 700,
-                                      padding: '2px 5px',
-                                      borderRadius: '4px',
-                                      background: isTop ? 'rgba(255, 77, 109, 0.2)' : 'rgba(255, 255, 255, 0.08)',
-                                      color: isTop ? '#ff4d6d' : '#d1d5db',
+                                      padding: '4px 9px',
+                                      borderRadius: '6px',
+                                      background: isTop ? 'rgba(255, 77, 109, 0.22)' : 'rgba(255, 255, 255, 0.1)',
+                                      color: isTop ? '#ff4d6d' : '#f3f4f6',
+                                      border: isTop ? '1px solid rgba(255, 77, 109, 0.45)' : '1px solid rgba(255, 255, 255, 0.14)',
                                       whiteSpace: 'nowrap',
-                                      flexShrink: 0
+                                      flexShrink: 0,
+                                      display: 'inline-flex',
+                                      alignItems: 'center'
                                     }}>
                                       {route.badge}
                                     </span>
