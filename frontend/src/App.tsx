@@ -284,7 +284,16 @@ export function App() {
   };
 
   return (
-    <div style={{ width: '100%', margin: 0, padding: '16px 28px', minHeight: '100vh', boxSizing: 'border-box' }}>
+    <div style={{
+      width: '100%',
+      margin: 0,
+      padding: '16px 28px 20px',
+      minHeight: '100vh',
+      boxSizing: 'border-box',
+      display: 'flex',
+      flexDirection: 'column',
+      flex: 1
+    }}>
       {/* Top Navbar */}
       <header style={{
         display: 'flex',

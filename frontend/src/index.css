@@ -44,6 +44,12 @@ body {
   background-attachment: fixed;
 }
 
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -114,7 +120,9 @@ button {
 /* Bottom Floating Radar Widget */
 .bottom-floating-radar-widget {
   width: 100%;
-  margin: 14px auto 0;
+  margin-top: auto;
+  padding-top: 20px;
 }
+
 
 
