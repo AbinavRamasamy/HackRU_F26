@@ -131,14 +131,14 @@ button {
   }
 }
 
-/* Bottom Floating Radar Widget: Always Aligned to the Bottom */
+/* Bottom Floating Radar Widget: Always Aligned to the Bottom & Stacked Above */
 .bottom-floating-radar-widget {
   width: 100%;
   margin-top: auto;
   padding-top: 10px;
   position: sticky;
   bottom: 0;
-  z-index: 30;
+  z-index: 60;
   flex-shrink: 0;
 }
 

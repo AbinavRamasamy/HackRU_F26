@@ -57,14 +57,14 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
 
   const floatingWidgetStyle: React.CSSProperties = isFloatingWidget ? {
     borderRadius: '16px',
-    background: 'rgba(18, 20, 29, 0.92)',
+    background: 'rgba(18, 20, 29, 0.95)',
     backdropFilter: 'blur(24px)',
     WebkitBackdropFilter: 'blur(24px)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(204, 0, 51, 0.12)',
-    padding: '12px 18px'
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.85), 0 0 24px rgba(204, 0, 51, 0.15)',
+    padding: '14px 20px'
   } : {
-    padding: '12px 18px'
+    padding: '14px 20px'
   };
 
   return (
@@ -231,7 +231,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
       <div style={{
         background: 'rgba(0,0,0,0.25)',
         borderRadius: '10px',
-        padding: '10px 12px',
+        padding: '12px 14px',
         border: '1px solid rgba(255,255,255,0.04)'
       }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -243,7 +243,7 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '8px',
-          maxHeight: '85px',
+          maxHeight: '145px',
           overflowY: 'auto',
           paddingRight: '4px'
         }}>

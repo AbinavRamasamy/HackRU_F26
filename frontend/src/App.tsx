@@ -860,31 +860,6 @@ export function App() {
                       </div>
                     );
                   })}
-
-                  {!expandedRoutes && routesList.length > 1 && (
-                    <button
-                      onClick={() => setExpandedRoutes(true)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px dashed rgba(255, 255, 255, 0.12)',
-                        borderRadius: '6px',
-                        color: '#38bdf8',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        padding: '5px 8px',
-                        width: '100%',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <span>Show {routesList.length - 1} more option{routesList.length > 2 ? 's' : ''} ({routesList.slice(1).map((r: any) => r.name).join(', ')})</span>
-                      <ChevronDown size={12} />
-                    </button>
-                  )}
                 </div>
               </div>
             );
