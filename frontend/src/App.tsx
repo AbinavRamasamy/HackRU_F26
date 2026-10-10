@@ -789,21 +789,23 @@ export function App() {
           )}
         </div>
       </div>
-      {/* End of Left Column */}
-
-      {/* Middle Column: 6. Rutgers Live Radar in Bottom Middle */}
-      <div className="grid-col-radar" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <CampusRadar
-          buses={buses}
-          selectedCampus={originCampus}
-          onSelectCampus={(c) => setOriginCampus(c)}
-        />
-      </div>
+      {/* End of Left Column (Schedule & Planner) */}
 
       {/* Right Column: 5. Ask ScarletHop Copilot in Right Side */}
       <div className="grid-col-right" style={{ position: 'sticky', top: '24px' }}>
         <AICopilotChat currentCampus={currentLocation} />
       </div>
+    </div>
+    {/* End of Upper 2-Column Dashboard Grid */}
+
+    {/* 6. Rutgers Live Transit Radar: Bottom Middle Floating Widget */}
+    <div className="bottom-floating-radar-widget">
+      <CampusRadar
+        buses={buses}
+        selectedCampus={originCampus}
+        onSelectCampus={(c) => setOriginCampus(c)}
+        isFloatingWidget={true}
+      />
     </div>
 
     </div>

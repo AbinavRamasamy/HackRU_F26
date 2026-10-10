@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigation, Compass } from 'lucide-react';
+import { Navigation, Compass, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface BusLocation {
   id: string;
@@ -18,15 +18,18 @@ interface CampusRadarProps {
   selectedCampus: string;
   onSelectCampus: (campus: string) => void;
   style?: React.CSSProperties;
+  isFloatingWidget?: boolean;
 }
 
 export const CampusRadar: React.FC<CampusRadarProps> = ({
   buses,
   selectedCampus,
   onSelectCampus,
-  style
+  style,
+  isFloatingWidget = false
 }) => {
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
+  const [minimized, setMinimized] = useState(false);
 
   const campuses = [
     { name: "College Ave", desc: "The Yard, Scott Hall, Student Center", color: "#cc0033" },
@@ -52,8 +55,20 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
     return true;
   });
 
+  const floatingWidgetStyle: React.CSSProperties = isFloatingWidget ? {
+    borderRadius: '24px',
+    background: 'rgba(18, 20, 29, 0.88)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    boxShadow: '0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(204, 0, 51, 0.14)',
+    padding: '26px'
+  } : {
+    padding: '24px'
+  };
+
   return (
-    <div className="glass-panel" style={{ padding: '24px', ...style }}>
+    <div className="glass-panel" style={{ ...floatingWidgetStyle, ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
@@ -90,8 +105,8 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           </div>
         </div>
 
-        {/* Route Filter Pills */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        {/* Route Filter Pills & Minimize Toggle */}
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           {["ALL", "Weekend 1", "Weekend 2", "LX", "B", "A", "H", "F", "EE", "REXB"].map(route => (
             <button
               key={route}
@@ -109,10 +124,39 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
               {route}
             </button>
           ))}
+
+          {isFloatingWidget && (
+            <button
+              onClick={() => setMinimized(prev => !prev)}
+              title={minimized ? "Expand Floating Widget" : "Minimize Floating Widget"}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#e5e7eb',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginLeft: '4px'
+              }}
+            >
+              {minimized ? (
+                <>Expand <ChevronUp size={13} /></>
+              ) : (
+                <>Minimize <ChevronDown size={13} /></>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Visual Campus Corridors Graph */}
+      {!minimized && (
+        <>
+          {/* Visual Campus Corridors Graph */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -257,6 +301,8 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
           ))}
         </div>
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 };

@@ -78,34 +78,23 @@ button {
   animation: pulse-ring 2.5s infinite ease-in-out;
 }
 
-/* Overhauled Dashboard Responsive Grid */
+/* Upper Dashboard 2-Column Grid (Left: Schedule & Planner, Right: Copilot) */
 .main-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(460px, 1fr) minmax(340px, 400px);
+  grid-template-columns: minmax(380px, 1.12fr) minmax(360px, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-@media (max-width: 1240px) and (min-width: 861px) {
-  .main-dashboard-grid {
-    grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr);
-  }
-  .grid-col-left {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .grid-col-right {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .grid-col-radar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-}
-
-@media (max-width: 860px) {
+@media (max-width: 980px) {
   .main-dashboard-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Bottom Floating Radar Widget */
+.bottom-floating-radar-widget {
+  max-width: 1400px;
+  margin: 32px auto 0;
+  width: 100%;
 }
