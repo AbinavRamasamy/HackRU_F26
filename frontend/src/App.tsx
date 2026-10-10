@@ -7,10 +7,12 @@ import { WidgetEmbedModal } from './WidgetEmbedModal';
 
 interface ClassItem {
   course: string;
-  days: string[];
+  days: string[] | string;
+  days_display?: string;
   startTime: string;
   endTime: string;
   building: string;
+  location?: string;
   campus: string;
   closest_stop?: string;
 }
@@ -20,27 +22,33 @@ export function App() {
     {
       course: "Intro to Computer Science (01:198:111)",
       days: ["M", "TH"],
+      days_display: "M, TH",
       startTime: "10:20",
       endTime: "11:40",
       building: "Hill Center 114",
+      location: "Hill Center 114 (Busch)",
       campus: "Busch",
       closest_stop: "Hill Center"
     },
     {
       course: "Linear Algebra (01:640:250)",
       days: ["M", "TH"],
+      days_display: "M, TH",
       startTime: "12:10",
       endTime: "13:30",
       building: "Tillett Hall 254",
+      location: "Tillett Hall 254 (Livingston)",
       campus: "Livingston",
       closest_stop: "Livingston Student Center"
     },
     {
       course: "Data Structures (01:198:112)",
       days: ["T", "F"],
+      days_display: "T, F",
       startTime: "14:00",
       endTime: "15:20",
       building: "Academic Building 1180",
+      location: "Academic Building 1180 (College Ave)",
       campus: "College Ave",
       closest_stop: "The Yard"
     }
@@ -310,24 +318,57 @@ export function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {classes.map((cls, idx) => (
               <div key={idx} style={{
-                padding: '14px',
-                borderRadius: '10px',
+                padding: '14px 16px',
+                borderRadius: '12px',
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid rgba(255, 255, 255, 0.06)',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                gap: '12px'
               }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff' }}>{cls.course}</div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={12} color="#cc0033" />
-                    <span>{cls.building} • <strong style={{ color: '#e5e7eb' }}>{cls.campus}</strong></span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {cls.course}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <MapPin size={13} color="#ef4444" style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong style={{ color: '#fff' }}>Location:</strong> {cls.location || cls.building || "Campus Classroom"}
+                    </span>
+                    {cls.closest_stop && (
+                      <span style={{
+                        fontSize: '11px',
+                        color: '#9ca3af',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        Stop: {cls.closest_stop}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8' }}>{cls.startTime} - {cls.endTime}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7280' }}>{cls.days.join(', ')}</div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#38bdf8' }}>
+                    {cls.startTime} - {cls.endTime}
+                  </div>
+                  <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '5px',
+                      background: 'rgba(204, 0, 51, 0.2)',
+                      border: '1px solid rgba(204, 0, 51, 0.45)',
+                      color: '#ff4d6d',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {cls.days_display || (Array.isArray(cls.days) ? cls.days.join(", ") : cls.days)}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
