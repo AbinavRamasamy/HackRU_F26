@@ -1,4 +1,4 @@
-# ScarletHop - Smarter Commutes Across the Banks
+# ScarletHop - Smarter Commutes Across Rutgers
 
 **ScarletHop** is an intelligent Rutgers transit companion and embeddable widget that helps students effortlessly navigate between campuses and classes on time.  
 By combining multimodal class schedule parsing, live campus bus telemetry, and AI-driven delay prediction, the system eliminates transit anxiety and eliminates the guesswork of New Brunswick bus commutes.
