@@ -94,15 +94,26 @@ export const CampusRadar: React.FC<CampusRadarProps> = ({
   const [selectedRoute, setSelectedRoute] = useState<string>("ALL");
   const [minimized, setMinimized] = useState(false);
 
-  // Available route pills dynamically based on selected campus filter
-  const availableRoutes = ["ALL", ...getRoutesForCampus(selectedCampus)];
+  // Extract currently active / working routes from live transitstat.us telemetry
+  const activeWorkingRoutes = Array.from(new Set(buses.map(b => b.route).filter(Boolean)));
+  const campusServicedRoutes = getRoutesForCampus(selectedCampus);
 
-  // Reset selectedRoute if currently selected route is not valid for newly filtered campus
+  // Only show working buses that are operating in transitstat.us and service the selected campus
+  const workingRoutes = activeWorkingRoutes.length > 0
+    ? activeWorkingRoutes.filter(r => campusServicedRoutes.includes(r))
+    : campusServicedRoutes;
+
+  // Preserve canonical Rutgers order + any dynamic lines
+  const sortedWorkingRoutes = ALL_RUTGERS_ROUTES.filter(r => workingRoutes.includes(r));
+  const extraActiveRoutes = workingRoutes.filter(r => !ALL_RUTGERS_ROUTES.includes(r));
+  const availableRoutes = ["ALL", ...sortedWorkingRoutes, ...extraActiveRoutes];
+
+  // Reset selectedRoute if currently selected route is not valid for newly filtered campus/telemetry
   useEffect(() => {
     if (selectedRoute !== "ALL" && !availableRoutes.includes(selectedRoute)) {
       setSelectedRoute("ALL");
     }
-  }, [selectedCampus]);
+  }, [selectedCampus, buses]);
 
   const campuses = [
     { name: "College Ave", desc: "The Yard, Scott Hall, Student Center", color: "#cc0033" },
