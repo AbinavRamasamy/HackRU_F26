@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 from dotenv import load_dotenv, find_dotenv
+import hashlib
+from app.user_store import load_users, save_users
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
@@ -293,3 +295,101 @@ def calculate_commute(plan: CommutePlanRequest):
         "rush_hour_minutes": rush_mins,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
+
+SPEED_OPTIONS = ["Mosey", "Wander", "Stroll", "Dash", "Zoom"]
+DISTANCE_OPTIONS = ["Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "A Mile or More"]
+class SignupRequest(BaseModel):
+    username: str
+    password: str
+    walking_speed: str
+    prefer_walking: bool
+    max_walking_distance: str
+    avoid_bad_weather: bool
+
+@app.post("/api/signup")
+def signup(req: SignupRequest):
+    username = req.username.strip().lower()
+
+    if username == "":
+        raise HTTPException(status_code=400, detail="Username can't be empty.")
+    if len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
+    if req.password.strip() == "":
+        raise HTTPException(status_code=400, detail="Password can't be empty.")
+    if req.walking_speed not in SPEED_OPTIONS:
+        raise HTTPException(status_code=400, detail="Invalid walking speed.")
+    if req.max_walking_distance not in DISTANCE_OPTIONS:
+        raise HTTPException(status_code=400, detail="Invalid walking distance.")
+
+    users = load_users()
+
+    if username in users:
+        raise HTTPException(status_code=409, detail="Username already in use.")
+
+    hashed_password = hashlib.sha256(req.password.strip().encode()).hexdigest()
+
+    users[username] = {
+        "password": hashed_password,
+        "walking_speed": req.walking_speed,
+        "prefer_walking": req.prefer_walking,
+        "max_walking_distance": req.max_walking_distance,
+        "avoid_bad_weather": req.avoid_bad_weather,
+    }
+    save_users(users)
+
+    return {"status": "success", "username": username}
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    username = req.username.strip().lower()
+    users = load_users()
+
+    if username not in users:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    hashed_password = hashlib.sha256(req.password.strip().encode()).hexdigest()
+
+    if users[username]["password"] != hashed_password:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    return {"status": "success", "username": username}
+
+#endpoint: POST /api/schedule/upload
+#   receives: a file AND a username
+@app.post("/api/schedule/upload")
+async def upload_schedule(file: UploadFile = File(...), username: str = Form(...))
+#   1. Clean the username (same cleanup you do in signup and login)
+    username = username.strip().lower()
+#   2. Load all users from the file
+#      If the username is not one of them:
+#          stop and send back a "user not found" error
+    if username not in load_users:
+        raise HTTPException(status_code= 404, detail = "User not Found.")
+    contents = await file.read()
+    # 3. Read the uploaded file's contents
+    filename = (file.filename or "").lower()
+    content_type = (file.content_type or "").lower()
+#   4. Decide which scanner to use:
+#      If it's an .ics file:
+#          run the .ics scanner
+#          (if that crashes, send back an error with empty classes)
+    if filenames.endwith(".ics") or "calander" in conent_type:
+
+#      Otherwise:
+    else:
+        result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
+#   5. Look at the scanner's result:
+#      If its status says it worked:
+        if results.get("status") == "success" :
+            #load the users AGAIN (fresh copy)
+            users = load_users
+            #put the result's classes list inside that user's data
+            users[username]["classes"] = result["classes"]
+            #save all users back to the file
+            save_users(users)
+#   6. Send the scanner's result back to the website
+    return results
