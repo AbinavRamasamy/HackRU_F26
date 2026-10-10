@@ -619,485 +619,485 @@ export function App() {
                 </div>
               )}
 
-            {/* Subtle Divider */}
-            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '2px 0' }} />
+              {/* Subtle Divider */}
+              <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '2px 0' }} />
 
-            {/* ========================================================
+              {/* ========================================================
                 SECTION 2: DIRECTIONS & TRANSIT OPTIONS (BELOW SCHEDULE)
                 ======================================================== */}
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <Navigation size={15} color="#FF375F" />
-                  <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
-                    Directions
-                  </h2>
-                </div>
-                {selectedRoute && (
-                  <span style={{ fontSize: '10.5px', color: '#30D158', fontWeight: 600 }}>
-                    ● Active on Map
-                  </span>
-                )}
-              </div>
-
-              {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
-              {upcomingClass && (
-                <div
-                  onClick={() => handleGetToNextClass()}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: '12px',
-                    background: 'rgba(255, 55, 95, 0.1)',
-                    border: '1px solid rgba(255, 55, 95, 0.3)',
-                    marginBottom: '10px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '10.5px', color: '#FF375F', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                      Next Class
-                    </div>
-                    <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {upcomingClass.course} • {upcomingClass.startTime} ({upcomingClass.campus})
-                    </div>
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <Navigation size={15} color="#FF375F" />
+                    <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+                      Directions
+                    </h2>
                   </div>
-                  <div className="apple-btn-primary" style={{ padding: '4px 10px', fontSize: '11px', flexShrink: 0 }}>
-                    Route <ArrowRight size={11} />
-                  </div>
-                </div>
-              )}
-
-              {/* Apple Maps Origin / Destination Form Card (Minimized by Default) */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderRadius: '14px',
-                padding: isRouteFormExpanded ? '12px' : '9px 12px',
-                border: '1px solid rgba(255, 255, 255, 0.07)',
-                marginBottom: '10px',
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-              }}>
-                {/* Minimized Summary Header / Toggle Button */}
-                <div
-                  onClick={() => setIsRouteFormExpanded(prev => !prev)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    userSelect: 'none'
-                  }}
-                  title={isRouteFormExpanded ? "Click to minimize departure/destination box" : "Click to edit departure/destination"}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                    <div style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 55, 95, 0.15)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <Navigation size={11} color="#FF375F" />
-                    </div>
-
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{
-                        fontSize: '12px',
-                        fontWeight: 650,
-                        color: '#fff',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px'
-                      }}>
-                        <span style={{ color: '#fff' }}>{originCampus}</span>
-                        <span style={{ color: 'var(--apple-label-tertiary)', fontSize: '10px' }}>➔</span>
-                        <span style={{ color: '#30D158' }}>{destCampus}</span>
-                      </div>
-                      {!isRouteFormExpanded && (
-                        <div style={{
-                          fontSize: '10.5px',
-                          color: 'var(--apple-label-secondary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          marginTop: '1px'
-                        }}>
-                          To: {targetLocation} • Stop: {resolvedNearestStop.name}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: isRouteFormExpanded ? '#FF375F' : 'var(--apple-label-secondary)',
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.05)'
-                    }}>
-                      {isRouteFormExpanded ? 'Collapse' : 'Change'}
+                  {selectedRoute && (
+                    <span style={{ fontSize: '10.5px', color: '#30D158', fontWeight: 600 }}>
+                      ● Active on Map
                     </span>
-                    <ChevronDown
-                      size={13}
-                      color="var(--apple-label-secondary)"
-                      style={{
-                        transform: isRouteFormExpanded ? 'rotate(180deg)' : 'none',
-                        transition: 'transform 0.22s ease'
-                      }}
-                    />
-                  </div>
+                  )}
                 </div>
 
-                {/* Expanded Form Fields */}
-                {isRouteFormExpanded && (
-                  <div style={{
-                    marginTop: '10px',
-                    paddingTop: '10px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.07)',
-                    animation: 'apple-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                  }}>
-                    {/* Origin */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                        Departing From
-                      </label>
-                      <select
-                        value={originCampus}
-                        onChange={(e) => setOriginCampus(e.target.value)}
-                        className="apple-select-box"
-                      >
-                        <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
-                        <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
-                        <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
-                        <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
-                      </select>
-                    </div>
-
-                    {/* Swap Button */}
-                    <div style={{ display: 'flex', justifyContent: 'center', margin: '-4px 0 4px' }}>
-                      <button
-                        onClick={handleSwapCampuses}
-                        className="apple-icon-btn"
-                        title="Swap origin and destination"
-                        style={{ width: '26px', height: '26px' }}
-                      >
-                        <ArrowDownUp size={12} />
-                      </button>
-                    </div>
-
-                    {/* Destination Campus */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                        Going To Campus
-                      </label>
-                      <select
-                        value={destCampus}
-                        onChange={(e) => {
-                          const newCamp = e.target.value;
-                          setDestCampus(newCamp);
-                          if (newCamp === "College Ave") setTargetLocation("College Ave Student Center");
-                          else if (newCamp === "Busch") setTargetLocation("Busch Student Center");
-                          else if (newCamp === "Livingston") setTargetLocation("Livingston Student Center");
-                          else if (newCamp === "Cook") setTargetLocation("College Hall");
-                        }}
-                        className="apple-select-box"
-                      >
-                        <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
-                        <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
-                        <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
-                        <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
-                      </select>
-                    </div>
-
-                    {/* Target Location / Building (Dynamic Nearest Stop Resolver) */}
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                        Next Location / Building
-                      </label>
-                      <select
-                        value={targetLocation}
-                        onChange={(e) => setTargetLocation(e.target.value)}
-                        className="apple-select-box"
-                      >
-                        {/* Primary Student Center / Hub */}
-                        <option value={
-                          destCampus === "College Ave" ? "College Ave Student Center" :
-                            destCampus === "Busch" ? "Busch Student Center" :
-                              destCampus === "Livingston" ? "Livingston Student Center" : "College Hall"
-                        } style={{ background: '#1c1c1e' }}>
-                          {destCampus === "College Ave" ? "College Ave Student Center (CASC)" :
-                            destCampus === "Busch" ? "Busch Student Center (BSC)" :
-                              destCampus === "Livingston" ? "Livingston Student Center (LSC)" : "College Hall"}
-                        </option>
-
-                        {/* All Campus Buildings */}
-                        {RUTGERS_BUILDINGS.filter(b => matchCampus(b.campus, destCampus) && !b.name.includes("Student Center")).map(b => (
-                          <option key={b.name} value={b.name} style={{ background: '#1c1c1e' }}>
-                            {b.name} {b.code ? `(${b.code})` : ''}
-                          </option>
-                        ))}
-
-                        {/* All Campus Bus Stops */}
-                        {RUTGERS_BUS_STOPS.filter(s => matchCampus(s.campus, destCampus) && !s.name.includes("Student Center")).map(s => (
-                          <option key={s.name} value={s.name} style={{ background: '#1c1c1e' }}>
-                            Bus Stop: {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Dynamic Nearest Bus Stop Display (ZERO HARDCODING) */}
-                    <div style={{
+                {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
+                {upcomingClass && (
+                  <div
+                    onClick={() => handleGetToNextClass()}
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: '12px',
+                      background: 'rgba(255, 55, 95, 0.1)',
+                      border: '1px solid rgba(255, 55, 95, 0.3)',
+                      marginBottom: '10px',
+                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: '6px',
-                      padding: '7px 10px',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      borderRadius: '9px',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      marginBottom: '10px',
-                      fontSize: '11px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <Bus size={12} color="#30D158" />
-                        <span style={{ color: 'var(--apple-label-secondary)' }}>Nearest Bus Stop:</span>
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '10.5px', color: '#FF375F', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        Next Class
                       </div>
-                      <span style={{ fontWeight: 700, color: '#30D158' }}>
-                        {resolvedNearestStop.name}
-                      </span>
+                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {upcomingClass.course} • {upcomingClass.startTime} ({upcomingClass.campus})
+                      </div>
                     </div>
-
-                    {/* Compute Route Button */}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => {
-                          handleCalculateRoute();
-                          setIsRouteFormExpanded(false);
-                        }}
-                        className="apple-btn-primary"
-                        style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', fontSize: '12px' }}
-                      >
-                        Update Routes <ArrowRight size={13} />
-                      </button>
-                      <button
-                        onClick={() => setIsRouteFormExpanded(false)}
-                        className="apple-btn-secondary"
-                        style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '12px' }}
-                      >
-                        Done
-                      </button>
+                    <div className="apple-btn-primary" style={{ padding: '4px 10px', fontSize: '11px', flexShrink: 0 }}>
+                      Route <ArrowRight size={11} />
                     </div>
                   </div>
                 )}
-              </div>
 
-              {/* Transit Options List (Showing Top 3 with Dropdown for More) */}
-              {planResult && (() => {
-                const allRoutes = ((planResult.routes && planResult.routes.length > 0) ? planResult.routes : [
-                  {
-                    name: "Weekend 2",
-                    type: "Bus",
-                    estimated_minutes: 16,
-                    badge: "Recommended",
-                    description: "Clockwise loop running directly into campus."
-                  }
-                ]);
-                const visibleRoutes = showAllRoutes ? allRoutes : allRoutes.slice(0, 3);
-                const hasMoreRoutes = allRoutes.length > 3;
-                const remainingCount = allRoutes.length - 3;
-
-                return (
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: 'var(--apple-label-secondary)',
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
+                {/* Apple Maps Origin / Destination Form Card (Minimized by Default) */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  borderRadius: '14px',
+                  padding: isRouteFormExpanded ? '12px' : '9px 12px',
+                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  marginBottom: '10px',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}>
+                  {/* Minimized Summary Header / Toggle Button */}
+                  <div
+                    onClick={() => setIsRouteFormExpanded(prev => !prev)}
+                    style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span>Transit Options ({planResult.origin} ➔ {planResult.destination})</span>
-                      <span style={{ fontSize: '10px', color: 'var(--apple-label-tertiary)' }}>
-                        Top {Math.min(3, allRoutes.length)} of {allRoutes.length}
-                      </span>
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                    title={isRouteFormExpanded ? "Click to minimize departure/destination box" : "Click to edit departure/destination"}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 55, 95, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Navigation size={11} color="#FF375F" />
+                      </div>
+
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 650,
+                          color: '#fff',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}>
+                          <span style={{ color: '#fff' }}>{originCampus}</span>
+                          <span style={{ color: 'var(--apple-label-tertiary)', fontSize: '10px' }}>➔</span>
+                          <span style={{ color: '#30D158' }}>{destCampus}</span>
+                        </div>
+                        {!isRouteFormExpanded && (
+                          <div style={{
+                            fontSize: '10.5px',
+                            color: 'var(--apple-label-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            marginTop: '1px'
+                          }}>
+                            To: {targetLocation} • Stop: {resolvedNearestStop.name}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                      {visibleRoutes.map((route: any, idx: number) => {
-                        const isSelected = selectedRoute?.name === route.name;
-                        const isTop = idx === 0;
-                        const colorInfo = getRouteColorInfo(route.name);
-                        const stops = getStopsForRoute(route.name);
-
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => setSelectedRoute(route)}
-                            style={{
-                              padding: '11px 13px',
-                              borderRadius: '13px',
-                              background: isSelected
-                                ? 'rgba(255, 255, 255, 0.08)'
-                                : 'rgba(255, 255, 255, 0.03)',
-                              border: isSelected
-                                ? `1.5px solid ${colorInfo.bg}`
-                                : '1px solid rgba(255, 255, 255, 0.07)',
-                              cursor: 'pointer',
-                              transition: 'all 0.18s ease',
-                              boxShadow: isSelected ? `0 0 16px ${colorInfo.bg}44` : 'none'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{
-                                  padding: '3px 8px',
-                                  borderRadius: '6px',
-                                  background: colorInfo.bg,
-                                  color: colorInfo.text,
-                                  fontSize: '11.5px',
-                                  fontWeight: 800
-                                }}>
-                                  {route.name}
-                                </span>
-                                {isSelected ? (
-                                  <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 700 }}>
-                                    ● Navigating
-                                  </span>
-                                ) : isTop ? (
-                                  <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 600 }}>
-                                    ● Recommended
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                                ~{route.estimated_minutes} min
-                              </div>
-                            </div>
-                            <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: '3px 0 0', lineHeight: 1.35 }}>
-                              {route.description}
-                            </p>
-
-                            {/* Stop Selector Buttons for Selected Route */}
-                            {isSelected && stops.length > 0 && (
-                              <div style={{
-                                marginTop: '9px',
-                                paddingTop: '8px',
-                                borderTop: '1px solid rgba(255, 255, 255, 0.08)'
-                              }}>
-                                <div style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  color: 'var(--apple-label-secondary)',
-                                  marginBottom: '6px',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.04em'
-                                }}>
-                                  <span>Stops ({stops.length})</span>
-                                  <span style={{ color: '#0A84FF', fontWeight: 600 }}>Tap to Route</span>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                                  {stops.map((st) => {
-                                    const isStopActive = targetLocation?.toLowerCase().includes(st.name.toLowerCase()) || 
-                                                         st.name.toLowerCase().includes(targetLocation?.toLowerCase() || '');
-                                    return (
-                                      <button
-                                        key={st.name}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setTargetLocation(st.name);
-                                          if (st.campus) setDestCampus(st.campus);
-                                        }}
-                                        title={`${st.name} (${st.campus})`}
-                                        className="apple-btn-secondary"
-                                        style={{
-                                          padding: '3px 7px',
-                                          fontSize: '10.5px',
-                                          borderRadius: '7px',
-                                          background: isStopActive ? colorInfo.bg : 'rgba(255, 255, 255, 0.06)',
-                                          color: isStopActive ? colorInfo.text : 'rgba(255, 255, 255, 0.9)',
-                                          border: isStopActive ? `1.5px solid ${colorInfo.bg}` : '1px solid rgba(255, 255, 255, 0.1)',
-                                          fontWeight: isStopActive ? 800 : 500,
-                                          boxShadow: isStopActive ? `0 0 10px ${colorInfo.bg}66` : 'none',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px'
-                                        }}
-                                      >
-                                        <span>{isStopActive ? '▼' : '🚏'}</span>
-                                        <span>{getStopShortCode(st.name)}</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      {/* Dropdown for More Transit Options */}
-                      {hasMoreRoutes && (
-                        <div style={{ marginTop: '2px' }}>
-                          <button
-                            onClick={() => setShowAllRoutes(prev => !prev)}
-                            className="apple-btn-secondary"
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              borderRadius: '11px',
-                              fontSize: '11.5px',
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              border: '1px solid rgba(255, 255, 255, 0.08)',
-                              cursor: 'pointer',
-                              transition: 'all 0.18s ease'
-                            }}
-                          >
-                            <span style={{ color: '#fff' }}>
-                              {showAllRoutes ? 'Show Fewer Options' : `More Transit Options (${remainingCount} more)`}
-                            </span>
-                            <ChevronDown
-                              size={13}
-                              color="var(--apple-label-secondary)"
-                              style={{
-                                transform: showAllRoutes ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.22s ease'
-                              }}
-                            />
-                          </button>
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: isRouteFormExpanded ? '#FF375F' : 'var(--apple-label-secondary)',
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.05)'
+                      }}>
+                        {isRouteFormExpanded ? 'Collapse' : 'Change'}
+                      </span>
+                      <ChevronDown
+                        size={13}
+                        color="var(--apple-label-secondary)"
+                        style={{
+                          transform: isRouteFormExpanded ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.22s ease'
+                        }}
+                      />
                     </div>
                   </div>
-                );
-              })()}
-            </div>
+
+                  {/* Expanded Form Fields */}
+                  {isRouteFormExpanded && (
+                    <div style={{
+                      marginTop: '10px',
+                      paddingTop: '10px',
+                      borderTop: '1px solid rgba(255, 255, 255, 0.07)',
+                      animation: 'apple-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}>
+                      {/* Origin */}
+                      <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
+                          Departing From
+                        </label>
+                        <select
+                          value={originCampus}
+                          onChange={(e) => setOriginCampus(e.target.value)}
+                          className="apple-select-box"
+                        >
+                          <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
+                          <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
+                          <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
+                          <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
+                        </select>
+                      </div>
+
+                      {/* Swap Button */}
+                      <div style={{ display: 'flex', justifyContent: 'center', margin: '-4px 0 4px' }}>
+                        <button
+                          onClick={handleSwapCampuses}
+                          className="apple-icon-btn"
+                          title="Swap origin and destination"
+                          style={{ width: '26px', height: '26px' }}
+                        >
+                          <ArrowDownUp size={12} />
+                        </button>
+                      </div>
+
+                      {/* Destination Campus */}
+                      <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
+                          Going To Campus
+                        </label>
+                        <select
+                          value={destCampus}
+                          onChange={(e) => {
+                            const newCamp = e.target.value;
+                            setDestCampus(newCamp);
+                            if (newCamp === "College Ave") setTargetLocation("College Ave Student Center");
+                            else if (newCamp === "Busch") setTargetLocation("Busch Student Center");
+                            else if (newCamp === "Livingston") setTargetLocation("Livingston Student Center");
+                            else if (newCamp === "Cook") setTargetLocation("College Hall");
+                          }}
+                          className="apple-select-box"
+                        >
+                          <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
+                          <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
+                          <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
+                          <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
+                        </select>
+                      </div>
+
+                      {/* Target Location / Building (Dynamic Nearest Stop Resolver) */}
+                      <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
+                          Next Location / Building
+                        </label>
+                        <select
+                          value={targetLocation}
+                          onChange={(e) => setTargetLocation(e.target.value)}
+                          className="apple-select-box"
+                        >
+                          {/* Primary Student Center / Hub */}
+                          <option value={
+                            destCampus === "College Ave" ? "College Ave Student Center" :
+                              destCampus === "Busch" ? "Busch Student Center" :
+                                destCampus === "Livingston" ? "Livingston Student Center" : "College Hall"
+                          } style={{ background: '#1c1c1e' }}>
+                            {destCampus === "College Ave" ? "College Ave Student Center (CASC)" :
+                              destCampus === "Busch" ? "Busch Student Center (BSC)" :
+                                destCampus === "Livingston" ? "Livingston Student Center (LSC)" : "College Hall"}
+                          </option>
+
+                          {/* All Campus Buildings */}
+                          {RUTGERS_BUILDINGS.filter(b => matchCampus(b.campus, destCampus) && !b.name.includes("Student Center")).map(b => (
+                            <option key={b.name} value={b.name} style={{ background: '#1c1c1e' }}>
+                              {b.name} {b.code ? `(${b.code})` : ''}
+                            </option>
+                          ))}
+
+                          {/* All Campus Bus Stops */}
+                          {RUTGERS_BUS_STOPS.filter(s => matchCampus(s.campus, destCampus) && !s.name.includes("Student Center")).map(s => (
+                            <option key={s.name} value={s.name} style={{ background: '#1c1c1e' }}>
+                              Bus Stop: {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Dynamic Nearest Bus Stop Display (ZERO HARDCODING) */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '6px',
+                        padding: '7px 10px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        borderRadius: '9px',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        marginBottom: '10px',
+                        fontSize: '11px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Bus size={12} color="#30D158" />
+                          <span style={{ color: 'var(--apple-label-secondary)' }}>Nearest Bus Stop:</span>
+                        </div>
+                        <span style={{ fontWeight: 700, color: '#30D158' }}>
+                          {resolvedNearestStop.name}
+                        </span>
+                      </div>
+
+                      {/* Compute Route Button */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => {
+                            handleCalculateRoute();
+                            setIsRouteFormExpanded(false);
+                          }}
+                          className="apple-btn-primary"
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '10px', fontSize: '12px' }}
+                        >
+                          Update Routes <ArrowRight size={13} />
+                        </button>
+                        <button
+                          onClick={() => setIsRouteFormExpanded(false)}
+                          className="apple-btn-secondary"
+                          style={{ padding: '8px 12px', borderRadius: '10px', fontSize: '12px' }}
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transit Options List (Showing Top 3 with Dropdown for More) */}
+                {planResult && (() => {
+                  const allRoutes = ((planResult.routes && planResult.routes.length > 0) ? planResult.routes : [
+                    {
+                      name: "Weekend 2",
+                      type: "Bus",
+                      estimated_minutes: 16,
+                      badge: "Recommended",
+                      description: "Clockwise loop running directly into campus."
+                    }
+                  ]);
+                  const visibleRoutes = showAllRoutes ? allRoutes : allRoutes.slice(0, 3);
+                  const hasMoreRoutes = allRoutes.length > 3;
+                  const remainingCount = allRoutes.length - 3;
+
+                  return (
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: 'var(--apple-label-secondary)',
+                        marginBottom: '8px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span>Transit Options ({planResult.origin} ➔ {planResult.destination})</span>
+                        <span style={{ fontSize: '10px', color: 'var(--apple-label-tertiary)' }}>
+                          Top {Math.min(3, allRoutes.length)} of {allRoutes.length}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        {visibleRoutes.map((route: any, idx: number) => {
+                          const isSelected = selectedRoute?.name === route.name;
+                          const isTop = idx === 0;
+                          const colorInfo = getRouteColorInfo(route.name);
+                          const stops = getStopsForRoute(route.name);
+
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedRoute(route)}
+                              style={{
+                                padding: '11px 13px',
+                                borderRadius: '13px',
+                                background: isSelected
+                                  ? 'rgba(255, 255, 255, 0.08)'
+                                  : 'rgba(255, 255, 255, 0.03)',
+                                border: isSelected
+                                  ? `1.5px solid ${colorInfo.bg}`
+                                  : '1px solid rgba(255, 255, 255, 0.07)',
+                                cursor: 'pointer',
+                                transition: 'all 0.18s ease',
+                                boxShadow: isSelected ? `0 0 16px ${colorInfo.bg}44` : 'none'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    background: colorInfo.bg,
+                                    color: colorInfo.text,
+                                    fontSize: '11.5px',
+                                    fontWeight: 800
+                                  }}>
+                                    {route.name}
+                                  </span>
+                                  {isSelected ? (
+                                    <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 700 }}>
+                                      ● Navigating
+                                    </span>
+                                  ) : isTop ? (
+                                    <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 600 }}>
+                                      ● Recommended
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                                  ~{route.estimated_minutes} min
+                                </div>
+                              </div>
+                              <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: '3px 0 0', lineHeight: 1.35 }}>
+                                {route.description}
+                              </p>
+
+                              {/* Stop Selector Buttons for Selected Route */}
+                              {isSelected && stops.length > 0 && (
+                                <div style={{
+                                  marginTop: '9px',
+                                  paddingTop: '8px',
+                                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                                }}>
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    color: 'var(--apple-label-secondary)',
+                                    marginBottom: '6px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em'
+                                  }}>
+                                    <span>Stops ({stops.length})</span>
+                                    <span style={{ color: '#0A84FF', fontWeight: 600 }}>Tap to Route</span>
+                                  </div>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                    {stops.map((st) => {
+                                      const isStopActive = targetLocation?.toLowerCase().includes(st.name.toLowerCase()) ||
+                                        st.name.toLowerCase().includes(targetLocation?.toLowerCase() || '');
+                                      return (
+                                        <button
+                                          key={st.name}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTargetLocation(st.name);
+                                            if (st.campus) setDestCampus(st.campus);
+                                          }}
+                                          title={`${st.name} (${st.campus})`}
+                                          className="apple-btn-secondary"
+                                          style={{
+                                            padding: '3px 7px',
+                                            fontSize: '10.5px',
+                                            borderRadius: '7px',
+                                            background: isStopActive ? colorInfo.bg : 'rgba(255, 255, 255, 0.06)',
+                                            color: isStopActive ? colorInfo.text : 'rgba(255, 255, 255, 0.9)',
+                                            border: isStopActive ? `1.5px solid ${colorInfo.bg}` : '1px solid rgba(255, 255, 255, 0.1)',
+                                            fontWeight: isStopActive ? 800 : 500,
+                                            boxShadow: isStopActive ? `0 0 10px ${colorInfo.bg}66` : 'none',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                        >
+                                          <span>{isStopActive ? '▼' : '🚏'}</span>
+                                          <span>{getStopShortCode(st.name)}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* Dropdown for More Transit Options */}
+                        {hasMoreRoutes && (
+                          <div style={{ marginTop: '2px' }}>
+                            <button
+                              onClick={() => setShowAllRoutes(prev => !prev)}
+                              className="apple-btn-secondary"
+                              style={{
+                                width: '100%',
+                                padding: '8px 12px',
+                                borderRadius: '11px',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                cursor: 'pointer',
+                                transition: 'all 0.18s ease'
+                              }}
+                            >
+                              <span style={{ color: '#fff' }}>
+                                {showAllRoutes ? 'Show Fewer Options' : `More Transit Options (${remainingCount} more)`}
+                              </span>
+                              <ChevronDown
+                                size={13}
+                                color="var(--apple-label-secondary)"
+                                style={{
+                                  transform: showAllRoutes ? 'rotate(180deg)' : 'none',
+                                  transition: 'transform 0.22s ease'
+                                }}
+                              />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </div>

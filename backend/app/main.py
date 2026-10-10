@@ -253,33 +253,6 @@ async def get_live_telemetry(route: Optional[str] = None):
 from app.schedule_parser import parse_schedule_with_gemini
 from app.ics_parser import parse_ics_schedule
 
-@app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...)):
-    """
-    Uploads a class schedule screenshot (via Gemini Vision OCR) or an .ics calendar file.
-    Extracts meetings for the current week and returns them sorted by date and time.
-    """
-    contents = await file.read()
-    filename = (file.filename or "").lower()
-    content_type = (file.content_type or "").lower()
-
-    # Check if uploaded file is an iCalendar (.ics) file
-    if filename.endswith(".ics") or "calendar" in content_type:
-        try:
-            text = contents.decode("utf-8", errors="ignore")
-            result = parse_ics_schedule(text)
-            return result
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to parse .ics calendar file: {str(e)}",
-                "classes": []
-            }
-
-    # Otherwise parse as image OCR via Gemini Vision
-    result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-    return result
-
 class ChatQueryRequest(BaseModel):
     query: str
     current_campus: Optional[str] = "College Ave"
@@ -426,38 +399,34 @@ def login(req: LoginRequest):
 
     return {"status": "success", "username": username}
 
-#endpoint: POST /api/schedule/upload
-#   receives: a file AND a username
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...), username: str = Form(...))
-#   1. Clean the username (same cleanup you do in signup and login)
+async def upload_schedule(file: UploadFile = File(...), username: str = Form(...)):
+    # 1. Clean the username
     username = username.strip().lower()
-#   2. Load all users from the file
-#      If the username is not one of them:
-#          stop and send back a "user not found" error
-    if username not in load_users:
-        raise HTTPException(status_code= 404, detail = "User not Found.")
+    # 2. Verify user exists
+    if username not in load_users():
+        raise HTTPException(status_code=404, detail="User not found.")
+    # 3. Read the uploaded file
     contents = await file.read()
-    # 3. Read the uploaded file's contents
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
-#   4. Decide which scanner to use:
-#      If it's an .ics file:
-#          run the .ics scanner
-#          (if that crashes, send back an error with empty classes)
-    if filenames.endwith(".ics") or "calander" in conent_type:
-
-#      Otherwise:
+    # 4. Choose parser: .ics calendar or image OCR
+    if filename.endswith(".ics") or "calendar" in content_type:
+        try:
+            text = contents.decode("utf-8", errors="ignore")
+            result = parse_ics_schedule(text)
+        except Exception as e:
+            result = {
+                "status": "error",
+                "message": f"Failed to parse .ics calendar file: {str(e)}",
+                "classes": []
+            }
     else:
         result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-#   5. Look at the scanner's result:
-#      If its status says it worked:
-        if results.get("status") == "success" :
-            #load the users AGAIN (fresh copy)
-            users = load_users
-            #put the result's classes list inside that user's data
-            users[username]["classes"] = result["classes"]
-            #save all users back to the file
-            save_users(users)
-#   6. Send the scanner's result back to the website
-    return results
+    # 5. If parsing succeeded, save classes to the user's profile
+    if result.get("status") == "success":
+        users = load_users()
+        users[username]["classes"] = result.get("classes", [])
+        save_users(users)
+    # 6. Return the result
+    return result

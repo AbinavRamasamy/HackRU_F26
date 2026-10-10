@@ -177,7 +177,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const [liveRoute, setLiveRoute] = useState<LiveRouteResult | null>(null);
   const [isRoutingLoading, setIsRoutingLoading] = useState<boolean>(false);
   const [currentZoom, setCurrentZoom] = useState<number>(13);
-  const currentZoomThreshold = 12.8;
+  const currentZoomThreshold = 14.5;
   const isZoomedOut = currentZoom < currentZoomThreshold;
 
   // 1. DYNAMIC NEAREST-STOP CALCULATION (ZERO HARDCODING):
@@ -236,11 +236,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
-    const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || 
-                   (selectedRoute.name || '').toLowerCase().includes('bike') || 
-                   (selectedRoute.name || '').toLowerCase().includes('scooter');
-    const isCar = (selectedRoute.name || '').toLowerCase().includes('knight') || 
-                  (selectedRoute.name || '').toLowerCase().includes('escort');
+    const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') ||
+      (selectedRoute.name || '').toLowerCase().includes('bike') ||
+      (selectedRoute.name || '').toLowerCase().includes('scooter');
+    const isCar = (selectedRoute.name || '').toLowerCase().includes('knight') ||
+      (selectedRoute.name || '').toLowerCase().includes('escort');
     const mode = isBike ? 'bike' : isCar ? 'car' : 'bus';
 
     setIsRoutingLoading(true);
@@ -843,7 +843,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     }
 
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || (selectedRoute.name || '').toLowerCase().includes('bike');
-    
+
     // Use actual road coordinates from live routing engine if loaded, else fallback
     const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
       ? liveRoute.coordinates
@@ -1462,7 +1462,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
           {/* Toggle between Google Dark, Google Standard, and Google Satellite */}
           <button
-            onClick={() => setMapTheme(prev => 
+            onClick={() => setMapTheme(prev =>
               prev === 'google-dark' ? 'google-standard' : prev === 'google-standard' ? 'google-satellite' : 'google-dark'
             )}
             className="apple-btn-dark-glass"
