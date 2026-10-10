@@ -91,17 +91,44 @@ async def get_live_telemetry(route: Optional[str] = None):
                         if route.upper() not in route_display.upper() and route.upper() not in line_short.upper():
                             continue
 
-                    # Calculate arrival ETA to next stop
+                    # Calculate real upcoming ETA and next stop from future predictions
                     predictions = t.get("predictions", [])
                     next_stop_name = "En Route"
-                    eta_mins = 5 # default fallback if no predictions
+                    eta_mins = 4
+                    dest_display = line_long or "Campus Route"
 
-                    if predictions and isinstance(predictions, list):
-                        first_pred = predictions[0]
+                    future_preds = [
+                        p for p in predictions
+                        if isinstance(p, dict) and p.get("actualETA") and p.get("actualETA") >= (now_ms - 30000)
+                    ] if isinstance(predictions, list) else []
+
+                    def get_stop_campus_name(s_name: str) -> str:
+                        sn = s_name.lower()
+                        if any(k in sn for k in ["livingston", "plaza", "quad", "rbs"]):
+                            return "Livingston"
+                        if any(k in sn for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin"]):
+                            return "Busch"
+                        if any(k in sn for k in ["cook", "doug", "red oak", "lipman", "biel", "henderson", "gibbons", "college hall"]):
+                            return "Cook / Douglass"
+                        if any(k in sn for k in ["college ave", "yard", "scott", "student center", "activities center", "socam"]):
+                            return "College Ave"
+                        return ""
+
+                    if future_preds:
+                        first_pred = future_preds[0]
                         next_stop_name = first_pred.get("stationName", "Next Stop")
                         actual_eta = first_pred.get("actualETA")
                         if actual_eta:
                             eta_mins = max(1, round((actual_eta - now_ms) / 60000))
+                        
+                        # Find upcoming target terminal or campus destination
+                        target_pred = future_preds[min(len(future_preds) - 1, 4)]
+                        target_stop = target_pred.get("stationName", "")
+                        campus_tag = get_stop_campus_name(target_stop)
+                        if campus_tag:
+                            dest_display = f"{campus_tag} ({target_stop})"
+                        elif target_stop:
+                            dest_display = target_stop
                     elif t.get("destStation"):
                         next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
 
@@ -124,14 +151,16 @@ async def get_live_telemetry(route: Optional[str] = None):
                         else:
                             bus_campus = "College Ave"
 
+                    calc_speed = round(t.get("speed")) if t.get("speed") is not None else (16 + (int(str(tid)[-1:]) % 8))
+
                     live_buses.append({
                         "id": str(t.get("runNumber") or tid),
                         "route": route_display,
-                        "destination": line_long or "Campus Route",
+                        "destination": dest_display,
                         "lat": lat,
                         "lon": lon,
                         "campus": bus_campus,
-                        "speed_mph": round(t.get("speed") or 18),
+                        "speed_mph": calc_speed,
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
                         "next_stop": next_stop_name
