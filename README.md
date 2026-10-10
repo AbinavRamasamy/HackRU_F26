@@ -18,7 +18,7 @@ Brief description of the project, inspiration, and goals.
 ### Setup
 ```bash
 # Clone the repository
-git clone <repo-url>
+git clone https://github.com/AbinavRamasamy/HackRU_F26.git
 cd HackRU_F26
 ```
 
