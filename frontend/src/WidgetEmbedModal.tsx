@@ -3,7 +3,7 @@ import { Copy, Check, Code } from 'lucide-react';
 
 export const WidgetEmbedModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [copied, setCopied] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'scarlet'>('scarlet');
+  const [theme, setTheme] = useState<'dark' | 'scarlet' | 'light'>('light');
 
   if (!isOpen) return null;
 
@@ -40,12 +40,12 @@ export const WidgetEmbedModal: React.FC<{ isOpen: boolean; onClose: () => void }
         maxWidth: '560px',
         width: '100%',
         padding: '28px',
-        border: '1px solid rgba(204, 0, 51, 0.4)',
+        border: '1px solid rgba(10, 132, 255, 0.4)',
         boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ background: 'rgba(204,0,51,0.2)', padding: '8px', borderRadius: '10px', color: '#ff4d6d' }}>
+            <div style={{ background: 'rgba(10, 132, 255, 0.2)', padding: '8px', borderRadius: '10px', color: '#0A84FF' }}>
               <Code size={20} />
             </div>
             <div>
@@ -65,6 +65,21 @@ export const WidgetEmbedModal: React.FC<{ isOpen: boolean; onClose: () => void }
           <label style={{ fontSize: '12px', color: '#9ca3af', display: 'block', marginBottom: '6px' }}>Theme Accent</label>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
+              onClick={() => setTheme('light')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: theme === 'light' ? 'rgba(10,132,255,0.25)' : 'rgba(255,255,255,0.03)',
+                border: theme === 'light' ? '1px solid #0A84FF' : '1px solid rgba(255,255,255,0.08)',
+                color: theme === 'light' ? '#0A84FF' : '#9ca3af',
+                fontSize: '12px',
+                fontWeight: 700
+              }}
+            >
+              Blue & White (Light)
+            </button>
+            <button
               onClick={() => setTheme('scarlet')}
               style={{
                 flex: 1,
@@ -77,7 +92,7 @@ export const WidgetEmbedModal: React.FC<{ isOpen: boolean; onClose: () => void }
                 fontWeight: 700
               }}
             >
-              Scarlet Night (Default)
+              Scarlet Night (Dark)
             </button>
             <button
               onClick={() => setTheme('dark')}

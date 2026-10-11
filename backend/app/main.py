@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -256,65 +257,152 @@ from app.ics_parser import parse_ics_schedule
 class ChatQueryRequest(BaseModel):
     query: str
     current_campus: Optional[str] = "College Ave"
+    current_location: Optional[str] = None
+    coords: Optional[List[float]] = None
     next_class: Optional[Dict[str, Any]] = None
 
 @app.post("/api/copilot/chat")
 async def copilot_chat(req: ChatQueryRequest):
     """
-    Answers natural language transit questions using Gemini or fast local heuristics.
+    Answers natural language transit questions using live Rutgers fleet telemetry
+    from store.transitstat.us/tripshot/rutgers combined with Gemini intelligence.
+    ALWAYS consults available buses before output, and takes student current location into account.
     """
     api_key = os.getenv("GEMINI_API_KEY")
-    query_lower = req.query.lower()
 
-    # Fast heuristics for immediate answers
-    if "tillett" in query_lower or "livingston" in query_lower:
-        return {
-            "reply": "Board the LX at The Yard or College Ave Student Center. Route 18 has moderate traffic, so allow ~14 minutes. Get off at Livingston Student Center and walk 2 minutes to Tillett Hall.",
-            "recommended_route": "LX",
-            "eta_mins": 4
-        }
-    elif "hill center" in query_lower or "busch" in query_lower:
-        return {
-            "reply": "Take the A or H bus from College Ave directly to Hill Center or Allison Road Classrooms. The next A departs in ~5 minutes.",
-            "recommended_route": "A / H",
-            "eta_mins": 5
-        }
-    elif "cook" in query_lower or "douglass" in query_lower or "hickman" in query_lower:
-        return {
-            "reply": "Hop on the F or EE bus heading down George Street towards College Hall and Red Oak Lane. Estimated transit time is ~12 minutes.",
-            "recommended_route": "F / EE",
-            "eta_mins": 6
-        }
+    # 1. ALWAYS consult real-time available buses from transitstat.us
+    telemetry = await get_live_telemetry()
+    buses = telemetry.get("buses", []) if isinstance(telemetry, dict) else []
+    
+    active_routes = sorted(list(set(b["route"] for b in buses if b.get("route"))))
+    now = datetime.now()
+    now_str = now.strftime("%A, %I:%M %p")
+    is_weekend = now.weekday() >= 5
+    
+    # Resolve student's exact current location & closest boarding bus stop
+    user_loc = req.current_location or req.current_campus or "Busch Student Center"
+    closest_stop_to_user = None
+    user_loc_clean = user_loc.lower().strip()
+    for b_name, b_meta in CAMPUS_BUILDINGS.items():
+        if b_name in user_loc_clean or user_loc_clean in b_name:
+            closest_stop_to_user = b_meta.get("stop")
+            break
+    boarding_stop_hint = closest_stop_to_user or user_loc
+    
+    # Compile real-time vehicle digest
+    bus_lines = []
+    for b in buses:
+        route = b.get("route", "BUS")
+        nxt = b.get("next_stop", "En Route")
+        eta = b.get("eta_mins", 3)
+        campus = b.get("campus", "Rutgers")
+        up = b.get("upcoming_stops", [])
+        up_str = ", ".join([f"{u.get('station')} (~{u.get('eta_mins')}m)" for u in up[:5]])
+        bus_lines.append(
+            f"- Route '{route}' (Bus #{b.get('id', '')} at/near {campus}): Next stop is '{nxt}' (ETA ~{eta}m). Following upcoming stops: {up_str or 'En Route'}"
+        )
+    telemetry_summary = "\n".join(bus_lines) if bus_lines else "No buses actively broadcasting GPS right now."
 
-    # If GEMINI_API_KEY is configured, use LLM
+    # If GEMINI_API_KEY is configured, ask Gemini with the mandatory active fleet context
     if api_key and api_key != "YOUR_GEMINI_API_KEY":
         try:
             from google import genai
             client = genai.Client(api_key=api_key)
-            model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+            model_name = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+            
             prompt = f"""
-            You are ScarletHop, an AI Rutgers University transit expert.
-            The student is currently at: {req.current_campus}.
-            Student's query: "{req.query}".
-            Known buses: LX (College Ave <-> Livingston), B (Busch <-> Livingston), A/H (College Ave <-> Busch), F/EE (College Ave <-> Cook/Douglass), REXB (Busch <-> Cook/Douglass), REXL (Livingston <-> Cook/Douglass), Weekend 1/2 (All Campuses on Weekends).
-            Provide a concise, encouraging 2-sentence response with the exact bus to catch, stop, and estimated walk/ride buffer.
-            """
+You are ScarletHop, the expert Rutgers University real-time transit AI assistant.
+Current Time: {now_str} ({'Weekend Service' if is_weekend else 'Weekday Regular Service'}).
+Student Current Campus: {req.current_campus}
+Student Exact Current Location / Building: {user_loc}
+Nearest Boarding Bus Stop to Student: {boarding_stop_hint}
+{f"Student Live GPS Coordinates: {req.coords}" if req.coords else ""}
+Student's Query: "{req.query}"
+
+=== LIVE FLEET TELEMETRY FROM TRANSITSTAT.US ===
+Active Routes Operating Right Now: {', '.join(active_routes) if active_routes else 'No live buses detected'}
+(CRITICAL: Any route NOT listed above is OFFLINE and NOT RUNNING right now. DO NOT recommend inactive routes. For example, on weekends do NOT recommend weekday-only routes like LX, B, A, H, F, EE, REXB, REXL.)
+
+Real-Time Vehicles & Upcoming Arrivals:
+{telemetry_summary}
+
+=== MANDATORY RULES ===
+1. ALWAYS consult the available buses from transitstat.us above before answering.
+2. Consider the student's exact current location ({user_loc}) and closest boarding stop ({boarding_stop_hint}). Direct them from there.
+3. Recommend ONLY active routes from the list above. If user is travelling between campuses, select the optimal operating route that serves their journey.
+4. Identify the boarding stop nearest to the student, the exact incoming bus route, its real live ETA in minutes from the predictions above, and where to get off/walk to reach their destination.
+5. Keep the answer friendly, concise, and 2-3 sentences.
+6. Return your answer in valid JSON format with EXACTLY these keys:
+{{
+  "reply": "<Friendly 2-3 sentence answer with the route name in bold, boarding stop, real-time ETA, and travel instructions>",
+  "recommended_route": "<Exact route name from the active routes list, e.g. Weekend 1, Weekend 2, LX, etc.>",
+  "eta_mins": <Integer number of minutes until the recommended bus reaches the boarding stop>
+}}
+"""
             response = client.models.generate_content(
                 model=model_name,
                 contents=prompt
             )
-            return {
-                "reply": response.text.strip(),
-                "recommended_route": "LX",
-                "eta_mins": 5
-            }
+            raw_text = response.text.strip()
+            
+            # Clean possible markdown block
+            cleaned = re.sub(r"^```(?:json)?\s*", "", raw_text, flags=re.MULTILINE)
+            cleaned = re.sub(r"```$", "", cleaned, flags=re.MULTILINE).strip()
+            
+            try:
+                parsed = json.loads(cleaned)
+                reply = parsed.get("reply", "").strip()
+                rec_route = parsed.get("recommended_route", "").strip()
+                eta_val = parsed.get("eta_mins")
+                
+                # Verify rec_route is in active_routes or normalize
+                matching_route = next((r for r in active_routes if r.lower() in rec_route.lower() or rec_route.lower() in r.lower()), None)
+                if matching_route:
+                    rec_route = matching_route
+                elif active_routes:
+                    rec_route = active_routes[0]
+
+                try:
+                    eta_mins = int(eta_val) if eta_val is not None else 3
+                except Exception:
+                    eta_mins = 3
+
+                if reply and rec_route:
+                    return {
+                        "reply": reply,
+                        "recommended_route": rec_route,
+                        "eta_mins": eta_mins
+                    }
+            except Exception:
+                pass
         except Exception as e:
-            pass
+            print("Gemini copilot error:", e)
+
+    # Deterministic fallback consulting live buses
+    chosen_bus = None
+    if buses:
+        for b in buses:
+            b_campus = (b.get("campus") or "").lower()
+            if req.current_campus and (req.current_campus.lower() in b_campus or b_campus in req.current_campus.lower()):
+                chosen_bus = b
+                break
+        if not chosen_bus:
+            chosen_bus = buses[0]
+
+    if chosen_bus:
+        route_name = chosen_bus.get("route", active_routes[0] if active_routes else "Bus")
+        eta = chosen_bus.get("eta_mins", 3)
+        stop_name = boarding_stop_hint or chosen_bus.get("next_stop", user_loc)
+        return {
+            "reply": f"Based on live transitstat.us tracking, catch the **{route_name}** at or near {stop_name} (arriving in ~{eta} min). It is currently operating and will connect you along the route.",
+            "recommended_route": route_name,
+            "eta_mins": eta
+        }
 
     return {
-        "reply": f"Based on live Rutgers telemetry, the fastest way to your destination is catching the next connecting campus loop. Check the live bus radar below for incoming arrivals!",
-        "recommended_route": "LX",
-        "eta_mins": 4
+        "reply": "No live buses are currently reported in service by transitstat.us. Please check the campus shuttle schedule or check back shortly.",
+        "recommended_route": "Weekend 1" if is_weekend else "LX",
+        "eta_mins": 5
     }
 
 @app.post("/api/plan")

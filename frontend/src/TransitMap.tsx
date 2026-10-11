@@ -7,18 +7,10 @@ import {
   ExternalLink,
   X,
   MapPin,
-  ChevronRight,
-  ChevronLeft,
-  List,
-  Clock,
-  Footprints,
-  Bike,
-  Car,
-  Bus as BusIcon,
-  Loader2
+  Clock
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
-import { fetchLiveRoute, type LiveRouteResult, type RouteStep } from './routingService';
+import { fetchLiveRoute, type LiveRouteResult } from './routingService';
 import {
   findNearestBusStop,
   resolveLocationCoords,
@@ -43,6 +35,7 @@ export interface TransitMapProps {
   onSelectRoute?: (route: any) => void;
   planResult?: any;
   googleMapsApiKey?: string;
+  appTheme?: 'dark' | 'light';
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -158,7 +151,8 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onClearSelectedRoute,
   onSelectRoute,
   planResult,
-  googleMapsApiKey
+  googleMapsApiKey,
+  appTheme = 'dark'
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -166,16 +160,19 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // Map Provider Themes: Google Maps Dark (default), Google Maps Standard, Google Satellite
-  const [mapTheme, setMapTheme] = useState<'google-dark' | 'google-standard' | 'google-satellite'>('google-dark');
-  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
-  const [showStepsDrawer, setShowStepsDrawer] = useState<boolean>(false);
-  const prevRouteNameRef = useRef<string | null>(null);
-  const prevRouteFitKeyRef = useRef<string | null>(null);
+  // Map Provider Themes: Google Maps Dark (default in dark mode), Google Maps Standard (default in light mode), Google Satellite
+  const [mapTheme, setMapTheme] = useState<'google-dark' | 'google-standard' | 'google-satellite'>(
+    appTheme === 'light' ? 'google-standard' : 'google-dark'
+  );
 
+  // Automatically sync map style when app theme toggles
+  useEffect(() => {
+    setMapTheme(appTheme === 'light' ? 'google-standard' : 'google-dark');
+  }, [appTheme]);
+
+  const prevRouteFitKeyRef = useRef<string | null>(null);
   // Live real-time road route fetched via Google Maps API or free OSRM engine
   const [liveRoute, setLiveRoute] = useState<LiveRouteResult | null>(null);
-  const [isRoutingLoading, setIsRoutingLoading] = useState<boolean>(false);
   const [currentZoom, setCurrentZoom] = useState<number>(13);
   const currentZoomThreshold = 14.5;
   const isZoomedOut = currentZoom < currentZoomThreshold;
@@ -209,13 +206,6 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     return getHaversineDistanceMeters(dropoffStop.lat, dropoffStop.lon, destTarget.lat, destTarget.lon);
   }, [dropoffStop, destTarget]);
 
-  const walkMins = Math.max(1, Math.round(walkDistMeters / 80));
-
-  if (selectedRoute?.name !== prevRouteNameRef.current) {
-    prevRouteNameRef.current = selectedRoute?.name || null;
-    if (currentStepIndex !== 0) setCurrentStepIndex(0);
-    if (showStepsDrawer) setShowStepsDrawer(false);
-  }
 
   // Global click delegate for Leaflet HTML popups
   useEffect(() => {
@@ -243,7 +233,6 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       (selectedRoute.name || '').toLowerCase().includes('escort');
     const mode = isBike ? 'bike' : isCar ? 'car' : 'bus';
 
-    setIsRoutingLoading(true);
     // Route directly between the dynamically calculated bus stops (e.g. into College Ave Student Center Stop)
     fetchLiveRoute(boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon, mode, selectedRoute.name)
       .then((res) => {
@@ -251,67 +240,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       })
       .catch((err) => {
         console.warn("Failed to fetch live route:", err);
-      })
-      .finally(() => {
-        setIsRoutingLoading(false);
       });
   }, [selectedRoute, boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon]);
 
-  const effectiveDurationMinutes = liveRoute?.durationMinutes || selectedRoute?.estimated_minutes || 16;
+  const effectiveDurationMinutes = selectedRoute?.estimated_minutes || liveRoute?.durationMinutes || 16;
   const effectiveDistanceMiles = liveRoute?.distanceMiles || 2.4;
-
-  // Ultra-intuitive Apple transit steps showing board, ride, dropoff, and walk
-  const steps: RouteStep[] = React.useMemo(() => {
-    if (!selectedRoute) return [];
-
-    const list: RouteStep[] = [
-      {
-        instruction: `Board ${selectedRoute.name} at ${boardingStop.name}`,
-        subText: `Departing from ${originCampus} • Near ${origTarget.name}`,
-        distance: '0.1 mi',
-        duration: '2 min',
-        iconType: 'bus',
-        distanceMeters: 160,
-        durationSeconds: 120
-      },
-      {
-        instruction: `Ride to ${dropoffStop.name}`,
-        subText: `Direct express transit along Route 18 into College Ave`,
-        distance: `${effectiveDistanceMiles} mi`,
-        duration: `${effectiveDurationMinutes} min`,
-        iconType: 'bus',
-        distanceMeters: Math.round(effectiveDistanceMiles * 1609),
-        durationSeconds: effectiveDurationMinutes * 60
-      },
-      {
-        instruction: `Alight at ${dropoffStop.name}`,
-        subText: walkDistMeters > 35 && destTarget.name !== dropoffStop.name
-          ? `Alight bus and proceed on foot to ${destTarget.name}`
-          : `Arrive at destination (${destTarget.name})`,
-        distance: 'Arrival',
-        duration: '1 min',
-        iconType: 'destination',
-        distanceMeters: 0,
-        durationSeconds: 60
-      }
-    ];
-
-    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
-      list.push({
-        instruction: `Walk to ${destTarget.name}`,
-        subText: `${Math.round(walkDistMeters * 3.28084)} ft • Approx ${walkMins} min walk from stop`,
-        distance: `${(walkDistMeters / 1609.34).toFixed(1)} mi`,
-        duration: `${walkMins} min`,
-        iconType: 'walk',
-        distanceMeters: walkDistMeters,
-        durationSeconds: walkMins * 60
-      });
-    }
-
-    return list;
-  }, [selectedRoute, boardingStop, dropoffStop, origTarget, destTarget, walkDistMeters, walkMins, effectiveDistanceMiles, effectiveDurationMinutes, originCampus]);
-
-  const currentStep = steps[currentStepIndex] || steps[0];
 
   // Helper to create Google Maps tile layer
   const createGoogleTileLayer = (theme: typeof mapTheme) => {
@@ -401,13 +334,20 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
     markersGroup.clearLayers();
 
+    const isLight = appTheme === 'light';
+    const markerBg = isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(28, 28, 30, 0.94)';
+    const textPrimary = isLight ? '#0F172A' : '#FFFFFF';
+    const textSecondary = isLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
+    const shadowColor = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.65)';
+    const destAccent = isLight ? '#0A84FF' : '#FF375F';
+
     // 1. When Zoomed Out (< 14.75): HIDE inner locations and ONLY show overall campus names
     if (isZoomedOut) {
       Object.entries(CAMPUS_COORDINATES).forEach(([key, info]) => {
         const isOrigin = getCampusKey(originCampus) === key;
         const isDest = getCampusKey(destCampus) === key;
 
-        const badgeColor = isOrigin ? '#30D158' : isDest ? '#FF375F' : '#0A84FF';
+        const badgeColor = isOrigin ? '#30D158' : isDest ? destAccent : '#0A84FF';
         const label = isOrigin ? 'START' : isDest ? 'DEST' : 'CAMPUS';
 
         const campusIcon = L.divIcon({
@@ -418,11 +358,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 6px;
               padding: 5px 12px;
-              background: rgba(28, 28, 30, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid ${isOrigin || isDest ? badgeColor : 'rgba(255,255,255,0.2)'};
-              box-shadow: 0 4px 18px rgba(0,0,0,0.65), 0 0 14px ${isOrigin || isDest ? badgeColor + '77' : 'transparent'};
+              border: 1.5px solid ${isOrigin || isDest ? badgeColor : (isLight ? 'rgba(15,23,42,0.14)' : 'rgba(255,255,255,0.2)')};
+              box-shadow: 0 4px 18px ${shadowColor}, 0 0 14px ${isOrigin || isDest ? badgeColor + '77' : 'transparent'};
               border-radius: 9999px;
               cursor: pointer;
               white-space: nowrap;
@@ -435,7 +375,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 background: ${badgeColor};
                 box-shadow: 0 0 10px ${badgeColor};
               "></span>
-              <span style="font-size: 12.5px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 12.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${key}
               </span>
               ${(isOrigin || isDest) && selectedRoute ? `
@@ -473,11 +413,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 3.5px;
               padding: 2.5px 7px 2.5px 3.5px;
-              background: rgba(20, 20, 22, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
               border: 1.5px solid #30D158;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(48, 209, 88, 0.4);
+              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(48, 209, 88, 0.4);
               border-radius: 9999px;
               cursor: pointer;
               transform: translate(-50%, -50%);
@@ -495,7 +435,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 color: #000;
                 font-weight: 900;
               ">▲</span>
-              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${boardingCode}
               </span>
             </div>
@@ -523,11 +463,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 3.5px;
               padding: 2.5px 7px 2.5px 3.5px;
-              background: rgba(20, 20, 22, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid #FF375F;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(255, 55, 95, 0.4);
+              border: 1.5px solid ${destAccent};
+              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px ${destAccent}66;
               border-radius: 9999px;
               cursor: pointer;
               transform: translate(-50%, -50%);
@@ -537,7 +477,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 width: 17px;
                 height: 17px;
                 border-radius: 50%;
-                background: #FF375F;
+                background: ${destAccent};
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
@@ -545,7 +485,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 color: #fff;
                 font-weight: 900;
               ">▼</span>
-              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${dropoffCode}
               </span>
             </div>
@@ -556,7 +496,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
         const dMarker = L.marker([dropoffStop.lat, dropoffStop.lon], { icon: dropoffIcon });
         dMarker.bindPopup(`
           <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
-            <div style="font-size: 12.5px; font-weight: 700; color: #FF375F;">🔴 Drop-off Stop</div>
+            <div style="font-size: 12.5px; font-weight: 700; color: ${destAccent};">📍 Drop-off Stop</div>
             <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${dropoffStop.name}</div>
             <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${dropoffStop.campus} Campus</div>
           </div>
@@ -576,17 +516,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 3px;
                 padding: 2.5px 6px;
-                background: rgba(28, 28, 30, 0.92);
+                background: ${markerBg};
                 backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.22);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.22)'};
                 border-radius: 9999px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                box-shadow: 0 2px 8px ${shadowColor};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.85); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9.5px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -635,15 +575,15 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 4px;
                 padding: 2.5px 7px;
-                background: rgba(28, 28, 30, 0.94);
+                background: ${markerBg};
                 border: 1.5px solid #0A84FF;
                 border-radius: 9999px;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+                box-shadow: 0 4px 14px ${shadowColor};
                 white-space: nowrap;
                 transform: translate(-50%, -50%);
               ">
                 <span style="font-size: 10px;">🏁</span>
-                <span style="font-size: 10.5px; font-weight: 700; color: #fff; font-family: -apple-system, sans-serif;">
+                <span style="font-size: 10.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, sans-serif;">
                   ${destCode}
                 </span>
               </div>
@@ -674,17 +614,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 2.5px;
                 padding: 2px 5.5px;
-                background: rgba(28, 28, 30, 0.88);
+                background: ${markerBg};
                 backdrop-filter: blur(14px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.2)'};
                 border-radius: 9999px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+                box-shadow: 0 2px 6px ${shadowColor};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 8.5px;">🚏</span>
-                <span style="font-size: 9px; font-weight: 600; color: rgba(235, 235, 245, 0.85); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -734,17 +674,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 3px;
                 padding: 2.5px 6px;
-                background: rgba(28, 28, 30, 0.92);
+                background: ${markerBg};
                 backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.22);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.22)'};
                 border-radius: 9999px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                box-shadow: 0 2px 8px ${shadowColor};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.9); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9.5px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -949,27 +889,6 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   // Deep links to Google Maps directly between the dynamic transit stops
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${boardingStop.lat},${boardingStop.lon}&destination=${dropoffStop.lat},${dropoffStop.lon}&travelmode=transit`;
 
-  // Render Maneuver Icon
-  const renderManeuverIcon = (type: RouteStep['iconType']) => {
-    switch (type) {
-      case 'walk':
-        return <Footprints size={19} />;
-      case 'bike':
-        return <Bike size={19} />;
-      case 'car':
-        return <Car size={19} />;
-      case 'destination':
-        return <MapPin size={19} />;
-      case 'turn-left':
-        return <Navigation size={19} style={{ transform: 'rotate(-45deg)' }} />;
-      case 'turn-right':
-        return <Navigation size={19} style={{ transform: 'rotate(45deg)' }} />;
-      case 'bus':
-      default:
-        return <BusIcon size={19} />;
-    }
-  };
-
   return (
     <div style={{
       position: 'relative',
@@ -986,339 +905,20 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       {/* Map Canvas */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
-      {/* ========================================================
-          TOP FLOATING GOOGLE MAPS NAVIGATION HEADER
-          (Triggered when routing option is selected)
-          ======================================================== */}
-      {selectedRoute ? (
+      {/* Top HUD when idle / viewing corridor */}
+      {!selectedRoute && (
         <div style={{
           position: 'absolute',
           top: '12px',
           left: '12px',
           right: '12px',
           zIndex: 1000,
-          background: 'rgba(20, 20, 22, 0.94)',
-          backdropFilter: 'blur(30px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(190%)',
-          border: '1px solid rgba(255, 255, 255, 0.16)',
-          borderRadius: '16px',
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(26, 115, 232, 0.25)',
-          padding: '12px 16px',
-          animation: 'fadeIn 0.2s ease-in-out'
-        }}>
-          {/* Top Line: Google Maps Badge + Routing Provider Status + Steps & Exit */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* Google Maps Navigation Badge */}
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '3px 10px',
-                borderRadius: '9999px',
-                background: 'rgba(28, 28, 30, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
-              }}>
-                <span>🗺️</span>
-                <span>Google Maps Navigation</span>
-              </div>
-
-              {/* Real Road Routing Provider Indicator */}
-              <span style={{
-                fontSize: '10.5px',
-                padding: '3px 9px',
-                borderRadius: '6px',
-                background: 'rgba(28, 28, 30, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#fff',
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                {isRoutingLoading ? (
-                  <>
-                    <Loader2 size={10} className="animate-spin" />
-                    Calculating Live Roads...
-                  </>
-                ) : (
-                  <>
-                    <span style={{ color: '#34A853' }}>●</span>
-                    {liveRoute?.provider === 'google' ? 'Google Directions API' : 'Free Live Road GPS'}
-                  </>
-                )}
-              </span>
-            </div>
-
-            {/* Step Counter & Itinerary Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => setShowStepsDrawer(!showStepsDrawer)}
-                className="apple-btn-dark-glass"
-                style={{ fontSize: '11px', padding: '4px 10px', height: '26px', gap: '4px' }}
-              >
-                <List size={12} />
-                <span>{showStepsDrawer ? 'Hide Steps' : `Steps (${steps.length})`}</span>
-              </button>
-
-              <button
-                onClick={onClearSelectedRoute}
-                title="End Navigation"
-                className="apple-btn-dark-glass"
-                style={{ width: '26px', height: '26px', padding: 0, borderRadius: '50%' }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          </div>
-
-          {/* Maneuver Banner: Maneuver Icon + Current Instruction */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#1A73E8',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 4px 14px rgba(26, 115, 232, 0.4)'
-            }}>
-              {renderManeuverIcon(currentStep?.iconType)}
-            </div>
-
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{
-                fontSize: '14.5px',
-                fontWeight: 700,
-                color: '#fff',
-                lineHeight: 1.25,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {currentStep?.instruction || `Board ${selectedRoute.name}`}
-              </div>
-              <div style={{
-                fontSize: '11.5px',
-                color: 'var(--apple-label-secondary)',
-                marginTop: '2px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {currentStep?.subText || `${originCampus} to ${destCampus} • ${selectedRoute.description}`}
-              </div>
-            </div>
-
-            {/* Step Advance Chevrons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-              <button
-                disabled={currentStepIndex <= 0}
-                onClick={() => setCurrentStepIndex(prev => Math.max(0, prev - 1))}
-                className="apple-btn-dark-glass"
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  padding: 0,
-                  borderRadius: '7px',
-                  opacity: currentStepIndex <= 0 ? 0.35 : 1
-                }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                disabled={currentStepIndex >= steps.length - 1}
-                onClick={() => setCurrentStepIndex(prev => Math.min(steps.length - 1, prev + 1))}
-                className="apple-btn-dark-glass"
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  padding: 0,
-                  borderRadius: '7px',
-                  opacity: currentStepIndex >= steps.length - 1 ? 0.35 : 1
-                }}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive Stop Selection Ribbon for Selected Route */}
-          {routeStops && routeStops.length > 0 && (
-            <div style={{
-              marginTop: '10px',
-              paddingTop: '8px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '10px',
-                fontWeight: 700,
-                color: 'rgba(235, 235, 245, 0.65)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase'
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span>Route Stops</span>
-                  <span style={{
-                    background: 'rgba(255, 255, 255, 0.12)',
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontWeight: 700
-                  }}>
-                    {routeStops.length}
-                  </span>
-                </span>
-                <span style={{ color: '#0A84FF', fontWeight: 600, fontSize: '10px' }}>
-                  Tap stop to route
-                </span>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '6px',
-                overflowX: 'auto',
-                paddingBottom: '2px',
-                scrollbarWidth: 'none',
-                WebkitOverflowScrolling: 'touch'
-              }}>
-                {routeStops.map((st) => {
-                  const isBoarding = st.name === boardingStop.name;
-                  const isDropoff = st.name === dropoffStop.name;
-                  const shortCode = getStopShortCode(st.name);
-
-                  let badgeIcon = '🚏';
-                  let btnBg = 'rgba(255, 255, 255, 0.08)';
-                  let btnBorder = '1px solid rgba(255, 255, 255, 0.12)';
-                  let btnColor = '#ffffff';
-
-                  if (isDropoff) {
-                    badgeIcon = '▼';
-                    btnBg = 'rgba(255, 55, 95, 0.28)';
-                    btnBorder = '1.5px solid #FF375F';
-                    btnColor = '#FF375F';
-                  } else if (isBoarding) {
-                    badgeIcon = '▲';
-                    btnBg = 'rgba(48, 209, 88, 0.28)';
-                    btnBorder = '1.5px solid #30D158';
-                    btnColor = '#30D158';
-                  }
-
-                  return (
-                    <button
-                      key={st.name}
-                      onClick={() => onSelectTargetLocation?.(st.name)}
-                      title={`${st.name} (${st.campus} Campus) - Tap to route`}
-                      className="apple-btn-dark-glass"
-                      style={{
-                        padding: '4px 9px',
-                        fontSize: '11px',
-                        fontWeight: (isBoarding || isDropoff) ? 700 : 500,
-                        borderRadius: '9999px',
-                        flexShrink: 0,
-                        gap: '5px',
-                        background: btnBg,
-                        border: btnBorder,
-                        color: btnColor,
-                        transition: 'all 0.15s ease',
-                        boxShadow: isDropoff ? '0 0 10px rgba(255, 55, 95, 0.35)' : isBoarding ? '0 0 10px rgba(48, 209, 88, 0.35)' : 'none'
-                      }}
-                    >
-                      <span style={{ fontSize: '10px' }}>{badgeIcon}</span>
-                      <span>{shortCode}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Expandable Step-by-Step Itinerary Sheet */}
-          {showStepsDrawer && (
-            <div style={{
-              marginTop: '10px',
-              paddingTop: '10px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              maxHeight: '220px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              {steps.map((st, idx) => {
-                const isCurrent = idx === currentStepIndex;
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => setCurrentStepIndex(idx)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '9px',
-                      padding: '6px 9px',
-                      borderRadius: '8px',
-                      background: isCurrent ? 'rgba(26, 115, 232, 0.22)' : 'rgba(28, 28, 30, 0.75)',
-                      border: isCurrent ? '1px solid rgba(26, 115, 232, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '6px',
-                      background: isCurrent ? '#1A73E8' : 'rgba(255, 255, 255, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      flexShrink: 0
-                    }}>
-                      {renderManeuverIcon(st.iconType)}
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '11.5px', fontWeight: isCurrent ? 700 : 500, color: '#fff' }}>
-                        {st.instruction}
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                        {st.subText}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)', flexShrink: 0 }}>
-                      {st.distance} ({st.duration})
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Top HUD when idle / viewing corridor */
-        <div style={{
-          position: 'absolute',
-          top: '12px',
-          left: '12px',
-          right: '12px',
-          zIndex: 1000,
-          background: 'rgba(28, 28, 30, 0.92)',
+          background: 'var(--apple-glass-overlay)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
+          border: '1px solid var(--apple-border)',
           borderRadius: '14px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
+          boxShadow: 'var(--apple-shadow-md)',
           padding: '8px 14px',
           display: 'flex',
           alignItems: 'center',
@@ -1326,9 +926,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           pointerEvents: 'auto'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px' }}>🗺️</span>
+            <MapPin size={15} color={appTheme === 'light' ? '#0A84FF' : '#FF375F'} />
             <div>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#fff' }}>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
                 Google Maps • Rutgers Transit Corridor
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
@@ -1366,17 +966,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: 'rgba(28, 28, 30, 0.94)',
+            background: 'var(--apple-glass-overlay)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
+            border: '1px solid var(--apple-border)',
             borderRadius: '14px',
             padding: '7px 14px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--apple-glass-text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
                 ~{effectiveDurationMinutes} min
               </div>
               <div style={{ fontSize: '10px', color: 'var(--apple-label-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1413,13 +1013,13 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: 'rgba(28, 28, 30, 0.92)',
+            background: 'var(--apple-glass-overlay)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             padding: '4px 6px',
             borderRadius: '9999px',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
+            border: '1px solid var(--apple-border)',
+            boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
             {["Busch", "Livingston", "College Ave", "Cook"].map((camp) => (
@@ -1433,7 +1033,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                   }
                 }}
                 className="apple-segment-btn"
-                style={{ padding: '3px 9px', fontSize: '11px', height: '24px', color: '#fff' }}
+                style={{ padding: '3px 9px', fontSize: '11px', height: '24px', color: 'var(--apple-glass-text)' }}
               >
                 {camp}
               </button>
@@ -1469,9 +1069,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
             title="Switch Google Maps Style"
           >
-            <Layers size={13} color="#FFFFFF" />
+            <Layers size={13} color={appTheme === 'light' ? '#0A84FF' : '#FFFFFF'} />
             <span>
-              {mapTheme === 'google-dark' ? 'Google Dark' : mapTheme === 'google-standard' ? 'Google Road' : 'Google Satellite'}
+              {mapTheme === 'google-dark' ? 'Google Dark' : mapTheme === 'google-standard' ? 'Google Light' : 'Google Satellite'}
             </span>
           </button>
 
@@ -1484,9 +1084,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px', textDecoration: 'none' }}
             title="Open transit directions in Google Maps app"
           >
-            <MapPin size={13} color="#EA4335" />
+            <MapPin size={13} color={appTheme === 'light' ? '#0A84FF' : '#EA4335'} />
             <span>Google Maps</span>
-            <ExternalLink size={10} style={{ opacity: 0.7 }} />
+            <ExternalLink size={10} color={appTheme === 'light' ? '#0A84FF' : 'currentColor'} style={{ opacity: 0.7 }} />
           </a>
         </div>
       </div>
