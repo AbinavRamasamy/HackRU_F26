@@ -432,6 +432,19 @@ export function App() {
     const formData = new FormData();
     formData.append("file", file);
 
+    // Pass logged in username if authenticated
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u?.netId) {
+          formData.append("username", u.netId);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/schedule/upload`, {
         method: "POST",
@@ -443,17 +456,19 @@ export function App() {
           alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend.");
         } else if (data.status === "error") {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
-        }
-
-        if (data.classes && data.classes.length > 0) {
-          setClasses(sortClassesByDateAndTime(data.classes));
+        } else if (data.classes && data.classes.length > 0) {
+          const sorted = sortClassesByDateAndTime(data.classes);
+          setClasses(sorted);
+          alert(`Successfully imported ${sorted.length} class meetings!`);
+        } else {
+          alert(data.message || "No classes were detected. Please make sure the uploaded image or .ics file contains class schedule details.");
         }
       } else {
-        alert(`Server returned error during schedule upload. Please verify backend is running on ${API_BASE_URL}.`);
+        alert(`Server returned an error during schedule upload (${res.status}). Please verify backend is running.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload error:", err);
-      alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload.`);
+      alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload: ${err?.message || err}`);
     } finally {
       setUploading(false);
       e.target.value = "";

@@ -504,7 +504,7 @@ async def upload_schedule(file: UploadFile = File(...), username: Optional[str] 
     content_type = (file.content_type or "").lower()
 
     # 4. Choose parser: .ics calendar or image OCR
-    if filename.endswith(".ics") or "calendar" in content_type:
+    if filename.endswith(".ics") or "calendar" in content_type or b"BEGIN:VCALENDAR" in contents[:500]:
         try:
             text = contents.decode("utf-8", errors="ignore")
             result = parse_ics_schedule(text)
@@ -520,8 +520,9 @@ async def upload_schedule(file: UploadFile = File(...), username: Optional[str] 
     # 5. If parsing succeeded and a username was provided, save classes to the user's SQL profile
     if result.get("status") == "success" and clean_user:
         users = load_users()
-        users[clean_user]["classes"] = result.get("classes", [])
-        save_users(users)
+        if clean_user in users:
+            users[clean_user]["classes"] = result.get("classes", [])
+            save_users(users)
 
     # 6. Return the result
     return result
