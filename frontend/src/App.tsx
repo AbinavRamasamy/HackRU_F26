@@ -293,6 +293,12 @@ export function App() {
 
     const targetCampus = targetClass.campus || "College Ave";
     const targetBuilding = targetClass.location || targetClass.building || targetCampus;
+
+    if (targetClass.location === "(Online)" || targetClass.campus === "(Online)") {
+      alert(`${targetClass.course} is an Online class - no transit navigation needed!`);
+      return;
+    }
+
     setTargetLocation(targetBuilding);
 
     let currentOrigin = originCampus;
@@ -755,7 +761,33 @@ export function App() {
                           </div>
                           <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <MapPin size={10} color="var(--apple-accent)" />
-                            <span>{cls.location || cls.building} ({cls.campus})</span>
+                            {cls.zoom_link ? (
+                              <a
+                                href={cls.zoom_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
+                                title="Open Zoom meeting in new tab"
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                📹 Join Zoom Call
+                              </a>
+                            ) : cls.location === '(Online)' || cls.campus === '(Online)' ? (
+                              <span style={{ color: 'var(--apple-label-tertiary)', fontStyle: 'italic' }}>(Online)</span>
+                            ) : (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cls.location || cls.building)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={`Search on Google Maps: ${cls.location || cls.building}`}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                {cls.location || cls.building}
+                              </a>
+                            )}
                           </div>
                         </div>
 
@@ -764,14 +796,41 @@ export function App() {
                             {cls.startTime} - {cls.endTime}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => handleGetToNextClass(cls)}
-                              className="apple-btn-secondary"
-                              style={{ padding: '3px 8px', fontSize: '10.5px' }}
-                              title="Calculate transit & start map navigation to this class"
-                            >
-                              Route ➔
-                            </button>
+                            {cls.zoom_link ? (
+                              <a
+                                href={cls.zoom_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="apple-btn-primary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '10.5px',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                                  color: '#fff',
+                                  borderRadius: '6px'
+                                }}
+                                title="Open Zoom meeting in new tab"
+                              >
+                                📹 Zoom
+                              </a>
+                            ) : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
+                              <button
+                                onClick={() => handleGetToNextClass(cls)}
+                                className="apple-btn-secondary"
+                                style={{ padding: '3px 8px', fontSize: '10.5px' }}
+                                title="Calculate transit & start map navigation to this class"
+                              >
+                                Route ➔
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '10px', color: 'var(--apple-label-tertiary)', padding: '2px 6px', borderRadius: '4px', background: 'var(--apple-card-bg-inset)' }}>
+                                Online
+                              </span>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -230,23 +230,12 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
 
         consolidated_classes = list(grouped_dict.values())
 
-        # Enrich with Rutgers campus, stop resolution, formatted location, and days_display
+        # Enrich with days_display and Google Maps search location / (Online) via Gemini 3.5 Flash Lite
         for item in consolidated_classes:
             item["days_display"] = ", ".join(item["days"])
-            matched_building = find_building(item.get("building", ""))
-            
-            if matched_building:
-                item["campus"] = matched_building["campus"]
-            else:
-                item["campus"] = "College Ave" # Default if unmapped
-
-            # Ensure clear, prominent location string
-            bldg_name = item.get("building", "")
-            campus_name = item.get("campus", "")
-            if campus_name and campus_name.lower() not in bldg_name.lower():
-                item["location"] = f"{bldg_name} ({campus_name})"
-            else:
-                item["location"] = bldg_name
+        
+        from app.ics_parser import resolve_locations_with_gemini
+        consolidated_classes = resolve_locations_with_gemini(consolidated_classes)
                 
         # Order strictly by Date (earliest day of the week) and Time
         def class_sort_key(cls_item):

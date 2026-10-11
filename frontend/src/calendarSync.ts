@@ -11,6 +11,7 @@ export interface ClassItem {
   building: string;
   location?: string;
   campus: string;
+  zoom_link?: string;
 }
 
 const DAY_ORDER: Record<string, number> = {
