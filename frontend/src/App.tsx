@@ -1502,9 +1502,6 @@ export function App() {
             classes={classes}
             upcomingClassInfo={upcomingClassInfo}
             onAutoRouteToNextClass={() => handleGetToNextClass()}
-            onUploadSchedule={() => scheduleFileInputRef.current?.click()}
-            onSyncDefaultCalendar={handleSyncCalendar}
-            isCalendarSyncing={isCalendarSyncing}
           />
           <input
             ref={scheduleFileInputRef}

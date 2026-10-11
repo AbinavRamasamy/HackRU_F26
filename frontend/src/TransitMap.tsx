@@ -9,9 +9,7 @@ import {
   MapPin,
   Clock,
   GraduationCap,
-  Calendar,
-  Upload,
-  RefreshCw
+  Calendar
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
 import { fetchLiveRoute, type LiveRouteResult } from './routingService';
@@ -46,9 +44,6 @@ export interface TransitMapProps {
   classes?: ClassItem[];
   upcomingClassInfo?: UpcomingClassResult;
   onAutoRouteToNextClass?: () => void;
-  onUploadSchedule?: () => void;
-  onSyncDefaultCalendar?: () => void;
-  isCalendarSyncing?: boolean;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -189,10 +184,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onSwitchToRoutes,
   classes: _classes = [],
   upcomingClassInfo,
-  onAutoRouteToNextClass,
-  onUploadSchedule,
-  onSyncDefaultCalendar,
-  isCalendarSyncing = false
+  onAutoRouteToNextClass
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -961,13 +953,13 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       const isMobile = window.innerWidth <= 768;
       const paddingOptions = isMobile
         ? {
-            paddingTopLeft: [24, 95] as [number, number],
-            paddingBottomRight: [24, 110] as [number, number]
-          }
+          paddingTopLeft: [24, 95] as [number, number],
+          paddingBottomRight: [24, 110] as [number, number]
+        }
         : {
-            paddingTopLeft: [50, 70] as [number, number],
-            paddingBottomRight: [50, 80] as [number, number]
-          };
+          paddingTopLeft: [50, 70] as [number, number],
+          paddingBottomRight: [50, 80] as [number, number]
+        };
 
       map.fitBounds(bounds, {
         ...paddingOptions,
@@ -1122,81 +1114,40 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             </>
           ) : (
             /* NO SCHEDULE CONNECTED */
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 210px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '11px',
-                  background: 'rgba(255, 149, 0, 0.15)',
-                  border: '1px solid rgba(255, 149, 0, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Calendar size={18} color="#FF9500" />
+            <div
+              onClick={onSwitchToRoutes}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                minWidth: 0,
+                flex: 1,
+                cursor: onSwitchToRoutes ? 'pointer' : 'default'
+              }}
+              title={onSwitchToRoutes ? "Click to open Schedule & Routes" : undefined}
+            >
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '11px',
+                background: 'rgba(255, 149, 0, 0.15)',
+                border: '1px solid rgba(255, 149, 0, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Calendar size={18} color="#FF9500" />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
+                  Auto-Select Route to Next Class
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
-                    Auto-Select Route to Next Class
-                  </div>
-                  <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
-                    Connect default calendar or upload schedule to auto-navigate
-                  </div>
+                <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
+                  Connect default calendar or upload schedule to auto-navigate
                 </div>
               </div>
-
-              {/* Action Buttons: Connect Calendar & Upload Schedule */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', flexShrink: 0 }}>
-                <button
-                  onClick={onSyncDefaultCalendar}
-                  disabled={isCalendarSyncing}
-                  className="apple-btn-primary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: isCalendarSyncing ? 'wait' : 'pointer',
-                    background: 'linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)',
-                    color: '#fff',
-                    border: 'none',
-                    boxShadow: '0 3px 10px rgba(10, 132, 255, 0.3)'
-                  }}
-                  title="Connect and sync your device's default calendar"
-                >
-                  {isCalendarSyncing ? <RefreshCw size={12} className="spin" /> : <Calendar size={12} />}
-                  <span>{isCalendarSyncing ? 'Syncing...' : 'Connect Calendar'}</span>
-                </button>
-
-                <button
-                  onClick={onUploadSchedule}
-                  className="apple-btn-secondary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    background: 'var(--apple-surface-card)',
-                    color: 'var(--apple-label-primary)',
-                    border: '1px solid var(--apple-border)',
-                    boxShadow: 'var(--apple-shadow-sm)'
-                  }}
-                  title="Upload course schedule (.ics or screenshot)"
-                >
-                  <Upload size={12} />
-                  <span>Upload</span>
-                </button>
-              </div>
-            </>
+            </div>
           )}
         </div>
       )}
