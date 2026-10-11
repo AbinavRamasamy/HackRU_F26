@@ -191,6 +191,7 @@ export function App() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
+  const [locationZoomTrigger, setLocationZoomTrigger] = useState<number>(0);
 
   const requestLocationPermission = (isManual = false) => {
     setGeoStatus("requesting");
@@ -200,15 +201,24 @@ export function App() {
         setResolvedGeo(loc);
         setCurrentLocation(loc.locationName);
         setOriginCampus(loc.campus);
+        if (isManual) {
+          setLocationZoomTrigger(Date.now());
+        }
       },
       (err) => {
         console.warn("Geolocation request failed or denied:", err);
         setGeoStatus("denied");
         if (isManual) {
-          alert("Location permission was not granted or is unavailable in your browser. You can select your campus location manually.");
+          setLocationZoomTrigger(Date.now());
         }
       }
     );
+  };
+
+  const handleLocationPillClick = () => {
+    setMobileTab('map');
+    setLocationZoomTrigger(Date.now());
+    requestLocationPermission(true);
   };
 
   useEffect(() => {
@@ -727,10 +737,10 @@ export function App() {
 
           {/* Location button */}
           <button
-            onClick={() => requestLocationPermission(true)}
+            onClick={handleLocationPillClick}
             className="apple-btn-secondary"
             style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
-            title="Update your current campus location"
+            title="Zoom to your current location"
           >
             <LocateFixed size={12} color={geoStatus === "granted" ? "#30D158" : "var(--apple-label-secondary)"} />
             <span className="btn-label-desktop">{geoStatus === "granted" ? originCampus : "Location"}</span>
@@ -1767,6 +1777,8 @@ export function App() {
             destCampus={destCampus}
             currentLocation={currentLocation}
             targetLocation={targetLocation}
+            userLocation={resolvedGeo ? resolvedGeo.coords : null}
+            zoomToLocationTrigger={locationZoomTrigger}
             onSelectTargetLocation={(loc) => {
               setTargetLocation(loc);
               const resolved = resolveLocationCoords(loc, destCampus);

@@ -8,7 +8,8 @@ import {
   X,
   MapPin,
   Clock,
-  ArrowRight
+  ArrowRight,
+  LocateFixed
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
 import { fetchLiveRoute, type LiveRouteResult } from './routingService';
@@ -43,6 +44,8 @@ export interface TransitMapProps {
   classes?: ClassItem[];
   upcomingClassInfo?: UpcomingClassResult;
   onAutoRouteToNextClass?: () => void;
+  userLocation?: { lat: number; lon: number } | null;
+  zoomToLocationTrigger?: number;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -183,7 +186,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onSwitchToRoutes,
   classes = [],
   upcomingClassInfo,
-  onAutoRouteToNextClass
+  onAutoRouteToNextClass,
+  userLocation,
+  zoomToLocationTrigger
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -388,6 +393,38 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     tileLayerRef.current = newTiles;
   }, [mapTheme, googleMapsApiKey]);
 
+  // Zoom to Current User Location when triggered by location pill click
+  useEffect(() => {
+    if (!zoomToLocationTrigger) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    let targetLat: number | null = null;
+    let targetLon: number | null = null;
+
+    if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+      targetLat = userLocation.lat;
+      targetLon = userLocation.lon;
+    } else if (origTarget && typeof origTarget.lat === 'number' && typeof origTarget.lon === 'number') {
+      targetLat = origTarget.lat;
+      targetLon = origTarget.lon;
+    } else {
+      const campKey = getCampusKey(originCampus);
+      if (CAMPUS_COORDINATES[campKey]) {
+        targetLat = CAMPUS_COORDINATES[campKey].lat;
+        targetLon = CAMPUS_COORDINATES[campKey].lon;
+      }
+    }
+
+    if (targetLat !== null && targetLon !== null) {
+      map.flyTo([targetLat, targetLon], 16.5, {
+        animate: true,
+        duration: 1.1
+      });
+      setCurrentZoom(16.5);
+    }
+  }, [zoomToLocationTrigger, userLocation, origTarget, originCampus]);
+
   // Update Campus Markers, Bus Stop Navigation Pins & Real-time Bus Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -402,6 +439,33 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     const textSecondary = isLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
     const shadowColor = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.65)';
     const destAccent = isLight ? '#0A84FF' : '#FF375F';
+
+    // 0. Current User GPS Location Marker (Apple-style Pulsing Blue Dot)
+    if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+      const userDotIcon = L.divIcon({
+        className: 'apple-user-location-marker',
+        html: `
+          <div style="position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); pointer-events: auto;">
+            <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background: rgba(10, 132, 255, 0.35); animation: pulseUserHalo 2s infinite ease-out;"></div>
+            <div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #0A84FF; border: 2.5px solid #FFFFFF; box-shadow: 0 2px 10px rgba(10, 132, 255, 0.75);"></div>
+          </div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const userMarker = L.marker([userLocation.lat, userLocation.lon], {
+        icon: userDotIcon,
+        zIndexOffset: 10000
+      });
+      userMarker.bindPopup(`
+        <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+          <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">📍 Current Location</div>
+          <div style="font-size: 11px; color: #444; margin-top: 2px;">${currentLocation || originCampus}</div>
+        </div>
+      `);
+      markersGroup.addLayer(userMarker);
+    }
 
     // 1. When Zoomed Out (< 14.5) AND no specific route is active: show overall campus names overview
     const showCampusOverview = !selectedRoute && isZoomedOut;
@@ -832,7 +896,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       `);
       markersGroup.addLayer(marker);
     });
-  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
+  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus, userLocation, currentLocation]);
 
   // Handle Route Navigation Layer with Real Road Geometry & Walking Connectors
   useEffect(() => {
@@ -1203,6 +1267,45 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
+            <button
+              onClick={() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+                let targetLat: number | null = null;
+                let targetLon: number | null = null;
+                if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+                  targetLat = userLocation.lat;
+                  targetLon = userLocation.lon;
+                } else if (origTarget && typeof origTarget.lat === 'number') {
+                  targetLat = origTarget.lat;
+                  targetLon = origTarget.lon;
+                } else {
+                  const campKey = getCampusKey(originCampus);
+                  if (CAMPUS_COORDINATES[campKey]) {
+                    targetLat = CAMPUS_COORDINATES[campKey].lat;
+                    targetLon = CAMPUS_COORDINATES[campKey].lon;
+                  }
+                }
+                if (targetLat !== null && targetLon !== null) {
+                  map.flyTo([targetLat, targetLon], 16.5, { animate: true, duration: 1.1 });
+                  setCurrentZoom(16.5);
+                }
+              }}
+              className="apple-segment-btn"
+              style={{
+                padding: '3px 8px',
+                fontSize: '11px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: userLocation ? '#0A84FF' : 'var(--apple-glass-text)'
+              }}
+              title="Zoom to My Location"
+            >
+              <LocateFixed size={11} color="#0A84FF" />
+              <span>Me</span>
+            </button>
             {["Busch", "Livingston", "College Ave", "Cook"].map((camp) => (
               <button
                 key={camp}
