@@ -377,16 +377,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '6px 8px',
-                borderRadius: '8px',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--apple-glass-text)',
+                justifyContent: 'center',
+                gap: '7px',
+                padding: '7px 12px',
+                borderRadius: '10px',
+                background: 'rgba(10, 132, 255, 0.12)',
+                border: '1px solid rgba(10, 132, 255, 0.25)',
+                color: '#0A84FF',
                 fontSize: '11.5px',
+                fontWeight: 600,
                 cursor: 'pointer',
                 width: '100%',
-                textAlign: 'left'
+                textAlign: 'center',
+                boxShadow: 'var(--apple-shadow-sm)'
               }}
             >
               <Calendar size={13} color="#0A84FF" />

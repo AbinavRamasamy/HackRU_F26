@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, Sun, Moon, RefreshCw, User } from 'lucide-react';
+import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, RefreshCw, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
@@ -505,31 +505,6 @@ export function App() {
 
         {/* Right: Clean Apple Controls Group */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Theme Toggle: Dark (Red/Black) vs Light (Blue/White) */}
-          <button
-            onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-            className="apple-btn-secondary"
-            style={{
-              fontSize: '12px',
-              padding: '5px 10px',
-              gap: '5px',
-              color: theme === 'light' ? '#0A84FF' : '#FF375F'
-            }}
-            title={`Switch to ${theme === 'dark' ? 'Light Theme (Blue & White)' : 'Dark Theme (Red & Black)'}`}
-          >
-            {theme === 'dark' ? (
-              <>
-                <Sun size={13} color="#FF9F0A" />
-                <span className="btn-label-desktop">Light</span>
-              </>
-            ) : (
-              <>
-                <Moon size={13} color="#0A84FF" />
-                <span className="btn-label-desktop">Dark</span>
-              </>
-            )}
-          </button>
-
           {/* Siri Copilot Drawer Trigger */}
           <button
             onClick={() => setShowCopilotModal(prev => !prev)}
@@ -1503,9 +1478,6 @@ export function App() {
             classes={classes}
             upcomingClassInfo={upcomingClassInfo}
             onAutoRouteToNextClass={() => handleGetToNextClass()}
-            onUploadSchedule={() => scheduleFileInputRef.current?.click()}
-            onSyncDefaultCalendar={handleSyncCalendar}
-            isCalendarSyncing={isCalendarSyncing}
           />
           <input
             ref={scheduleFileInputRef}

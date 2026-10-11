@@ -8,10 +8,7 @@ import {
   X,
   MapPin,
   Clock,
-  GraduationCap,
-  Calendar,
-  Upload,
-  RefreshCw
+  GraduationCap
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
 import { fetchLiveRoute, type LiveRouteResult } from './routingService';
@@ -46,9 +43,6 @@ export interface TransitMapProps {
   classes?: ClassItem[];
   upcomingClassInfo?: UpcomingClassResult;
   onAutoRouteToNextClass?: () => void;
-  onUploadSchedule?: () => void;
-  onSyncDefaultCalendar?: () => void;
-  isCalendarSyncing?: boolean;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -189,10 +183,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onSwitchToRoutes,
   classes: _classes = [],
   upcomingClassInfo,
-  onAutoRouteToNextClass,
-  onUploadSchedule,
-  onSyncDefaultCalendar,
-  isCalendarSyncing = false
+  onAutoRouteToNextClass
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -1009,8 +1000,8 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       {/* Map Canvas */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
-      {/* Top HUD: Auto-Select Route to Next Class / Connect Schedule */}
-      {!selectedRoute && (
+      {/* Top HUD: Auto-Select Route to Next Class (Only shown once a calendar/schedule is connected) */}
+      {!selectedRoute && upcomingClassInfo?.nextClass && (
         <div style={{
           position: 'absolute',
           top: '12px',
@@ -1031,173 +1022,91 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           gap: '10px',
           pointerEvents: 'auto'
         }}>
-          {upcomingClassInfo?.nextClass ? (
-            /* HAS SCHEDULE & UPCOMING CLASS */
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 230px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '11px',
-                  background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.22), rgba(10, 132, 255, 0.22))',
-                  border: '1px solid var(--apple-border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 230px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '11px',
+              background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.22), rgba(10, 132, 255, 0.22))',
+              border: '1px solid var(--apple-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <GraduationCap size={18} color={appTheme === 'light' ? '#CC0033' : '#FF375F'} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '1px' }}>
+                <span style={{
+                  fontSize: '9.5px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: appTheme === 'light' ? '#CC0033' : '#FF375F'
                 }}>
-                  <GraduationCap size={18} color={appTheme === 'light' ? '#CC0033' : '#FF375F'} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '1px' }}>
-                    <span style={{
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      color: appTheme === 'light' ? '#CC0033' : '#FF375F'
-                    }}>
-                      {upcomingClassInfo.dayLabel} Next Class
-                    </span>
-                    {upcomingClassInfo.minutesUntil !== null && (
-                      <span style={{
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        padding: '1px 5px',
-                        borderRadius: '4px',
-                        background: upcomingClassInfo.minutesUntil <= 30 ? 'rgba(255, 59, 48, 0.18)' : 'rgba(48, 209, 88, 0.18)',
-                        color: upcomingClassInfo.minutesUntil <= 30 ? '#FF3B30' : '#30D158'
-                      }}>
-                        {upcomingClassInfo.minutesUntil <= 0 ? 'Starting now' : `in ${upcomingClassInfo.minutesUntil}m`}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{
-                    fontSize: '13px',
+                  {upcomingClassInfo.dayLabel} Next Class
+                </span>
+                {upcomingClassInfo.minutesUntil !== null && (
+                  <span style={{
+                    fontSize: '9px',
                     fontWeight: 700,
-                    color: 'var(--apple-glass-text)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    background: upcomingClassInfo.minutesUntil <= 30 ? 'rgba(255, 59, 48, 0.18)' : 'rgba(48, 209, 88, 0.18)',
+                    color: upcomingClassInfo.minutesUntil <= 30 ? '#FF3B30' : '#30D158'
                   }}>
-                    {upcomingClassInfo.nextClass.course}
-                  </div>
-                  <div style={{
-                    fontSize: '10.5px',
-                    color: 'var(--apple-label-secondary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • {upcomingClassInfo.nextClass.campus} Campus • ⏰ {upcomingClassInfo.nextClass.startTime}
-                  </div>
-                </div>
+                    {upcomingClassInfo.minutesUntil <= 0 ? 'Starting now' : `in ${upcomingClassInfo.minutesUntil}m`}
+                  </span>
+                )}
               </div>
+              <div style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--apple-glass-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {upcomingClassInfo.nextClass.course}
+              </div>
+              <div style={{
+                fontSize: '10.5px',
+                color: 'var(--apple-label-secondary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • {upcomingClassInfo.nextClass.campus} Campus • ⏰ {upcomingClassInfo.nextClass.startTime}
+              </div>
+            </div>
+          </div>
 
-              {/* Action Button: Auto-Select Route to Next Class */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                <button
-                  onClick={onAutoRouteToNextClass}
-                  className="apple-btn-primary"
-                  style={{
-                    padding: '7px 14px',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
-                    color: '#fff',
-                    boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
-                    border: 'none'
-                  }}
-                  title="Auto-select transit route directly to this class"
-                >
-                  <Navigation size={13} />
-                  <span>Route to Class</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            /* NO SCHEDULE CONNECTED */
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 210px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '11px',
-                  background: 'rgba(255, 149, 0, 0.15)',
-                  border: '1px solid rgba(255, 149, 0, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <Calendar size={18} color="#FF9500" />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
-                    Auto-Select Route to Next Class
-                  </div>
-                  <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
-                    Connect default calendar or upload schedule to auto-navigate
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons: Connect Calendar & Upload Schedule */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', flexShrink: 0 }}>
-                <button
-                  onClick={onSyncDefaultCalendar}
-                  disabled={isCalendarSyncing}
-                  className="apple-btn-primary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: isCalendarSyncing ? 'wait' : 'pointer',
-                    background: 'linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)',
-                    color: '#fff',
-                    border: 'none',
-                    boxShadow: '0 3px 10px rgba(10, 132, 255, 0.3)'
-                  }}
-                  title="Connect and sync your device's default calendar"
-                >
-                  {isCalendarSyncing ? <RefreshCw size={12} className="spin" /> : <Calendar size={12} />}
-                  <span>{isCalendarSyncing ? 'Syncing...' : 'Connect Calendar'}</span>
-                </button>
-
-                <button
-                  onClick={onUploadSchedule}
-                  className="apple-btn-secondary"
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    borderRadius: '9999px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    background: 'var(--apple-surface-card)',
-                    color: 'var(--apple-label-primary)',
-                    border: '1px solid var(--apple-border)',
-                    boxShadow: 'var(--apple-shadow-sm)'
-                  }}
-                  title="Upload course schedule (.ics or screenshot)"
-                >
-                  <Upload size={12} />
-                  <span>Upload</span>
-                </button>
-              </div>
-            </>
-          )}
+          {/* Action Button: Auto-Select Route to Next Class */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            <button
+              onClick={onAutoRouteToNextClass}
+              className="apple-btn-primary"
+              style={{
+                padding: '7px 14px',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                borderRadius: '9999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
+                color: '#fff',
+                boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
+                border: 'none'
+              }}
+              title="Auto-select transit route directly to this class"
+            >
+              <Navigation size={13} />
+              <span>Route to Class</span>
+            </button>
+          </div>
         </div>
       )}
 
