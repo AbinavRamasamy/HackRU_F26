@@ -580,8 +580,40 @@ export function App() {
     }
   };
 
-  const handleDeleteClass = (targetClass: ClassItem) => {
-    setClasses(prev => prev.filter(c => c !== targetClass));
+  const handleDeleteClass = async (targetClass: ClassItem) => {
+    const updated = classes.filter(c => c !== targetClass);
+    setClasses(updated);
+
+    // Persist deletion immediately to SQLite database
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      const u = savedUser ? JSON.parse(savedUser) : null;
+      await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classes: updated, username: u?.netId || 'ar2783' })
+      });
+    } catch (err) {
+      console.warn("Failed to delete class from SQL:", err);
+    }
+  };
+
+  const handleClearAllClasses = async () => {
+    if (!window.confirm("Clear all classes from your schedule?")) return;
+    setClasses([]);
+
+    // Clear from SQLite database
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      const u = savedUser ? JSON.parse(savedUser) : null;
+      await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classes: [], username: u?.netId || 'ar2783' })
+      });
+    } catch (err) {
+      console.warn("Failed to clear classes from SQL:", err);
+    }
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
@@ -758,11 +790,7 @@ export function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {classes.length > 0 && (
                     <button
-                      onClick={() => {
-                        if (window.confirm("Clear all classes from your schedule?")) {
-                          setClasses([]);
-                        }
-                      }}
+                      onClick={handleClearAllClasses}
                       className="apple-btn-secondary"
                       style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
                       title="Clear all imported classes"

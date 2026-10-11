@@ -908,6 +908,42 @@ def get_device_synced_classes(username: Optional[str] = None):
     return {"status": "success", "username": None, "classes": []}
 
 
+class DeleteClassRequest(BaseModel):
+    course: str
+    startTime: Optional[str] = None
+    username: Optional[str] = None
+
+
+@app.post("/api/calendar/delete-class")
+def delete_class_endpoint(req: DeleteClassRequest):
+    """
+    Deletes a specific class meeting from the user's SQLite records.
+    """
+    users = load_users()
+    target_user = req.username.strip().lower() if req.username else None
+    if not target_user or target_user not in users:
+        target_user = "ar2783" if "ar2783" in users else (list(users.keys())[0] if users else None)
+
+    if not target_user:
+        return {"status": "error", "message": "No user found"}
+
+    current_classes = users.get(target_user, {}).get("classes", [])
+    new_classes = [
+        c for c in current_classes
+        if not (
+            c.get("course", "").strip().lower() == req.course.strip().lower() and
+            (not req.startTime or c.get("startTime") == req.startTime)
+        )
+    ]
+    save_user_classes(target_user, new_classes)
+    return {
+        "status": "success",
+        "username": target_user,
+        "classes_count": len(new_classes),
+        "classes": new_classes
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
