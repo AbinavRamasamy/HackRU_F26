@@ -267,32 +267,65 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     };
   }, [onSelectTargetLocation]);
 
-  // Fetch actual live road routing from the dynamic boarding stop to dynamic drop-off stop
+  // Fetch actual live road / pedestrian routing from origin to destination
   useEffect(() => {
     if (!selectedRoute) {
       setLiveRoute(null);
       return;
     }
 
+    const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
+      (selectedRoute.name || '').toLowerCase().includes('walk') ||
+      (selectedRoute.name || '').toLowerCase().includes('pedestrian');
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('scooter');
     const isCar = (selectedRoute.name || '').toLowerCase().includes('knight') ||
       (selectedRoute.name || '').toLowerCase().includes('escort');
-    const mode = isBike ? 'bike' : isCar ? 'car' : 'bus';
+    const mode: 'bus' | 'bike' | 'car' | 'walk' = isWalk ? 'walk' : isBike ? 'bike' : isCar ? 'car' : 'bus';
 
-    // Route directly between the dynamically calculated bus stops (e.g. into College Ave Student Center Stop)
-    fetchLiveRoute(boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon, mode, selectedRoute.name)
+    const originLat = isWalk ? (userLocation?.lat ?? origTarget.lat) : boardingStop.lat;
+    const originLon = isWalk ? (userLocation?.lon ?? origTarget.lon) : boardingStop.lon;
+    const destLat = isWalk ? destTarget.lat : dropoffStop.lat;
+    const destLon = isWalk ? destTarget.lon : dropoffStop.lon;
+
+    fetchLiveRoute(originLat, originLon, destLat, destLon, mode, selectedRoute.name)
       .then((res) => {
         setLiveRoute(res);
       })
       .catch((err) => {
         console.warn("Failed to fetch live route:", err);
       });
-  }, [selectedRoute, boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon]);
+  }, [
+    selectedRoute,
+    boardingStop.lat,
+    boardingStop.lon,
+    dropoffStop.lat,
+    dropoffStop.lon,
+    userLocation?.lat,
+    userLocation?.lon,
+    origTarget.lat,
+    origTarget.lon,
+    destTarget.lat,
+    destTarget.lon
+  ]);
 
-  const effectiveDurationMinutes = selectedRoute?.estimated_minutes || liveRoute?.durationMinutes || 16;
-  const effectiveDistanceMiles = liveRoute?.distanceMiles || 2.4;
+  const isSelectedWalk = (selectedRoute?.type || '').toLowerCase().includes('walk') ||
+    (selectedRoute?.name || '').toLowerCase().includes('walk') ||
+    (selectedRoute?.name || '').toLowerCase().includes('pedestrian');
+
+  const walkingDistMeters = getHaversineDistanceMeters(
+    userLocation?.lat ?? origTarget.lat,
+    userLocation?.lon ?? origTarget.lon,
+    destTarget.lat,
+    destTarget.lon
+  );
+  const fallbackWalkingMinutes = Math.max(1, Math.round(walkingDistMeters / 80.4));
+
+  const effectiveDurationMinutes = isSelectedWalk
+    ? (liveRoute?.durationMinutes || selectedRoute?.estimated_minutes || fallbackWalkingMinutes)
+    : (selectedRoute?.estimated_minutes || liveRoute?.durationMinutes || 16);
+  const effectiveDistanceMiles = liveRoute?.distanceMiles || (isSelectedWalk ? Number((walkingDistMeters * 0.000621371).toFixed(1)) : 2.4);
 
   // Helper to create Google Maps tile layer
   const createGoogleTileLayer = (theme: typeof mapTheme) => {
@@ -910,40 +943,45 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
+    const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
+      (selectedRoute.name || '').toLowerCase().includes('walk') ||
+      (selectedRoute.name || '').toLowerCase().includes('pedestrian');
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || (selectedRoute.name || '').toLowerCase().includes('bike');
 
-    // Use actual road coordinates from live routing engine if loaded, else fallback
+    // Use actual road/pathway coordinates from live routing engine if loaded, else fallback
     const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
       ? liveRoute.coordinates
+      : isWalk
+      ? [[userLocation?.lat ?? origTarget.lat, userLocation?.lon ?? origTarget.lon], [destTarget.lat, destTarget.lon]]
       : getFallbackRouteGeometry(originCampus, destCampus, isBike, boardingStop, dropoffStop, selectedRoute?.name);
 
-    // Glowing navigation route line (transitstat.us route color or bike green)
-    const routeColor = isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
+    // Glowing navigation route line (transitstat.us route color, bike green, or pedestrian blue)
+    const routeColor = isWalk ? '#0A84FF' : isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
 
     // Outer glow casing
     const glowPolyline = L.polyline(pathCoords, {
       color: routeColor,
-      weight: 10,
+      weight: isWalk ? 8 : 10,
       opacity: 0.45,
       lineCap: 'round',
       lineJoin: 'round'
     });
 
-    // Core sharp road line
+    // Core sharp road / footpath line
     const corePolyline = L.polyline(pathCoords, {
       color: '#FFFFFF',
       weight: 4.5,
       opacity: 0.95,
       lineCap: 'round',
       lineJoin: 'round',
-      dashArray: isBike ? '6, 8' : undefined
+      dashArray: isWalk ? '4, 6' : isBike ? '6, 8' : undefined
     });
 
     routeGroup.addLayer(glowPolyline);
     routeGroup.addLayer(corePolyline);
 
-    // If destination building is a separate walk from the drop-off bus stop, render dotted walking line
-    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+    // If destination building is a separate walk from the drop-off bus stop (only if not already a walking route)
+    if (!isWalk && walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
       const walkPolyline = L.polyline([
         [dropoffStop.lat, dropoffStop.lon],
         [destTarget.lat, destTarget.lon]
@@ -1045,8 +1083,29 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     isBike
   ]);
 
-  // Deep links to Google Maps directly between the dynamic transit stops
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${boardingStop.lat},${boardingStop.lon}&destination=${dropoffStop.lat},${dropoffStop.lon}&travelmode=transit`;
+  const isSelectedBike = (selectedRoute?.type || '').toLowerCase().includes('bike') ||
+    (selectedRoute?.name || '').toLowerCase().includes('bike') ||
+    (selectedRoute?.name || '').toLowerCase().includes('scooter');
+  const isIntraCampus = originCampus === destCampus;
+
+  // Determine if walking mode should be used in Google Maps
+  const isPedestrian = isSelectedWalk || (!selectedRoute && isIntraCampus);
+  const gmapsTravelMode = isPedestrian ? 'walking' : isSelectedBike ? 'bicycling' : 'transit';
+
+  // Origin: exact GPS user coordinates if available, otherwise origin target building/stop
+  const gmapsOriginLat = isPedestrian
+    ? (userLocation?.lat ?? origTarget.lat)
+    : (userLocation?.lat ?? boardingStop.lat);
+  const gmapsOriginLon = isPedestrian
+    ? (userLocation?.lon ?? origTarget.lon)
+    : (userLocation?.lon ?? boardingStop.lon);
+
+  // Destination: target destination building
+  const gmapsDestLat = destTarget.lat;
+  const gmapsDestLon = destTarget.lon;
+
+  // Deep links to Google Maps directly with exact walking / biking / transit travelmode
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${gmapsOriginLat},${gmapsOriginLon}&destination=${gmapsDestLat},${gmapsDestLon}&travelmode=${gmapsTravelMode}`;
 
   return (
     <div style={{
@@ -1221,10 +1280,12 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             pointerEvents: 'auto'
           }}>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--apple-glass-text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
-                ~{effectiveDurationMinutes} min
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--apple-glass-text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                {isSelectedWalk && <span style={{ fontSize: '14px' }}>🚶</span>}
+                <span>~{effectiveDurationMinutes} min</span>
+                {isSelectedWalk && <span style={{ fontSize: '11px', fontWeight: 700, color: '#0A84FF', marginLeft: '2px' }}>walk</span>}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--apple-label-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--apple-label-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                 <Clock size={10} />
                 <span>Arrive {getArrivalClock(effectiveDurationMinutes)} • {effectiveDistanceMiles} mi</span>
               </div>
@@ -1378,10 +1439,10 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             rel="noopener noreferrer"
             className="apple-btn-dark-glass"
             style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px', textDecoration: 'none' }}
-            title="Open transit directions in Google Maps app"
+            title={isPedestrian ? "Open walking directions to target location in Google Maps" : isSelectedBike ? "Open cycling directions in Google Maps" : "Open transit directions in Google Maps"}
           >
-            <MapPin size={13} color={appTheme === 'light' ? '#0A84FF' : '#EA4335'} />
-            <span>Google Maps</span>
+            <MapPin size={13} color={isPedestrian ? '#30D158' : appTheme === 'light' ? '#0A84FF' : '#EA4335'} />
+            <span>{isPedestrian ? 'Walk in Maps' : isSelectedBike ? 'Bike in Maps' : 'Google Maps'}</span>
             <ExternalLink size={10} color={appTheme === 'light' ? '#0A84FF' : 'currentColor'} style={{ opacity: 0.7 }} />
           </a>
         </div>

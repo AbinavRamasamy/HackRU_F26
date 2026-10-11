@@ -55,16 +55,21 @@ const parseOsrmManeuver = (
   const modifier = (m.modifier || '').toLowerCase();
   const streetName = (step.name || '').trim();
 
-  let iconType: RouteStep['iconType'] = travelMode === 'bike' ? 'bike' : 'car';
+  const isWalk = travelMode === 'walk';
+  let iconType: RouteStep['iconType'] = isWalk ? 'walk' : travelMode === 'bike' ? 'bike' : 'car';
   let instruction = '';
   let subText = '';
 
   if (index === 0) {
-    instruction = `Depart from starting point`;
-    subText = streetName ? `Head toward ${streetName}` : 'Follow campus roadway';
-    iconType = travelMode === 'bike' ? 'bike' : 'car';
+    instruction = isWalk
+      ? (streetName ? `Walk toward ${streetName}` : 'Depart along pedestrian walkway')
+      : `Depart from starting point`;
+    subText = streetName
+      ? `Head toward ${streetName}`
+      : (isWalk ? 'Follow campus footpath' : 'Follow campus roadway');
+    iconType = isWalk ? 'walk' : travelMode === 'bike' ? 'bike' : 'car';
   } else if (index === totalSteps - 1 || type === 'arrive') {
-    instruction = `Arrive at destination campus`;
+    instruction = isWalk ? `Arrive at destination building` : `Arrive at destination campus`;
     subText = streetName ? `Destination is on ${streetName}` : 'Trip completed';
     iconType = 'destination';
   } else if (type === 'turn') {
@@ -75,26 +80,32 @@ const parseOsrmManeuver = (
       instruction = `Turn right${streetName ? ` onto ${streetName}` : ''}`;
       iconType = 'turn-right';
     } else {
-      instruction = `Continue straight${streetName ? ` on ${streetName}` : ''}`;
-      iconType = 'car';
+      instruction = isWalk
+        ? `Walk straight${streetName ? ` on ${streetName}` : ''}`
+        : `Continue straight${streetName ? ` on ${streetName}` : ''}`;
+      iconType = isWalk ? 'walk' : 'car';
     }
-    subText = `Continue for ${formatDistance(step.distance)}`;
+    subText = isWalk ? `Walk for ${formatDistance(step.distance)}` : `Continue for ${formatDistance(step.distance)}`;
   } else if (type.includes('roundabout') || type.includes('rotary')) {
     instruction = `Take roundabout${streetName ? ` toward ${streetName}` : ''}`;
     iconType = modifier.includes('left') ? 'turn-left' : 'turn-right';
     subText = `Exit for ${formatDistance(step.distance)}`;
   } else if (type.includes('ramp') || type.includes('merge')) {
-    instruction = `Merge onto ${streetName || 'connector highway'}`;
-    iconType = 'car';
-    subText = `Cruise for ${formatDistance(step.distance)}`;
+    instruction = isWalk
+      ? `Follow connector path${streetName ? ` toward ${streetName}` : ''}`
+      : `Merge onto ${streetName || 'connector highway'}`;
+    iconType = isWalk ? 'walk' : 'car';
+    subText = `Proceed for ${formatDistance(step.distance)}`;
   } else if (type === 'new name' || type === 'continue') {
-    instruction = `Continue on ${streetName || 'roadway'}`;
-    iconType = 'car';
+    instruction = isWalk
+      ? `Continue walking on ${streetName || 'pathway'}`
+      : `Continue on ${streetName || 'roadway'}`;
+    iconType = isWalk ? 'walk' : 'car';
     subText = `Follow path for ${formatDistance(step.distance)}`;
   } else {
     const formattedMod = modifier ? ` ${modifier}` : '';
     instruction = `${type.charAt(0).toUpperCase() + type.slice(1)}${formattedMod}${streetName ? ` on ${streetName}` : ''}`;
-    iconType = modifier.includes('left') ? 'turn-left' : modifier.includes('right') ? 'turn-right' : 'car';
+    iconType = modifier.includes('left') ? 'turn-left' : modifier.includes('right') ? 'turn-right' : (isWalk ? 'walk' : 'car');
     subText = `Proceed for ${formatDistance(step.distance)}`;
   }
 
@@ -109,7 +120,7 @@ export async function fetchLiveRoute(
   originLon: number,
   destLat: number,
   destLon: number,
-  transitType: 'bus' | 'bike' | 'car' = 'bus',
+  transitType: 'bus' | 'bike' | 'car' | 'walk' = 'bus',
   routeName: string = ''
 ): Promise<LiveRouteResult> {
   const cacheKey = `${originLat.toFixed(4)},${originLon.toFixed(4)}_${destLat.toFixed(4)},${destLon.toFixed(4)}_${transitType}_${routeName}`;
@@ -120,7 +131,13 @@ export async function fetchLiveRoute(
   // 1. Try Google Maps Directions API if API key is present
   if (GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY.trim() !== '') {
     try {
-      const mode = transitType === 'bike' ? 'bicycling' : transitType === 'bus' ? 'transit' : 'driving';
+      const mode = transitType === 'walk'
+        ? 'walking'
+        : transitType === 'bike'
+        ? 'bicycling'
+        : transitType === 'bus'
+        ? 'transit'
+        : 'driving';
       const googleUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${originLat},${originLon}&destination=${destLat},${destLon}&mode=${mode}&key=${GOOGLE_MAPS_API_KEY.trim()}`;
       
       const res = await fetch(googleUrl);
@@ -148,7 +165,7 @@ export async function fetchLiveRoute(
             subText: s.distance?.text ? `${s.distance.text} • ${s.duration?.text || ''}` : 'Follow directions',
             distance: s.distance?.text || '0.5 mi',
             duration: s.duration?.text || '2 min',
-            iconType: transitType === 'bike' ? 'bike' : 'car',
+            iconType: transitType === 'walk' ? 'walk' : transitType === 'bike' ? 'bike' : 'car',
             distanceMeters: s.distance?.value || 800,
             durationSeconds: s.duration?.value || 120
           }));
@@ -156,7 +173,9 @@ export async function fetchLiveRoute(
           const result: LiveRouteResult = {
             coordinates,
             distanceMiles: Number(((leg.distance?.value || 4000) * 0.000621371).toFixed(1)),
-            durationMinutes: Math.max(5, Math.round((leg.duration?.value || 900) / 60)),
+            durationMinutes: transitType === 'walk'
+              ? Math.max(1, Math.round((leg.duration?.value || 300) / 60))
+              : Math.max(5, Math.round((leg.duration?.value || 900) / 60)),
             steps,
             provider: 'google'
           };
@@ -172,7 +191,7 @@ export async function fetchLiveRoute(
 
   // 2. Free High-Precision OSRM Live Routing Engine (Zero API Key, 100% Free)
   try {
-    const osrmProfile = transitType === 'bike' ? 'bike' : 'driving';
+    const osrmProfile = transitType === 'walk' ? 'foot' : transitType === 'bike' ? 'bike' : 'driving';
     const osrmUrl = `https://router.project-osrm.org/route/v1/${osrmProfile}/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
 
     const res = await fetch(osrmUrl);
@@ -191,7 +210,7 @@ export async function fetchLiveRoute(
         const steps: RouteStep[] = (leg.steps || []).map((s: any, idx: number) => {
           const { instruction, subText, iconType } = parseOsrmManeuver(s, idx, totalSteps, transitType);
           return {
-            instruction: (idx === 1 && routeName) ? `Board ${routeName}` : instruction,
+            instruction: (idx === 1 && routeName && transitType === 'bus') ? `Board ${routeName}` : instruction,
             subText,
             distance: formatDistance(s.distance || 0),
             duration: formatDuration(s.duration || 60),
@@ -204,6 +223,8 @@ export async function fetchLiveRoute(
         const totalDistanceMiles = Number(((leg.distance || 4000) * 0.000621371).toFixed(1));
         const totalDurationMins = transitType === 'bus' 
           ? Math.max(8, Math.round((leg.duration || 600) / 60) + 4) // include bus dwell & stops
+          : transitType === 'walk'
+          ? Math.max(1, Math.round((leg.distance || 400) / 80)) // ~3.0 mph walking pace
           : Math.max(4, Math.round((leg.duration || 600) / 60));
 
         const result: LiveRouteResult = {
@@ -229,11 +250,42 @@ export async function fetchLiveRoute(
     [destLat, destLon]
   ];
 
+  const fallbackDistMiles = transitType === 'walk' ? 0.3 : 2.5;
+  const fallbackDurMins = transitType === 'walk' ? 6 : 16;
+
   return {
     coordinates: fallbackCoords,
-    distanceMiles: 2.5,
-    durationMinutes: 16,
-    steps: [
+    distanceMiles: fallbackDistMiles,
+    durationMinutes: fallbackDurMins,
+    steps: transitType === 'walk' ? [
+      {
+        instruction: 'Walk along campus pathway',
+        subText: 'Follow walkways toward your target facility',
+        distance: '0.1 mi',
+        duration: '2 min',
+        iconType: 'walk',
+        distanceMeters: 160,
+        durationSeconds: 120
+      },
+      {
+        instruction: 'Continue on pedestrian crosswalk',
+        subText: 'Direct path to building entrance',
+        distance: '0.2 mi',
+        duration: '4 min',
+        iconType: 'walk',
+        distanceMeters: 320,
+        durationSeconds: 240
+      },
+      {
+        instruction: 'Arrive at destination building',
+        subText: 'Enter through main entrance',
+        distance: '50 ft',
+        duration: '1 min',
+        iconType: 'destination',
+        distanceMeters: 15,
+        durationSeconds: 30
+      }
+    ] : [
       {
         instruction: `Depart from origin`,
         subText: 'Follow campus walkway to transit shelter',
