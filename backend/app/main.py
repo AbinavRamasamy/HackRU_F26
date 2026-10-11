@@ -425,15 +425,18 @@ def calculate_commute(plan: CommutePlanRequest):
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
 
-SPEED_OPTIONS = ["Mosey", "Wander", "Stroll", "Dash", "Zoom"]
-DISTANCE_OPTIONS = ["Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "A Mile or More"]
+SPEED_OPTIONS = ["Mosey", "Wander", "Stroll", "Dash", "Zoom", "2.0 mph", "2.5 mph", "3.0 mph", "3.5 mph"]
+DISTANCE_OPTIONS = ["Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "1 Mile", "A Mile or More", "1.5 Miles+"]
+
 class SignupRequest(BaseModel):
     username: str
     password: str
-    walking_speed: str
-    prefer_walking: bool
-    max_walking_distance: str
-    avoid_bad_weather: bool
+    walking_speed: Optional[str] = "2.5 mph"
+    prefer_walking: Optional[bool] = True
+    max_walking_distance: Optional[str] = "1 Mile"
+    avoid_bad_weather: Optional[bool] = True
+    avoid_rain: Optional[bool] = True
+    avoid_snow: Optional[bool] = True
 
 @app.post("/api/signup")
 def signup(req: SignupRequest):
@@ -445,10 +448,6 @@ def signup(req: SignupRequest):
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
     if req.password.strip() == "":
         raise HTTPException(status_code=400, detail="Password can't be empty.")
-    if req.walking_speed not in SPEED_OPTIONS:
-        raise HTTPException(status_code=400, detail="Invalid walking speed.")
-    if req.max_walking_distance not in DISTANCE_OPTIONS:
-        raise HTTPException(status_code=400, detail="Invalid walking distance.")
 
     users = load_users()
 
@@ -459,10 +458,13 @@ def signup(req: SignupRequest):
 
     users[username] = {
         "password": hashed_password,
-        "walking_speed": req.walking_speed,
-        "prefer_walking": req.prefer_walking,
-        "max_walking_distance": req.max_walking_distance,
-        "avoid_bad_weather": req.avoid_bad_weather,
+        "walking_speed": req.walking_speed or "2.5 mph",
+        "prefer_walking": True if req.prefer_walking is None else req.prefer_walking,
+        "max_walking_distance": req.max_walking_distance or "1 Mile",
+        "avoid_bad_weather": True if req.avoid_bad_weather is None else req.avoid_bad_weather,
+        "avoid_rain": True if req.avoid_rain is None else req.avoid_rain,
+        "avoid_snow": True if req.avoid_snow is None else req.avoid_snow,
+        "classes": []
     }
     save_users(users)
 
@@ -488,16 +490,19 @@ def login(req: LoginRequest):
     return {"status": "success", "username": username}
 
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...), username: str = Form(...)):
-    # 1. Clean the username
-    username = username.strip().lower()
-    # 2. Verify user exists
-    if username not in load_users():
+async def upload_schedule(file: UploadFile = File(...), username: Optional[str] = Form(None)):
+    # 1. Clean the username if provided
+    clean_user = username.strip().lower() if username else None
+
+    # 2. Verify user exists if username was specified
+    if clean_user and clean_user not in load_users():
         raise HTTPException(status_code=404, detail="User not found.")
+
     # 3. Read the uploaded file
     contents = await file.read()
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
+
     # 4. Choose parser: .ics calendar or image OCR
     if filename.endswith(".ics") or "calendar" in content_type:
         try:
@@ -511,10 +516,106 @@ async def upload_schedule(file: UploadFile = File(...), username: str = Form(...
             }
     else:
         result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-    # 5. If parsing succeeded, save classes to the user's profile
-    if result.get("status") == "success":
+
+    # 5. If parsing succeeded and a username was provided, save classes to the user's SQL profile
+    if result.get("status") == "success" and clean_user:
         users = load_users()
-        users[username]["classes"] = result.get("classes", [])
+        users[clean_user]["classes"] = result.get("classes", [])
         save_users(users)
+
     # 6. Return the result
     return result
+
+
+@app.get("/api/database/status")
+def get_database_status():
+    raw_url = os.getenv("DATABASE_URL") or os.getenv("TIGERDATA_DATABASE_URL", "")
+    provider = "TigerData (PostgreSQL Cloud)" if raw_url else "SQLite (Local File Fallback)"
+    users = load_users()
+    return {
+        "status": "connected",
+        "provider": provider,
+        "is_tigerdata": bool(raw_url),
+        "database_url_configured": bool(raw_url),
+        "registered_users_count": len(users),
+        "usernames": list(users.keys())
+    }
+
+
+@app.get("/api/users")
+def list_registered_users():
+    users = load_users()
+    return {
+        "count": len(users),
+        "users": [
+            {
+                "username": u,
+                "walking_speed": data.get("walking_speed"),
+                "classes_count": len(data.get("classes", []))
+            }
+            for u, data in users.items()
+        ]
+    }
+
+
+@app.get("/api/user/{username}")
+def get_user_profile(username: str):
+    clean = username.strip().lower()
+    users = load_users()
+    if clean not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+    u_data = users[clean]
+    return {
+        "username": clean,
+        "walking_speed": u_data.get("walking_speed", "2.5 mph"),
+        "prefer_walking": u_data.get("prefer_walking", True),
+        "max_walking_distance": u_data.get("max_walking_distance", "1 Mile"),
+        "avoid_bad_weather": u_data.get("avoid_bad_weather", True),
+        "avoid_rain": u_data.get("avoid_rain", True),
+        "avoid_snow": u_data.get("avoid_snow", True),
+        "classes": u_data.get("classes", [])
+    }
+
+
+class PreferencesUpdateRequest(BaseModel):
+    walking_speed: Optional[str] = None
+    prefer_walking: Optional[bool] = None
+    max_walking_distance: Optional[str] = None
+    avoid_bad_weather: Optional[bool] = None
+    avoid_rain: Optional[bool] = None
+    avoid_snow: Optional[bool] = None
+
+
+@app.post("/api/user/{username}/preferences")
+def update_user_preferences(username: str, req: PreferencesUpdateRequest):
+    clean = username.strip().lower()
+    users = load_users()
+    if clean not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if req.walking_speed is not None:
+        users[clean]["walking_speed"] = req.walking_speed
+    if req.prefer_walking is not None:
+        users[clean]["prefer_walking"] = req.prefer_walking
+    if req.max_walking_distance is not None:
+        users[clean]["max_walking_distance"] = req.max_walking_distance
+    if req.avoid_bad_weather is not None:
+        users[clean]["avoid_bad_weather"] = req.avoid_bad_weather
+    if req.avoid_rain is not None:
+        users[clean]["avoid_rain"] = req.avoid_rain
+    if req.avoid_snow is not None:
+        users[clean]["avoid_snow"] = req.avoid_snow
+
+    save_users(users)
+    return {
+        "status": "success",
+        "username": clean,
+        "preferences": {
+            "walking_speed": users[clean].get("walking_speed", "2.5 mph"),
+            "prefer_walking": users[clean].get("prefer_walking", True),
+            "max_walking_distance": users[clean].get("max_walking_distance", "1 Mile"),
+            "avoid_bad_weather": users[clean].get("avoid_bad_weather", True),
+            "avoid_rain": users[clean].get("avoid_rain", True),
+            "avoid_snow": users[clean].get("avoid_snow", True)
+        }
+    }
