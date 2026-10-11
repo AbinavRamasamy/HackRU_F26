@@ -309,7 +309,7 @@ async def copilot_chat(req: ChatQueryRequest):
         try:
             from google import genai
             client = genai.Client(api_key=api_key)
-            model_name = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+            model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
             
             prompt = f"""
 You are ScarletHop, the expert Rutgers University real-time transit AI assistant.
@@ -621,3 +621,9 @@ def update_user_preferences(username: str, req: PreferencesUpdateRequest):
             "avoid_snow": users[clean].get("avoid_snow", True)
         }
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+

@@ -128,14 +128,8 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
     # Normalize image to standard JPEG bytes
     safe_image_bytes, safe_mime = prepare_image_for_gemini(image_bytes, mime_type)
 
-    # Candidate models in preferred order
-    env_model = os.getenv("GEMINI_MODEL", "").strip()
-    candidate_models = []
-    if env_model:
-        candidate_models.append(env_model)
-    for default_m in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
-        if default_m not in candidate_models:
-            candidate_models.append(default_m)
+    model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+    print(f"[ScheduleOCR] Analyzing image with Gemini model: {model_name}...")
 
     prompt = """
     You are an expert Rutgers University academic assistant.
@@ -166,30 +160,20 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
     """
 
     client = genai.Client(api_key=api_key.strip())
-    raw_text = ""
-    last_error = None
-
-    for model_name in candidate_models:
-        try:
-            print(f"[ScheduleOCR] Analyzing image with Gemini model: {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=[
-                    types.Part.from_bytes(data=safe_image_bytes, mime_type=safe_mime),
-                    prompt
-                ]
-            )
-            raw_text = response.text.strip()
-            if raw_text:
-                break
-        except Exception as e:
-            last_error = e
-            print(f"[ScheduleOCR] Model {model_name} error: {e}. Trying next model...")
-
-    if not raw_text:
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[
+                types.Part.from_bytes(data=safe_image_bytes, mime_type=safe_mime),
+                prompt
+            ]
+        )
+        raw_text = response.text.strip()
+    except Exception as e:
+        print(f"[ScheduleOCR] Gemini parsing error: {e}")
         return {
             "status": "error",
-            "message": f"Gemini Vision parsing failed: {str(last_error)}",
+            "message": f"Gemini Vision parsing failed: {str(e)}",
             "classes": []
         }
 
