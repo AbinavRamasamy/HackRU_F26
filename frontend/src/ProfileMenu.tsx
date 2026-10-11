@@ -51,6 +51,7 @@ interface ProfileMenuProps {
   onSyncCalendar?: () => void;
   onClassesLoaded?: (classes: any[]) => void;
   onLogout?: () => void;
+  onLogin?: (user: UserProfile) => void;
 }
 
 const DEFAULT_GUEST: UserProfile | null = null;
@@ -73,7 +74,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   onSelectTheme,
   onSyncCalendar,
   onClassesLoaded,
-  onLogout
+  onLogout,
+  onLogin
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +217,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       };
 
       setCurrentUser(user);
+      if (onLogin) {
+        onLogin(user);
+      }
       setAuthModalView('none');
       setAuthPassword('');
       setAuthError('');
@@ -277,6 +282,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       };
 
       setCurrentUser(user);
+      if (onLogin) {
+        onLogin(user);
+      }
       setAuthModalView('none');
       setAuthPassword('');
       setAuthError('');
@@ -323,6 +331,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       preferences
     };
     setCurrentUser(demoUser);
+    if (onLogin) {
+      onLogin(demoUser);
+    }
     setAuthModalView('none');
     setAuthError('');
   };

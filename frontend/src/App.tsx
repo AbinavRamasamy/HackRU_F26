@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, RefreshCw, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
@@ -111,29 +111,61 @@ export function App() {
     }
   }, [classes, currentUser, isSessionUploaded]);
 
-  // On startup or login, pull latest synced classes from backend SQLite database if user is authenticated
-  useEffect(() => {
-    const syncProfileClasses = async () => {
-      // On desktop laptop, do not fetch from app.db unless user is signed in
-      if (!Capacitor.isNativePlatform() && !currentUser?.netId) {
-        return;
+  const [isDbRefreshing, setIsDbRefreshing] = useState(false);
+
+  // Pull latest synced classes from backend database based on user_id / username
+  const fetchScheduleFromDb = useCallback(async (userToFetch = currentUser, notify = false) => {
+    // If not signed in and on desktop, schedule should be empty unless user uploaded .ics this session
+    if (!Capacitor.isNativePlatform() && !userToFetch?.netId) {
+      if (!isSessionUploaded) {
+        setClasses([]);
       }
-      try {
-        const username = currentUser?.netId;
-        const url = `${API_BASE_URL}/api/calendar/device-sync${username ? `?username=${username}` : ''}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.classes && data.classes.length > 0) {
-            setClasses(sortClassesByDateAndTime(data.classes));
+      if (notify) {
+        alert("Please sign in with your Rutgers NetID to fetch your saved schedule from the database.");
+      }
+      return;
+    }
+
+    setIsDbRefreshing(true);
+    try {
+      const username = userToFetch?.netId;
+      const url = `${API_BASE_URL}/api/calendar/device-sync${username ? `?username=${username}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.classes && Array.isArray(data.classes)) {
+          const sorted = sortClassesByDateAndTime(data.classes);
+          setClasses(sorted);
+          if (notify) {
+            alert(sorted.length > 0
+              ? `Loaded ${sorted.length} classes from database for ${username}!`
+              : `Connected to database for ${username}, but no classes are saved yet.`
+            );
           }
+        } else if (notify) {
+          alert(`No saved schedule found in database for ${username}.`);
         }
-      } catch (err) {
-        console.log("Device calendar sync skipped:", err);
+      } else if (notify) {
+        alert(`Failed to retrieve schedule from database (HTTP ${res.status}).`);
       }
-    };
-    syncProfileClasses();
-  }, [currentUser]);
+    } catch (err: any) {
+      console.warn("Database schedule refresh error:", err);
+      if (notify) {
+        alert(`Could not connect to database: ${err?.message || err}`);
+      }
+    } finally {
+      setIsDbRefreshing(false);
+    }
+  }, [currentUser, isSessionUploaded]);
+
+  // On startup or whenever currentUser changes (sign in / sign out), refresh schedule from database
+  useEffect(() => {
+    if (currentUser?.netId) {
+      fetchScheduleFromDb(currentUser, false);
+    } else if (!Capacitor.isNativePlatform() && !isSessionUploaded) {
+      setClasses([]);
+    }
+  }, [currentUser, fetchScheduleFromDb, isSessionUploaded]);
 
   const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
@@ -766,6 +798,11 @@ export function App() {
                 } catch {}
                 setClasses(sortClassesByDateAndTime(loadedClasses));
               }}
+              onLogin={(loggedInUser) => {
+                setCurrentUser(loggedInUser);
+                setIsSessionUploaded(false);
+                fetchScheduleFromDb(loggedInUser, false);
+              }}
               onLogout={() => {
                 setCurrentUser(null);
                 setIsSessionUploaded(false);
@@ -829,11 +866,29 @@ export function App() {
                   </h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => fetchScheduleFromDb(currentUser, true)}
+                    disabled={isDbRefreshing}
+                    className="apple-btn-secondary"
+                    style={{
+                      fontSize: '11px',
+                      padding: '4px 7px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: isDbRefreshing ? 'wait' : 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    title="Refresh schedule from database"
+                  >
+                    <RefreshCw size={11} className={isDbRefreshing ? "spin" : ""} color="var(--apple-accent)" />
+                    <span style={{ fontSize: '10.5px' }}>Refresh</span>
+                  </button>
                   {classes.length > 0 && (
                     <button
                       onClick={handleClearAllClasses}
                       className="apple-btn-secondary"
-                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
+                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A', borderRadius: '8px' }}
                       title="Clear all imported classes"
                     >
                       Clear
