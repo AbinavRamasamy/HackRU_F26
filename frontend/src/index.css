@@ -359,6 +359,66 @@ button:active {
   color: var(--apple-label-primary);
 }
 
+/* Apple HIG Form Inputs & Selects */
+.apple-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--apple-input-bg);
+  border: 1px solid var(--apple-border);
+  color: var(--apple-label-primary);
+  font-family: var(--font-apple);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.apple-input::placeholder {
+  color: var(--apple-label-tertiary);
+  font-size: 13.5px;
+}
+
+.apple-input:focus {
+  border-color: var(--apple-accent);
+  box-shadow: 0 0 0 3px var(--apple-accent-glow);
+  background: var(--apple-input-focus-bg);
+}
+
+.apple-select {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--apple-input-bg);
+  border: 1px solid var(--apple-border);
+  color: var(--apple-label-primary);
+  font-family: var(--font-apple);
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.apple-select:focus {
+  border-color: var(--apple-accent);
+  box-shadow: 0 0 0 3px var(--apple-accent-glow);
+  background: var(--apple-input-focus-bg);
+}
+
+.apple-select option {
+  background-color: var(--apple-option-bg);
+  color: var(--apple-label-primary);
+}
+
 /* Dynamic Island / Live Activity Pill */
 .apple-dynamic-island {
   display: inline-flex;

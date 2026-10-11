@@ -12,7 +12,8 @@ import {
   Mail,
   Lock,
   Sparkles,
-  Calendar
+  Calendar,
+  ChevronDown
 } from 'lucide-react';
 
 export interface UserProfile {
@@ -81,6 +82,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      // If auth modal is active, its own backdrop handles outside clicks
+      if (authModalView !== 'none') return;
+
       const target = e.target as Node;
       if (
         menuRef.current &&
@@ -95,7 +99,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose, triggerRef]);
+  }, [isOpen, onClose, triggerRef, authModalView]);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,77 +415,94 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
       {/* Sign In / Sign Up Modal */}
       {authModalView !== 'none' && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.65)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          zIndex: 100001,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '360px',
-            background: 'var(--apple-surface-card)',
-            border: '1px solid var(--apple-border)',
-            borderRadius: '22px',
-            boxShadow: 'var(--apple-shadow-xl)',
-            padding: '22px',
-            position: 'relative',
-            animation: 'appleModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}>
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setAuthModalView('none');
+              setAuthError('');
+            }
+          }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.68)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            zIndex: 100001,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '390px',
+              background: 'var(--apple-glass-overlay)',
+              backdropFilter: 'blur(32px)',
+              WebkitBackdropFilter: 'blur(32px)',
+              border: '1px solid var(--apple-border)',
+              borderRadius: '24px',
+              boxShadow: 'var(--apple-shadow-xl)',
+              padding: '26px 22px',
+              position: 'relative',
+              animation: 'appleModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
             {/* Close Button */}
             <button
+              type="button"
               onClick={() => {
                 setAuthModalView('none');
                 setAuthError('');
               }}
+              aria-label="Close"
               style={{
                 position: 'absolute',
                 top: '14px',
                 right: '14px',
-                width: '28px',
-                height: '28px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '9999px',
-                background: 'rgba(255, 255, 255, 0.1)',
+                background: 'rgba(255, 255, 255, 0.12)',
                 border: 'none',
                 color: 'var(--apple-label-secondary)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'background 0.2s ease, transform 0.15s ease'
               }}
             >
-              <X size={15} />
+              <X size={16} />
             </button>
 
             {/* Modal Title & Brand */}
-            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <div style={{
-                width: '44px',
-                height: '44px',
-                borderRadius: '13px',
+                width: '48px',
+                height: '48px',
+                borderRadius: '14px',
                 background: 'linear-gradient(135deg, #CC0033 0%, #FF375F 100%)',
                 color: '#fff',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: '8px',
-                boxShadow: '0 4px 14px rgba(204, 0, 51, 0.4)'
+                marginBottom: '10px',
+                boxShadow: '0 4px 16px rgba(204, 0, 51, 0.45)'
               }}>
-                <GraduationCap size={24} />
+                <GraduationCap size={26} />
               </div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 4px', color: 'var(--apple-label-primary)' }}>
+              <h3 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: 'var(--apple-label-primary)', letterSpacing: '-0.3px' }}>
                 {authModalView === 'login' ? 'Sign In to ScarletHop' : 'Create Student Account'}
               </h3>
-              <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: 'var(--apple-label-secondary)', margin: 0, lineHeight: 1.4 }}>
                 {authModalView === 'login'
                   ? 'Access synced schedules and Rutgers bus alerts'
                   : 'Get personalized transit suggestions across campuses'}
@@ -493,10 +514,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: '4px',
-              background: 'var(--apple-surface-ground)',
+              background: 'var(--apple-control-bg)',
               padding: '3px',
-              borderRadius: '11px',
-              marginBottom: '16px'
+              borderRadius: '12px',
+              marginBottom: '18px'
             }}>
               <button
                 type="button"
@@ -505,7 +526,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   setAuthError('');
                 }}
                 className={`apple-segment-btn ${authModalView === 'login' ? 'active' : ''}`}
-                style={{ padding: '6px', fontSize: '12px' }}
+                style={{ padding: '7px 12px', fontSize: '13px', borderRadius: '9px' }}
               >
                 Log In
               </button>
@@ -516,7 +537,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   setAuthError('');
                 }}
                 className={`apple-segment-btn ${authModalView === 'signup' ? 'active' : ''}`}
-                style={{ padding: '6px', fontSize: '12px' }}
+                style={{ padding: '7px 12px', fontSize: '13px', borderRadius: '9px' }}
               >
                 Sign Up
               </button>
@@ -524,14 +545,15 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
             {authError && (
               <div style={{
-                padding: '8px 11px',
-                borderRadius: '9px',
+                padding: '9px 12px',
+                borderRadius: '10px',
                 background: 'rgba(255, 69, 58, 0.15)',
                 border: '1px solid rgba(255, 69, 58, 0.3)',
                 color: '#FF453A',
-                fontSize: '11.5px',
-                marginBottom: '12px',
-                textAlign: 'center'
+                fontSize: '12px',
+                marginBottom: '14px',
+                textAlign: 'center',
+                fontWeight: 500
               }}>
                 {authError}
               </div>
@@ -540,74 +562,77 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
             {/* Form */}
             <form onSubmit={authModalView === 'login' ? handleLoginSubmit : handleSignUpSubmit}>
               {authModalView === 'signup' && (
-                <div style={{ marginBottom: '11px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '4px' }}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '6px' }}>
                     Full Name
                   </label>
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input
                       type="text"
                       placeholder="e.g. Scarlet Knight"
                       value={authName}
                       onChange={(e) => setAuthName(e.target.value)}
                       className="apple-input"
-                      style={{ width: '100%', paddingLeft: '32px', fontSize: '12.5px' }}
+                      style={{ paddingLeft: '42px', fontSize: '14px', height: '46px' }}
                     />
-                    <User size={13} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--apple-label-tertiary)' }} />
+                    <User size={16} style={{ position: 'absolute', left: '14px', pointerEvents: 'none', color: 'var(--apple-label-tertiary)' }} />
                   </div>
                 </div>
               )}
 
-              <div style={{ marginBottom: '11px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '4px' }}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '6px' }}>
                   Rutgers NetID or Scarletmail
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type="text"
                     placeholder="netid or netid@scarletmail.rutgers.edu"
                     value={authEmail}
                     onChange={(e) => setAuthEmail(e.target.value)}
                     className="apple-input"
-                    style={{ width: '100%', paddingLeft: '32px', fontSize: '12.5px' }}
+                    style={{ paddingLeft: '42px', fontSize: '14px', height: '46px' }}
                   />
-                  <Mail size={13} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--apple-label-tertiary)' }} />
+                  <Mail size={16} style={{ position: 'absolute', left: '14px', pointerEvents: 'none', color: 'var(--apple-label-tertiary)' }} />
                 </div>
               </div>
 
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '4px' }}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '6px' }}>
                   Password
                 </label>
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
                     type="password"
                     placeholder="••••••••••••"
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
                     className="apple-input"
-                    style={{ width: '100%', paddingLeft: '32px', fontSize: '12.5px' }}
+                    style={{ paddingLeft: '42px', fontSize: '14px', height: '46px' }}
                   />
-                  <Lock size={13} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--apple-label-tertiary)' }} />
+                  <Lock size={16} style={{ position: 'absolute', left: '14px', pointerEvents: 'none', color: 'var(--apple-label-tertiary)' }} />
                 </div>
               </div>
 
               {authModalView === 'signup' && (
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '4px' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '6px' }}>
                     Primary Campus
                   </label>
-                  <select
-                    value={authCampus}
-                    onChange={(e) => setAuthCampus(e.target.value)}
-                    className="apple-select"
-                    style={{ width: '100%', fontSize: '12px' }}
-                  >
-                    <option value="Busch">Busch Campus</option>
-                    <option value="Livingston">Livingston Campus</option>
-                    <option value="College Ave">College Avenue Campus</option>
-                    <option value="Cook">Cook / Douglass Campus</option>
-                  </select>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <select
+                      value={authCampus}
+                      onChange={(e) => setAuthCampus(e.target.value)}
+                      className="apple-select"
+                      style={{ height: '46px', fontSize: '14px', paddingLeft: '14px', paddingRight: '36px' }}
+                    >
+                      <option value="Busch">Busch Campus</option>
+                      <option value="Livingston">Livingston Campus</option>
+                      <option value="College Ave">College Avenue Campus</option>
+                      <option value="Cook">Cook / Douglass Campus</option>
+                    </select>
+                    <ChevronDown size={16} style={{ position: 'absolute', right: '14px', pointerEvents: 'none', color: 'var(--apple-label-tertiary)' }} />
+                  </div>
                 </div>
               )}
 
@@ -617,10 +642,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 style={{
                   width: '100%',
                   justifyContent: 'center',
-                  padding: '9px 14px',
-                  fontSize: '13px',
+                  height: '46px',
+                  fontSize: '14px',
                   fontWeight: 700,
-                  borderRadius: '12px',
+                  borderRadius: '13px',
                   marginBottom: '10px'
                 }}
               >
@@ -634,12 +659,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 style={{
                   width: '100%',
                   justifyContent: 'center',
-                  padding: '7px 12px',
-                  fontSize: '11.5px',
+                  height: '42px',
+                  fontSize: '12.5px',
+                  borderRadius: '12px',
                   gap: '6px'
                 }}
               >
-                <Sparkles size={12} color="#BF5AF2" />
+                <Sparkles size={14} color="#BF5AF2" />
                 <span>Demo Student 1-Click Login</span>
               </button>
             </form>
