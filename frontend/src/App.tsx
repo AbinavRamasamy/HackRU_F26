@@ -110,6 +110,7 @@ export function App() {
   const [showCopilotModal, setShowCopilotModal] = useState(false);
   const [isRouteFormExpanded, setIsRouteFormExpanded] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'map' | 'routes'>('map');
   const widgetTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
 
@@ -443,15 +444,15 @@ export function App() {
 
 
         {/* Right: Clean Apple Controls Group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Theme Toggle: Dark (Red/Black) vs Light (Blue/White) */}
           <button
             onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
             className="apple-btn-secondary"
             style={{
               fontSize: '12px',
-              padding: '5px 12px',
-              gap: '6px',
+              padding: '5px 10px',
+              gap: '5px',
               color: theme === 'light' ? '#0A84FF' : '#FF375F'
             }}
             title={`Switch to ${theme === 'dark' ? 'Light Theme (Blue & White)' : 'Dark Theme (Red & Black)'}`}
@@ -459,12 +460,12 @@ export function App() {
             {theme === 'dark' ? (
               <>
                 <Sun size={13} color="#FF9F0A" />
-                <span>Light Mode</span>
+                <span className="btn-label-desktop">Light</span>
               </>
             ) : (
               <>
                 <Moon size={13} color="#0A84FF" />
-                <span>Dark Mode</span>
+                <span className="btn-label-desktop">Dark</span>
               </>
             )}
           </button>
@@ -473,22 +474,22 @@ export function App() {
           <button
             onClick={() => setShowCopilotModal(prev => !prev)}
             className="apple-btn-secondary"
-            style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
+            style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
             title="Ask Transit Copilot"
           >
             <Sparkles size={13} color="#BF5AF2" />
-            <span>Copilot</span>
+            <span className="btn-label-desktop">Copilot</span>
           </button>
 
           {/* Location button */}
           <button
             onClick={() => requestLocationPermission(true)}
             className="apple-btn-secondary"
-            style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
+            style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
             title="Update your current campus location"
           >
             <LocateFixed size={12} color={geoStatus === "granted" ? "#30D158" : "var(--apple-label-secondary)"} />
-            <span>{geoStatus === "granted" ? `GPS: ${originCampus}` : "Location"}</span>
+            <span className="btn-label-desktop">{geoStatus === "granted" ? originCampus : "Location"}</span>
           </button>
 
           {/* Widget trigger */}
@@ -497,10 +498,11 @@ export function App() {
               ref={widgetTriggerRef}
               onClick={() => setShowWidgetOverlay(prev => !prev)}
               className="apple-btn-secondary"
-              style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
+              style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
+              title="Quick Widget Overlay"
             >
               <Code size={12} color="var(--apple-accent)" />
-              <span>Widget</span>
+              <span className="btn-label-desktop">Widget</span>
             </button>
 
             <TransitWidget
@@ -514,10 +516,32 @@ export function App() {
         </div>
       </header>
 
+      {/* Mobile Segmented View Control: Apple HIG View Switcher */}
+      <div className="apple-mobile-tab-bar">
+        <div className="apple-segmented-control" style={{ width: '100%', maxWidth: '340px' }}>
+          <button
+            onClick={() => setMobileTab('map')}
+            className={`apple-segment-btn ${mobileTab === 'map' ? 'active' : ''}`}
+            style={{ flex: 1, padding: '6px 12px' }}
+          >
+            <Navigation size={13} />
+            <span>Live Map</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('routes')}
+            className={`apple-segment-btn ${mobileTab === 'routes' ? 'active' : ''}`}
+            style={{ flex: 1, padding: '6px 12px' }}
+          >
+            <Calendar size={13} />
+            <span>Routes & Schedule</span>
+          </button>
+        </div>
+      </div>
+
       {/* 2. Apple Dual-Pane Workspace */}
       <main className="apple-main-workspace">
-        {/* Left Sheet: Combined Directions & Schedule with Apple Ideology */}
-        <div className="apple-sidebar-sheet">
+        {/* Left Sheet: Combined Directions & Schedule with Apple HIG */}
+        <div className={`apple-sidebar-sheet ${mobileTab === 'routes' ? 'mobile-active' : ''}`}>
           <div className="apple-panel" style={{
             padding: '16px',
             height: '100%',
@@ -691,16 +715,31 @@ export function App() {
                     </h2>
                   </div>
                   {selectedRoute && (
-                    <span style={{ fontSize: '10.5px', color: '#30D158', fontWeight: 600 }}>
-                      ● Active on Map
-                    </span>
+                    <button
+                      onClick={() => setMobileTab('map')}
+                      className="apple-segment-btn"
+                      style={{
+                        padding: '3px 9px',
+                        fontSize: '11px',
+                        color: '#30D158',
+                        background: 'rgba(48, 209, 88, 0.12)',
+                        border: '1px solid rgba(48, 209, 88, 0.3)',
+                        fontWeight: 600
+                      }}
+                      title="View active route on map"
+                    >
+                      ● Active on Map ➔
+                    </button>
                   )}
                 </div>
 
                 {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
                 {upcomingClass && (
                   <div
-                    onClick={() => handleGetToNextClass()}
+                    onClick={() => {
+                      handleGetToNextClass();
+                      setMobileTab('map');
+                    }}
                     style={{
                       padding: '9px 12px',
                       borderRadius: '12px',
@@ -1144,7 +1183,11 @@ export function App() {
                           return (
                             <div
                               key={idx}
-                              onClick={() => setSelectedRoute(isSelected ? null : route)}
+                              onClick={() => {
+                                const nextSel = isSelected ? null : route;
+                                setSelectedRoute(nextSel);
+                                if (nextSel) setMobileTab('map');
+                              }}
                               style={{
                                 padding: '11px 13px',
                                 borderRadius: '13px',
@@ -1268,6 +1311,7 @@ export function App() {
                                             e.stopPropagation();
                                             setTargetLocation(st.name);
                                             if (st.campus) setDestCampus(st.campus);
+                                            setMobileTab('map');
                                           }}
                                           title={isBoarding ? `${st.name} (▲ Boarding Stop near you)` : isDropoff ? `${st.name} (▼ Selected Drop-off Stop)` : `Tap to set destination to ${st.name}`}
                                           className="apple-btn-secondary"
@@ -1342,7 +1386,7 @@ export function App() {
         </div>
 
         {/* Right Canvas: Replaced with Interactive Transit Map with Navigation */}
-        <div className="apple-canvas-area">
+        <div className={`apple-canvas-area ${mobileTab === 'map' ? 'mobile-active' : ''}`}>
           <TransitMap
             appTheme={theme}
             buses={buses}
@@ -1369,6 +1413,7 @@ export function App() {
             onClearSelectedRoute={() => setSelectedRoute(null)}
             onSelectRoute={(rt) => setSelectedRoute(rt)}
             planResult={planResult}
+            onSwitchToRoutes={() => setMobileTab('routes')}
           />
         </div>
       </main>

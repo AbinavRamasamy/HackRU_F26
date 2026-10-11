@@ -36,6 +36,7 @@ export interface TransitMapProps {
   planResult?: any;
   googleMapsApiKey?: string;
   appTheme?: 'dark' | 'light';
+  onSwitchToRoutes?: () => void;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -152,7 +153,8 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onSelectRoute,
   planResult,
   googleMapsApiKey,
-  appTheme = 'dark'
+  appTheme = 'dark',
+  onSwitchToRoutes
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -303,7 +305,26 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     routeLayerRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
+    // Responsive: Invalidate map bounds on container resize (mobile tab changes / orientation changes)
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
+    const onWindowResize = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener('resize', onWindowResize);
+
     return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', onWindowResize);
       map.off('zoomend', onZoom);
       map.off('zoom', onZoom);
       map.remove();
@@ -949,7 +970,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           ======================================================== */}
       <div style={{
         position: 'absolute',
-        bottom: '12px',
+        bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
         left: '12px',
         right: '12px',
         zIndex: 1000,
@@ -1048,6 +1069,18 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           gap: '6px',
           pointerEvents: 'auto'
         }}>
+          {/* Quick toggle to Routes & Schedule view on mobile */}
+          {onSwitchToRoutes && (
+            <button
+              onClick={onSwitchToRoutes}
+              className="apple-btn-dark-glass"
+              style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
+              title="Open Directions & Schedule"
+            >
+              <span>📋 Routes</span>
+            </button>
+          )}
+
           {/* Quick Route Switcher if planResult is present and idle */}
           {planResult && planResult.routes && onSelectRoute && !selectedRoute && (
             <button
