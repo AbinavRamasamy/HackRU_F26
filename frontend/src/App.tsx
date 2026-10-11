@@ -179,7 +179,8 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setPlanResult(data);
-        if (data.routes && data.routes.length > 0) {
+        const stillServes = selectedRoute && data.routes?.some((r: any) => r.name === selectedRoute.name);
+        if (!stillServes && data.routes && data.routes.length > 0) {
           setSelectedRoute(data.routes[0]);
         }
         return;
@@ -188,42 +189,73 @@ export function App() {
       // Fallback calculation
     }
 
+    const isSame = originCampus === destCampus;
     const isBuschCol = (originCampus === "Busch" && destCampus === "College Ave") || (originCampus === "College Ave" && destCampus === "Busch");
     const isBuschLiv = (originCampus === "Busch" && destCampus === "Livingston") || (originCampus === "Livingston" && destCampus === "Busch");
+    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
 
-    const fallbackRoutes = [
-      {
-        name: isBuschCol ? "Weekend 2" : isBuschLiv ? "Route B (Direct)" : "Route LX (Express)",
-        type: "Direct Bus",
-        estimated_minutes: isBuschCol ? 16 : isBuschLiv ? 7 : 10,
-        rush_hour_minutes: isBuschCol ? 22 : 14,
-        badge: "Recommended",
-        description: isBuschCol
-          ? "Clockwise loop running directly from Busch into College Ave (The Yard & Student Center)."
-          : "Board express line directly to your destination."
-      },
-      {
-        name: "Rutgers E-Scooter / Bike",
-        type: "Bike / E-Scooter",
-        estimated_minutes: 17,
-        rush_hour_minutes: 18,
-        description: "Cross the Landing Lane Bridge and Johnson Park path straight into College Ave."
-      },
-      {
-        name: "Knight Mover / Student Escort",
-        type: "On-Demand Transit",
-        estimated_minutes: 20,
-        rush_hour_minutes: 25,
-        description: "Request Rutgers Knight Mover for direct on-demand student center pickup."
-      },
-      {
-        name: "Weekend 1 (Counter-Clockwise Loop)",
-        type: "Loop Bus",
-        estimated_minutes: 26,
-        rush_hour_minutes: 32,
-        description: "Circles Busch -> Livingston -> Cook/Douglass -> College Ave. Reliable if Weekend 2 is full."
-      }
-    ];
+    let fallbackRoutes: any[] = [];
+    if (isSame) {
+      const primaryBus = isWeekend ? "Weekend 2" : (originCampus === "Busch" ? "Route B" : originCampus === "College Ave" ? "Route EE" : "Route B");
+      fallbackRoutes = [
+        {
+          name: primaryBus,
+          type: "Campus Bus",
+          estimated_minutes: 5,
+          rush_hour_minutes: 7,
+          badge: "Recommended",
+          description: `Direct bus connecting local stops across ${originCampus} (BSC, Hill, Science, ARC).`
+        },
+        {
+          name: "Rutgers E-Scooter / Bike",
+          type: "Bike / E-Scooter",
+          estimated_minutes: 3,
+          rush_hour_minutes: 4,
+          description: `Hop on a Veo e-scooter or bike for quick cross-building transit on ${originCampus}.`
+        },
+        {
+          name: "Campus Pedestrian Walk",
+          type: "Walking Path",
+          estimated_minutes: 6,
+          rush_hour_minutes: 8,
+          description: `Direct pedestrian walk between buildings on ${originCampus}.`
+        }
+      ];
+    } else {
+      fallbackRoutes = [
+        {
+          name: isBuschCol ? "Weekend 2" : isBuschLiv ? "Route B (Direct)" : "Route LX (Express)",
+          type: "Direct Bus",
+          estimated_minutes: isBuschCol ? 16 : isBuschLiv ? 7 : 10,
+          rush_hour_minutes: isBuschCol ? 22 : 14,
+          badge: "Recommended",
+          description: isBuschCol
+            ? "Clockwise loop running directly from Busch into College Ave (The Yard & Student Center)."
+            : "Board express line directly to your destination."
+        },
+        {
+          name: "Rutgers E-Scooter / Bike",
+          type: "Bike / E-Scooter",
+          estimated_minutes: 17,
+          rush_hour_minutes: 18,
+          description: "Cross the Landing Lane Bridge and Johnson Park path straight into College Ave."
+        },
+        {
+          name: "Knight Mover / Student Escort",
+          type: "On-Demand Transit",
+          estimated_minutes: 20,
+          rush_hour_minutes: 25,
+          description: "Request Rutgers Knight Mover for direct on-demand student center pickup."
+        },
+        {
+          name: "Weekend 1 (Counter-Clockwise Loop)",
+          type: "Loop Bus",
+          estimated_minutes: 26,
+          rush_hour_minutes: 32,
+          description: "Circles Busch -> Livingston -> Cook/Douglass -> College Ave. Reliable if Weekend 2 is full."
+        }
+      ];
+    }
 
     const fallbackPlan = {
       origin: originCampus,
@@ -235,7 +267,10 @@ export function App() {
     };
 
     setPlanResult(fallbackPlan);
-    setSelectedRoute(fallbackRoutes[0]);
+    const stillServesFallback = selectedRoute && fallbackRoutes.some((r: any) => r.name === selectedRoute.name);
+    if (!stillServesFallback && fallbackRoutes.length > 0) {
+      setSelectedRoute(fallbackRoutes[0]);
+    }
   };
 
   // Automatically calculate route on mount and when origin or destination changes
@@ -1046,7 +1081,14 @@ export function App() {
                           </label>
                           <select
                             value={targetLocation}
-                            onChange={(e) => setTargetLocation(e.target.value)}
+                            onChange={(e) => {
+                              const newLoc = e.target.value;
+                              setTargetLocation(newLoc);
+                              const res = resolveLocationCoords(newLoc, destCampus);
+                              if (res && res.campus && res.campus !== destCampus) {
+                                setDestCampus(res.campus);
+                              }
+                            }}
                             className="apple-select-box"
                           >
                             {/* Primary Student Center / Hub */}

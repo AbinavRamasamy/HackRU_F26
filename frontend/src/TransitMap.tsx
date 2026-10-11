@@ -18,6 +18,7 @@ import {
   getRouteColorInfo,
   getStopShortCode,
   getStopsForRoute,
+  getRouteSegmentStops,
   RUTGERS_BUS_STOPS,
   type BusStop
 } from './transitDirectory';
@@ -58,7 +59,27 @@ export const getCampusKey = (campusName: string): string => {
 };
 
 // Fallback path coordinates connecting campuses along Rutgers transit highways
-export const getFallbackRouteGeometry = (origin: string, dest: string, isBike: boolean = false): [number, number][] => {
+export const getFallbackRouteGeometry = (
+  origin: string,
+  dest: string,
+  isBike: boolean = false,
+  boardingStop?: BusStop,
+  dropoffStop?: BusStop,
+  routeName?: string
+): [number, number][] => {
+  if (boardingStop && dropoffStop) {
+    const segmentStops = getRouteSegmentStops(routeName, boardingStop.name, dropoffStop.name);
+    if (segmentStops.length >= 2) {
+      return segmentStops.map(s => [s.lat, s.lon] as [number, number]);
+    }
+    if (boardingStop.lat !== dropoffStop.lat || boardingStop.lon !== dropoffStop.lon) {
+      return [
+        [boardingStop.lat, boardingStop.lon],
+        [dropoffStop.lat, dropoffStop.lon]
+      ];
+    }
+  }
+
   const o = getCampusKey(origin);
   const d = getCampusKey(dest);
 
@@ -191,7 +212,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
   // Geodesic distance minimization against all candidate stops served by the route
   const boardingStop: BusStop = React.useMemo(() => {
-    return findNearestBusStop(origTarget, originCampus, selectedRoute?.name);
+    return findNearestBusStop(origTarget, origTarget.campus || originCampus, selectedRoute?.name);
   }, [origTarget, originCampus, selectedRoute?.name]);
 
   const dropoffStop: BusStop = React.useMemo(() => {
@@ -203,6 +224,18 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     if (!selectedRoute?.name) return [];
     return getStopsForRoute(selectedRoute.name);
   }, [selectedRoute?.name]);
+
+  // Stops strictly on the active journey segment between boarding and drop-off
+  const routeSegmentStops = React.useMemo(() => {
+    if (!selectedRoute?.name) return [];
+    return getRouteSegmentStops(selectedRoute.name, boardingStop.name, dropoffStop.name);
+  }, [selectedRoute?.name, boardingStop.name, dropoffStop.name]);
+
+  const isBike = React.useMemo(() => {
+    return (selectedRoute?.type || '').toLowerCase().includes('bike') ||
+      (selectedRoute?.name || '').toLowerCase().includes('bike') ||
+      (selectedRoute?.name || '').toLowerCase().includes('scooter');
+  }, [selectedRoute]);
 
   const walkDistMeters = React.useMemo(() => {
     return getHaversineDistanceMeters(dropoffStop.lat, dropoffStop.lon, destTarget.lat, destTarget.lon);
@@ -362,8 +395,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     const shadowColor = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.65)';
     const destAccent = isLight ? '#0A84FF' : '#FF375F';
 
-    // 1. When Zoomed Out (< 14.75): HIDE inner locations and ONLY show overall campus names
-    if (isZoomedOut) {
+    // 1. When Zoomed Out (< 14.5) AND no specific route is active: show overall campus names overview
+    const showCampusOverview = !selectedRoute && isZoomedOut;
+    if (showCampusOverview) {
       Object.entries(CAMPUS_COORDINATES).forEach(([key, info]) => {
         const isOrigin = getCampusKey(originCampus) === key;
         const isDest = getCampusKey(destCampus) === key;
@@ -528,6 +562,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
         routeStops.forEach((st) => {
           if (st.name === boardingStop.name || st.name === dropoffStop.name) return;
           const code = getStopShortCode(st.name);
+          const isOnSegment = routeSegmentStops.some(s => s.name.toLowerCase() === st.name.toLowerCase());
 
           const stopGlyphIcon = L.divIcon({
             className: 'apple-stop-glyph-marker',
@@ -539,15 +574,15 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 padding: 2.5px 6px;
                 background: ${markerBg};
                 backdrop-filter: blur(16px);
-                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.22)'};
+                border: ${isOnSegment ? '1.5px solid #0A84FF' : (isLight ? '1px solid rgba(15, 23, 42, 0.14)' : '1px solid rgba(255, 255, 255, 0.22)')};
                 border-radius: 9999px;
-                box-shadow: 0 2px 8px ${shadowColor};
+                box-shadow: ${isOnSegment ? `0 2px 10px rgba(10, 132, 255, 0.4), 0 2px 8px ${shadowColor}` : `0 2px 8px ${shadowColor}`};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9.5px; font-weight: ${isOnSegment ? '700' : '600'}; color: ${isOnSegment ? '#0A84FF' : textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -789,7 +824,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       `);
       markersGroup.addLayer(marker);
     });
-  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, walkDistMeters, routeStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
+  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
 
   // Handle Route Navigation Layer with Real Road Geometry & Walking Connectors
   useEffect(() => {
@@ -808,7 +843,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     // Use actual road coordinates from live routing engine if loaded, else fallback
     const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
       ? liveRoute.coordinates
-      : getFallbackRouteGeometry(originCampus, destCampus, isBike);
+      : getFallbackRouteGeometry(originCampus, destCampus, isBike, boardingStop, dropoffStop, selectedRoute?.name);
 
     // Glowing navigation route line (transitstat.us route color or bike green)
     const routeColor = isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
@@ -836,8 +871,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     routeGroup.addLayer(corePolyline);
 
     // If destination building is a separate walk from the drop-off bus stop, render dotted walking line
-    // HIDE inner walking line when zoomed out!
-    if (!isZoomedOut && walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
       const walkPolyline = L.polyline([
         [dropoffStop.lat, dropoffStop.lon],
         [destTarget.lat, destTarget.lon]
@@ -895,17 +929,49 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     const travelerMarker = L.marker([midCoord[0], midCoord[1]], { icon: travelerIcon });
     routeGroup.addLayer(travelerMarker);
 
-    // Animate bounds to smoothly fit the real road coordinates when route or destination changes
-    const routeFitKey = `${selectedRoute?.name}_${originCampus}_${destCampus}_${destTarget.name}`;
+    // Animate bounds to smoothly fit the entire route path and its stops
+    const liveCoordCount = liveRoute?.coordinates?.length || 0;
+    const routeFitKey = `${selectedRoute?.name}_${originCampus}_${destCampus}_${boardingStop?.name}_${dropoffStop?.name}_${destTarget.name}_${origTarget.name}_${liveCoordCount}_${pathCoords.length}`;
     if (prevRouteFitKeyRef.current !== routeFitKey) {
       prevRouteFitKeyRef.current = routeFitKey;
       const bounds = L.latLngBounds(pathCoords);
-      if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
-        bounds.extend([destTarget.lat, destTarget.lon]);
-      }
-      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16, animate: true, duration: 0.8 });
+      bounds.extend([boardingStop.lat, boardingStop.lon]);
+      bounds.extend([dropoffStop.lat, dropoffStop.lon]);
+      bounds.extend([origTarget.lat, origTarget.lon]);
+      bounds.extend([destTarget.lat, destTarget.lon]);
+      routeSegmentStops.forEach((st) => bounds.extend([st.lat, st.lon]));
+
+      const isMobile = window.innerWidth <= 768;
+      const paddingOptions = isMobile
+        ? {
+            paddingTopLeft: [24, 95] as [number, number],
+            paddingBottomRight: [24, 110] as [number, number]
+          }
+        : {
+            paddingTopLeft: [50, 70] as [number, number],
+            paddingBottomRight: [50, 80] as [number, number]
+          };
+
+      map.fitBounds(bounds, {
+        ...paddingOptions,
+        maxZoom: 17,
+        animate: true,
+        duration: 0.8
+      });
     }
-  }, [selectedRoute, liveRoute, originCampus, destCampus, dropoffStop, destTarget, walkDistMeters, isZoomedOut]);
+  }, [
+    selectedRoute,
+    liveRoute,
+    originCampus,
+    destCampus,
+    boardingStop,
+    dropoffStop,
+    origTarget,
+    destTarget,
+    routeSegmentStops,
+    walkDistMeters,
+    isBike
+  ]);
 
   // Deep links to Google Maps directly between the dynamic transit stops
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${boardingStop.lat},${boardingStop.lon}&destination=${dropoffStop.lat},${dropoffStop.lon}&travelmode=transit`;

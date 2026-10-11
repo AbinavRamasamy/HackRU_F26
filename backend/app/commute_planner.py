@@ -22,7 +22,18 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
 
     # Case 1: Same campus
     if origin == dest:
+        is_weekend = datetime.now().weekday() >= 5
+        primary_bus = "Weekend 2" if is_weekend else ("Route B" if origin == "Busch" else "Route EE" if "college" in origin.lower() else "Route B")
+        alt_bus = "Weekend 1" if is_weekend else ("Route A" if origin == "Busch" else "Route F")
         routes = [
+            {
+                "name": primary_bus,
+                "type": "Campus Bus",
+                "estimated_minutes": 5,
+                "rush_hour_minutes": 7,
+                "badge": "Recommended",
+                "description": f"Direct campus bus connecting stops across {origin} (e.g. Student Center, Hill, Science, ARC)."
+            },
             {
                 "name": "Rutgers E-Scooter / Campus Bike",
                 "type": "Bike / E-Scooter",
@@ -40,15 +51,14 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 "description": f"Direct pedestrian walk between buildings on {origin}. No bus wait required."
             },
             {
-                "name": "Internal Campus Loop / Stop Hopper",
+                "name": alt_bus,
                 "type": "Campus Bus",
-                "estimated_minutes": 9,
-                "rush_hour_minutes": 12,
-                "badge": "Campus Loop",
-                "description": f"Catch any local bus servicing internal stops across {origin} (e.g. Student Center to lecture halls)."
+                "estimated_minutes": 8,
+                "rush_hour_minutes": 10,
+                "badge": "Alternative Bus",
+                "description": f"Secondary loop servicing internal stops across {origin}."
             }
         ]
-        routes.sort(key=lambda r: r["estimated_minutes"])
         return routes
 
     # Route catalogs by campus pairs
