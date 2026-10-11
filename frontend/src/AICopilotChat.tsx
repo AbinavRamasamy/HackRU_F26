@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, ArrowUp, Bot } from 'lucide-react';
+import { API_BASE_URL } from './apiConfig';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -10,14 +11,22 @@ interface Message {
 
 interface AICopilotChatProps {
   currentCampus?: string;
+  currentLocation?: string;
+  userCoords?: [number, number];
   style?: React.CSSProperties;
 }
 
-export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "Busch Student Center", style }) => {
+export const AICopilotChat: React.FC<AICopilotChatProps> = ({
+  currentCampus = "Busch Student Center",
+  currentLocation,
+  userCoords,
+  style
+}) => {
+  const effectiveLocation = currentLocation || currentCampus;
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      text: `Hello! I'm your Rutgers Transit Copilot. You're currently near ${currentCampus}. Ask me anything like: "What bus gets me to Tillett Hall on Livingston fastest right now?"`
+      text: `Hello! I'm your Rutgers Transit Copilot. You're currently near ${effectiveLocation}. Ask me anything like: "What bus gets me to Tillett Hall on Livingston fastest right now?"`
     }
   ]);
   const [input, setInput] = useState("");
@@ -33,9 +42,9 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
   }, [messages]);
 
   const quickPrompts = [
-    "Next LX to Livingston?",
+    "Next bus to Livingston?",
     "Is Route 18 backed up?",
-    "Fastest way to Busch ARC?"
+    "Fastest way to Cook/Douglass?"
   ];
 
   const handleSend = async (queryText?: string) => {
@@ -47,10 +56,15 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/copilot/chat", {
+      const res = await fetch(`${API_BASE_URL}/api/copilot/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: textToSend, current_campus: currentCampus })
+        body: JSON.stringify({
+          query: textToSend,
+          current_campus: currentCampus,
+          current_location: effectiveLocation,
+          coords: userCoords
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -71,9 +85,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         ...prev,
         {
           role: 'assistant',
-          text: "Catch the LX at The Yard in ~4 minutes. Allow ~14 minutes total travel time to account for Route 18 bridge traffic.",
-          recommendedRoute: "LX",
-          eta: 4
+          text: "Unable to connect to the live transit intelligence server. Please check your connection or consult the live bus radar below."
         }
       ]);
     } finally {
@@ -97,17 +109,17 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
           width: '32px',
           height: '32px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #FF375F 0%, #BF5AF2 50%, #0A84FF 100%)',
+          background: 'linear-gradient(135deg, var(--apple-accent) 0%, #BF5AF2 50%, var(--apple-blue) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 0 16px rgba(191, 90, 242, 0.45)'
+          boxShadow: '0 0 16px var(--apple-accent-glow)'
         }}>
           <Sparkles size={16} color="#fff" />
         </div>
         <div>
-          <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
-            Scarlet Copilot
+          <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: 'var(--apple-label-primary)', margin: 0, letterSpacing: '-0.015em' }}>
+            Transit Copilot
           </h3>
           <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: 0 }}>
             Natural language transit routing & delay prediction
@@ -144,14 +156,14 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
                   width: '26px',
                   height: '26px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.1)',
+                  background: 'var(--apple-accent-subtle)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                   marginBottom: '2px'
                 }}>
-                  <Bot size={14} color="#FF375F" />
+                  <Bot size={14} color="var(--apple-accent)" />
                 </div>
               )}
 
@@ -159,20 +171,20 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
                 padding: '10px 14px',
                 borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                 background: isUser
-                  ? 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)'
-                  : 'rgba(255, 255, 255, 0.06)',
-                border: isUser ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
-                color: '#fff',
+                  ? 'linear-gradient(135deg, var(--apple-accent) 0%, var(--apple-accent-dark) 100%)'
+                  : 'var(--apple-card-bg)',
+                border: isUser ? 'none' : '1px solid var(--apple-border)',
+                color: isUser ? '#fff' : 'var(--apple-label-primary)',
                 fontSize: '13px',
                 lineHeight: 1.45,
-                boxShadow: isUser ? '0 3px 12px rgba(255, 55, 95, 0.28)' : 'none'
+                boxShadow: isUser ? '0 3px 12px var(--apple-accent-glow)' : 'var(--apple-shadow-sm)'
               }}>
                 <div>{m.text}</div>
                 {m.recommendedRoute && (
                   <div style={{
                     marginTop: '8px',
                     paddingTop: '6px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderTop: '1px solid var(--apple-border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
@@ -200,15 +212,15 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
             <div style={{
               padding: '10px 14px',
               borderRadius: '18px',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--apple-card-bg)',
+              border: '1px solid var(--apple-border)',
               fontSize: '12px',
               color: 'var(--apple-label-secondary)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
             }}>
-              <span className="animate-pulse-ring" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#FF375F' }} />
+              <span className="animate-pulse-ring" style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--apple-accent)' }} />
               Thinking...
             </div>
           </div>
@@ -234,7 +246,9 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
               fontSize: '11.5px',
               whiteSpace: 'nowrap',
               borderRadius: '9999px',
-              background: 'rgba(255, 255, 255, 0.05)'
+              background: 'var(--apple-btn-secondary-bg)',
+              border: '1px solid var(--apple-border-subtle)',
+              color: 'var(--apple-label-primary)'
             }}
           >
             {prompt}
@@ -247,10 +261,10 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        background: 'rgba(255, 255, 255, 0.08)',
+        background: 'var(--apple-input-bg)',
         borderRadius: '9999px',
         padding: '4px 6px 4px 14px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '1px solid var(--apple-border)',
         flexShrink: 0
       }}>
         <input
@@ -263,7 +277,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
             flex: 1,
             background: 'transparent',
             border: 'none',
-            color: '#fff',
+            color: 'var(--apple-label-primary)',
             fontSize: '13px',
             outline: 'none'
           }}
@@ -275,8 +289,8 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({ currentCampus = "B
             width: '28px',
             height: '28px',
             borderRadius: '50%',
-            background: input.trim() && !loading ? '#FF375F' : 'rgba(255, 255, 255, 0.12)',
-            color: '#fff',
+            background: input.trim() && !loading ? 'var(--apple-accent)' : 'var(--apple-btn-secondary-bg)',
+            color: input.trim() && !loading ? '#fff' : 'var(--apple-label-tertiary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

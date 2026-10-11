@@ -80,6 +80,7 @@ def sign_up(users):
 #calander data save
 
 
-#runs program
-users = load_users()
-sign_up(users)
+# Runs CLI program only when executed directly
+if __name__ == "__main__":
+    users = load_users()
+    sign_up(users)

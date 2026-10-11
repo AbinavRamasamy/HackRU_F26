@@ -1,6 +1,9 @@
 # Campus Buildings mapping to coordinates and closest bus stops
+import re
 CAMPUS_BUILDINGS = {
     # Busch Campus
+    "bsc": {"code": "BSC", "campus": "Busch", "stop": "Busch Student Center", "coords": [40.5233, -74.4586]},
+    "werblin": {"code": "WERB", "campus": "Busch", "stop": "Busch Student Center", "coords": [40.5202, -74.4600]},
     "hill center": {"code": "HILL", "campus": "Busch", "stop": "Hill Center", "coords": [40.52192, -74.4633]},
     "hll": {"code": "HLL", "campus": "Busch", "stop": "Hill Center", "coords": [40.52192, -74.4633]},
     "hil": {"code": "HIL", "campus": "Busch", "stop": "Hill Center", "coords": [40.52192, -74.4633]},
@@ -16,6 +19,12 @@ CAMPUS_BUILDINGS = {
     "pharmacy": {"code": "PH", "campus": "Busch", "stop": "Allison Road Classrooms", "coords": [40.5240, -74.4650]},
     
     # Livingston Campus
+    "jersey mikes": {"code": "JM", "campus": "Livingston", "stop": "Livingston Plaza", "coords": [40.5280, -74.4390]},
+    "jersey mike's": {"code": "JM", "campus": "Livingston", "stop": "Livingston Plaza", "coords": [40.5280, -74.4390]},
+    "livingston plaza": {"code": "PLAZA", "campus": "Livingston", "stop": "Livingston Plaza", "coords": [40.5273, -74.4398]},
+    "plaza": {"code": "PLAZA", "campus": "Livingston", "stop": "Livingston Plaza", "coords": [40.5273, -74.4398]},
+    "quads": {"code": "QUADS", "campus": "Livingston", "stop": "Quads", "coords": [40.5202, -74.4389]},
+    "beck": {"code": "BECK", "campus": "Livingston", "stop": "Livingston Student Center", "coords": [40.5248, -74.4385]},
     "tillett hall": {"code": "TIL", "campus": "Livingston", "stop": "Livingston Student Center", "coords": [40.5255, -74.4371]},
     "til": {"code": "TIL", "campus": "Livingston", "stop": "Livingston Student Center", "coords": [40.5255, -74.4371]},
     "beck hall": {"code": "BECK", "campus": "Livingston", "stop": "Livingston Student Center", "coords": [40.5248, -74.4385]},
@@ -61,6 +70,19 @@ CAMPUS_BUILDINGS = {
     "gibbons": {"code": "GIBB", "campus": "Douglass", "stop": "Gibbons", "coords": [40.48523, -74.43194]},
     "food science building": {"code": "FOOD", "campus": "Cook", "stop": "Biel Road", "coords": [40.4796, -74.4287]}
 }
+
+def find_building(text):
+    text = (text or "").lower()
+    cleaned = re.sub(r"(\b(rm|room)\s*\d+)|(-\s*\d+)|(\b\d{3,4}\b)", "", text).strip()
+    
+    for candidate in [cleaned, text] :
+        for key, data in CAMPUS_BUILDINGS.items():
+            if re.search(r"\b" + re.escape(key) + r"\b", candidate):
+                return data
+            code = data.get("code", "").lower()
+            if code and re.search(r"\b" + re.escape(code) + r"\b", candidate):
+                return data 
+    return None
 
 # Authoritative Rutgers New Brunswick Bus Stops from transitstat.us/rutgers
 CAMPUS_STOPS = {

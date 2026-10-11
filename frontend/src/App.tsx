@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Bus, Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2 } from 'lucide-react';
+import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, RefreshCw, User } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
 import { AICopilotChat } from './AICopilotChat';
+import { ProfileMenu } from './ProfileMenu';
 import { requestBrowserLocation, type ResolvedLocation } from './geolocation';
 import {
   RUTGERS_BUILDINGS,
@@ -14,38 +16,85 @@ import {
   getStopShortCode,
   getRouteColorInfo
 } from './transitDirectory';
+import {
+  type ClassItem,
+  getNextUpcomingClass,
+  syncDefaultDeviceCalendar,
+  sortClassesByDateAndTime
+} from './calendarSync';
+import { API_BASE_URL } from './apiConfig';
 
-interface ClassItem {
-  course: string;
-  days: string[] | string;
-  days_display?: string;
-  startTime: string;
-  endTime: string;
-  building: string;
-  location?: string;
-  campus: string;
-}
+const WingedSneakerIcon = ({ size = 21, color = "#fff" }: { size?: number; color?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    stroke={color}
+    strokeWidth="6.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{
+      filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25))',
+      display: 'block'
+    }}
+  >
+    {/* 1. Hermes Wing with 3 Rounded Feathers Sweeping Up and Left */}
+    <path
+      d="M 52 42 C 45 28 32 18 16 12 C 14 11 13 13 14 15 C 16 20 20 25 21 28 C 17 25 15 25 15 27 C 16 32 23 37 25 39 C 21 37 19 38 20 41 C 22 47 28 50 32 50 C 37 50 44 47 50 42"
+      strokeWidth="6.8"
+    />
+    {/* Interior Wing Feather Lines */}
+    <path d="M 21 28 C 28 31 36 34 43 33" strokeWidth="5.8" />
+    <path d="M 25 39 C 32 41 38 43 44 41" strokeWidth="5.8" />
 
-const DAY_ORDER: Record<string, number> = {
-  "M": 1, "T": 2, "W": 3, "TH": 4, "F": 5, "S": 6, "SU": 7
-};
+    {/* 2. Shoe Heel & Upper */}
+    <path d="M 32 50 C 26 55 23 62 21 68" strokeWidth="6.8" />
+    <path d="M 50 42 C 55 48 64 60 74 67 C 80 71 85 73 87 71 C 88 68 85 64 78 60 C 68 53 58 45 50 42" strokeWidth="6.8" />
 
-export const sortClassesByDateAndTime = (items: ClassItem[]): ClassItem[] => {
-  return [...items].sort((a, b) => {
-    const aDays = Array.isArray(a.days) ? a.days : [a.days];
-    const bDays = Array.isArray(b.days) ? b.days : [b.days];
-    const aMinDay = Math.min(...aDays.map(d => DAY_ORDER[d] || 99));
-    const bMinDay = Math.min(...bDays.map(d => DAY_ORDER[d] || 99));
+    {/* 3. Double-Layer Curved Sole */}
+    <path d="M 21 68 C 36 74 58 78 84 72" strokeWidth="6.8" />
+    <path d="M 22 74 C 38 82 60 85 86 78 C 88 77 88 74 85 72" strokeWidth="6.8" />
 
-    if (aMinDay !== bMinDay) {
-      return aMinDay - bMinDay;
-    }
-    return (a.startTime || "00:00").localeCompare(b.startTime || "00:00");
-  });
-};
+    {/* 4. Two Diagonal Stripes Across Midfoot */}
+    <line x1="42" y1="67" x2="60" y2="52" strokeWidth="5.8" />
+    <line x1="53" y1="73" x2="70" y2="58" strokeWidth="5.8" />
+  </svg>
+);
 
 export function App() {
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('scarlethop_theme');
+    return saved === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('scarlethop_theme', theme);
+  }, [theme]);
+
+  const [classes, setClasses] = useState<ClassItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('scarlethop_classes');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+    } catch (err) {
+      console.warn("Failed to persist classes to localStorage:", err);
+    }
+  }, [classes]);
+
+  const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
+  const scheduleFileInputRef = useRef<HTMLInputElement>(null);
+  const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
+
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
 
   const [originCampus, setOriginCampus] = useState("Busch");
@@ -61,7 +110,10 @@ export function App() {
   const [showCopilotModal, setShowCopilotModal] = useState(false);
   const [isRouteFormExpanded, setIsRouteFormExpanded] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'map' | 'routes'>('map');
   const widgetTriggerRef = useRef<HTMLButtonElement>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
 
   const requestLocationPermission = (isManual = false) => {
@@ -90,7 +142,7 @@ export function App() {
   useEffect(() => {
     const fetchBuses = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/telemetry");
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
         if (res.ok) {
           const data = await res.json();
           if (data.buses && data.buses.length > 0) {
@@ -117,7 +169,7 @@ export function App() {
 
   const handleCalculateRoute = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -129,7 +181,8 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setPlanResult(data);
-        if (data.routes && data.routes.length > 0) {
+        const stillServes = selectedRoute && data.routes?.some((r: any) => r.name === selectedRoute.name);
+        if (!stillServes && data.routes && data.routes.length > 0) {
           setSelectedRoute(data.routes[0]);
         }
         return;
@@ -138,42 +191,73 @@ export function App() {
       // Fallback calculation
     }
 
+    const isSame = originCampus === destCampus;
     const isBuschCol = (originCampus === "Busch" && destCampus === "College Ave") || (originCampus === "College Ave" && destCampus === "Busch");
     const isBuschLiv = (originCampus === "Busch" && destCampus === "Livingston") || (originCampus === "Livingston" && destCampus === "Busch");
+    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
 
-    const fallbackRoutes = [
-      {
-        name: isBuschCol ? "Weekend 2" : isBuschLiv ? "Route B (Direct)" : "Route LX (Express)",
-        type: "Direct Bus",
-        estimated_minutes: isBuschCol ? 16 : isBuschLiv ? 7 : 10,
-        rush_hour_minutes: isBuschCol ? 22 : 14,
-        badge: "Recommended",
-        description: isBuschCol
-          ? "Clockwise loop running directly from Busch into College Ave (The Yard & Student Center)."
-          : "Board express line directly to your destination."
-      },
-      {
-        name: "Rutgers E-Scooter / Bike",
-        type: "Bike / E-Scooter",
-        estimated_minutes: 17,
-        rush_hour_minutes: 18,
-        description: "Cross the Landing Lane Bridge and Johnson Park path straight into College Ave."
-      },
-      {
-        name: "Knight Mover / Student Escort",
-        type: "On-Demand Transit",
-        estimated_minutes: 20,
-        rush_hour_minutes: 25,
-        description: "Request Rutgers Knight Mover for direct on-demand student center pickup."
-      },
-      {
-        name: "Weekend 1 (Counter-Clockwise Loop)",
-        type: "Loop Bus",
-        estimated_minutes: 26,
-        rush_hour_minutes: 32,
-        description: "Circles Busch -> Livingston -> Cook/Douglass -> College Ave. Reliable if Weekend 2 is full."
-      }
-    ];
+    let fallbackRoutes: any[] = [];
+    if (isSame) {
+      const primaryBus = isWeekend ? "Weekend 2" : (originCampus === "Busch" ? "Route B" : originCampus === "College Ave" ? "Route EE" : "Route B");
+      fallbackRoutes = [
+        {
+          name: primaryBus,
+          type: "Campus Bus",
+          estimated_minutes: 5,
+          rush_hour_minutes: 7,
+          badge: "Recommended",
+          description: `Direct bus connecting local stops across ${originCampus} (BSC, Hill, Science, ARC).`
+        },
+        {
+          name: "Rutgers E-Scooter / Bike",
+          type: "Bike / E-Scooter",
+          estimated_minutes: 3,
+          rush_hour_minutes: 4,
+          description: `Hop on a Veo e-scooter or bike for quick cross-building transit on ${originCampus}.`
+        },
+        {
+          name: "Campus Pedestrian Walk",
+          type: "Walking Path",
+          estimated_minutes: 6,
+          rush_hour_minutes: 8,
+          description: `Direct pedestrian walk between buildings on ${originCampus}.`
+        }
+      ];
+    } else {
+      fallbackRoutes = [
+        {
+          name: isBuschCol ? "Weekend 2" : isBuschLiv ? "Route B (Direct)" : "Route LX (Express)",
+          type: "Direct Bus",
+          estimated_minutes: isBuschCol ? 16 : isBuschLiv ? 7 : 10,
+          rush_hour_minutes: isBuschCol ? 22 : 14,
+          badge: "Recommended",
+          description: isBuschCol
+            ? "Clockwise loop running directly from Busch into College Ave (The Yard & Student Center)."
+            : "Board express line directly to your destination."
+        },
+        {
+          name: "Rutgers E-Scooter / Bike",
+          type: "Bike / E-Scooter",
+          estimated_minutes: 17,
+          rush_hour_minutes: 18,
+          description: "Cross the Landing Lane Bridge and Johnson Park path straight into College Ave."
+        },
+        {
+          name: "Knight Mover / Student Escort",
+          type: "On-Demand Transit",
+          estimated_minutes: 20,
+          rush_hour_minutes: 25,
+          description: "Request Rutgers Knight Mover for direct on-demand student center pickup."
+        },
+        {
+          name: "Weekend 1 (Counter-Clockwise Loop)",
+          type: "Loop Bus",
+          estimated_minutes: 26,
+          rush_hour_minutes: 32,
+          description: "Circles Busch -> Livingston -> Cook/Douglass -> College Ave. Reliable if Weekend 2 is full."
+        }
+      ];
+    }
 
     const fallbackPlan = {
       origin: originCampus,
@@ -185,7 +269,10 @@ export function App() {
     };
 
     setPlanResult(fallbackPlan);
-    setSelectedRoute(fallbackRoutes[0]);
+    const stillServesFallback = selectedRoute && fallbackRoutes.some((r: any) => r.name === selectedRoute.name);
+    if (!stillServesFallback && fallbackRoutes.length > 0) {
+      setSelectedRoute(fallbackRoutes[0]);
+    }
   };
 
   // Automatically calculate route on mount and when origin or destination changes
@@ -196,33 +283,22 @@ export function App() {
   const handleGetToNextClass = async (specificClass?: ClassItem) => {
     let targetClass = specificClass;
     if (!targetClass) {
-      if (classes.length === 0) {
-        alert("Please upload your course schedule first (.ics or screenshot).");
+      const up = getNextUpcomingClass(classes);
+      if (!up.nextClass) {
+        alert("Please connect your default calendar or upload your course schedule first.");
         return;
       }
-
-      const now = new Date();
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-      const daysArr = ["SU", "M", "T", "W", "TH", "F", "S"];
-      const currentDayCode = daysArr[now.getDay()];
-
-      const parseTimeToMins = (timeStr: string) => {
-        if (!timeStr) return 0;
-        const parts = timeStr.split(":");
-        return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || "0", 10);
-      };
-
-      const todayClasses = classes.filter(cls => {
-        const days = Array.isArray(cls.days) ? cls.days : [cls.days];
-        return days.includes(currentDayCode);
-      });
-      todayClasses.sort((a, b) => parseTimeToMins(a.startTime) - parseTimeToMins(b.startTime));
-
-      targetClass = todayClasses.find(cls => parseTimeToMins(cls.startTime) >= currentMins) || (todayClasses.length > 0 ? todayClasses[0] : classes[0]);
+      targetClass = up.nextClass;
     }
 
     const targetCampus = targetClass.campus || "College Ave";
     const targetBuilding = targetClass.location || targetClass.building || targetCampus;
+
+    if (targetClass.location === "(Online)" || targetClass.campus === "(Online)") {
+      alert(`${targetClass.course} is an Online class - no transit navigation needed!`);
+      return;
+    }
+
     setTargetLocation(targetBuilding);
 
     let currentOrigin = originCampus;
@@ -235,9 +311,10 @@ export function App() {
 
     setOriginCampus(currentOrigin);
     setDestCampus(targetCampus);
+    setMobileTab('map');
 
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -289,13 +366,12 @@ export function App() {
   };
 
   const handleSwapCampuses = () => {
-    const temp = originCampus;
+    const tempCampus = originCampus;
+    const tempLoc = currentLocation;
     setOriginCampus(destCampus);
-    setDestCampus(temp);
-    if (temp === "College Ave") setTargetLocation("College Ave Student Center");
-    else if (temp === "Busch") setTargetLocation("Busch Student Center");
-    else if (temp === "Livingston") setTargetLocation("Livingston Student Center");
-    else if (temp === "Cook") setTargetLocation("College Hall");
+    setDestCampus(tempCampus);
+    setCurrentLocation(targetLocation);
+    setTargetLocation(tempLoc);
   };
 
   // Dynamically resolve target coordinates and find the nearest bus stop (ZERO HARDCODING)
@@ -307,6 +383,54 @@ export function App() {
     return findNearestBusStop(resolvedDestCoords, destCampus, selectedRoute?.name);
   }, [resolvedDestCoords, destCampus, selectedRoute?.name]);
 
+  const resolvedOrigCoords = useMemo(() => {
+    return resolveLocationCoords(currentLocation || originCampus, originCampus);
+  }, [currentLocation, originCampus]);
+
+  const resolvedBoardingStop = useMemo(() => {
+    return findNearestBusStop(resolvedOrigCoords, originCampus, selectedRoute?.name);
+  }, [resolvedOrigCoords, originCampus, selectedRoute?.name]);
+
+  const handleSyncCalendar = async () => {
+    setIsCalendarSyncing(true);
+    try {
+      const result = await syncDefaultDeviceCalendar();
+      if (result.success && result.classes && result.classes.length > 0) {
+        setClasses(result.classes);
+        alert(`Successfully synced ${result.classes.length} classes from your device calendar!`);
+        const up = getNextUpcomingClass(result.classes);
+        if (up.nextClass) {
+          handleGetToNextClass(up.nextClass);
+        }
+      } else if (result.source === 'web') {
+        alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
+        scheduleFileInputRef.current?.click();
+      } else if (result.success && result.classes && result.classes.length === 0) {
+        alert("Connected to calendar, but no classes with Rutgers locations were found. Please verify your calendar events or upload your schedule.");
+      } else if (result.error) {
+        alert("Calendar Notice: " + result.error);
+      }
+    } catch (err: any) {
+      console.warn("Calendar sync error:", err);
+      alert("Calendar sync error: " + (err?.message || "Failed to access calendar."));
+    } finally {
+      setIsCalendarSyncing(false);
+    }
+  };
+
+  // Mobile Device: Auto-sync default calendar on app launch
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      syncDefaultDeviceCalendar().then(res => {
+        if (res.success && res.classes && res.classes.length > 0) {
+          setClasses(res.classes);
+        }
+      }).catch(err => {
+        console.log("Background calendar auto-sync skipped:", err);
+      });
+    }
+  }, []);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setUploading(true);
@@ -314,29 +438,58 @@ export function App() {
     const formData = new FormData();
     formData.append("file", file);
 
+    // Pass logged in username if authenticated
     try {
-      const res = await fetch("http://localhost:8000/api/schedule/upload", {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u?.netId) {
+          formData.append("username", u.netId);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 35000);
+
+    try {
+      console.log(`[Upload] Uploading ${file.name} (${file.type || 'file'}) to ${API_BASE_URL}/api/schedule/upload...`);
+      const res = await fetch(`${API_BASE_URL}/api/schedule/upload`, {
         method: "POST",
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (data.status === "missing_api_key") {
           alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend.");
         } else if (data.status === "error") {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
-        }
-
-        if (data.classes && data.classes.length > 0) {
-          setClasses(sortClassesByDateAndTime(data.classes));
+        } else if (data.classes && data.classes.length > 0) {
+          const sorted = sortClassesByDateAndTime(data.classes);
+          setClasses(sorted);
+          alert(`Successfully imported ${sorted.length} class meetings!`);
+        } else {
+          alert(data.message || "No classes were detected. Please make sure the uploaded image or .ics file contains class schedule details.");
         }
       } else {
-        alert("Server returned error during schedule upload. Please verify backend is running on port 8000.");
+        alert(`Server returned an error during schedule upload (${res.status}). Please verify backend is running on ${API_BASE_URL}.`);
       }
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error("Upload error:", err);
-      alert("Could not connect to backend server at http://localhost:8000/api/schedule/upload.");
+      if (err.name === 'AbortError') {
+        alert(`Schedule upload timed out after 35 seconds. Please check that the backend server is reachable at ${API_BASE_URL}.`);
+      } else {
+        alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload: ${err?.message || err}`);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setUploading(false);
       e.target.value = "";
     }
@@ -358,24 +511,24 @@ export function App() {
             width: '32px',
             height: '32px',
             borderRadius: '9px',
-            background: 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)',
+            background: 'linear-gradient(135deg, var(--apple-accent) 0%, var(--apple-accent-dark) 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 10px rgba(255, 55, 95, 0.35)'
+            boxShadow: '0 2px 10px var(--apple-accent-glow)'
           }}>
-            <Bus size={17} color="#fff" strokeWidth={2.2} />
+            <WingedSneakerIcon size={20} color="#fff" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <h1 style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.025em', color: '#fff', margin: 0 }}>
-                Scarlet<span style={{ color: '#FF375F' }}>Hop</span>
+              <h1 style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--apple-label-primary)', margin: 0 }}>
+                Scarlet<span style={{ color: 'var(--apple-accent)' }}>Hop</span>
               </h1>
               <span style={{
                 fontSize: '10px',
                 fontWeight: 700,
-                color: 'rgba(235, 235, 245, 0.55)',
-                background: 'rgba(255, 255, 255, 0.08)',
+                color: 'var(--apple-label-tertiary)',
+                background: 'var(--apple-surface-tag)',
                 padding: '1px 5px',
                 borderRadius: '4px'
               }}>
@@ -385,58 +538,29 @@ export function App() {
           </div>
         </div>
 
-        {/* Center: Apple Dynamic Island / Live Activity Pill */}
-        <div
-          className="apple-dynamic-island"
-          onClick={upcomingClass ? () => handleGetToNextClass() : undefined}
-          style={{ cursor: upcomingClass ? 'pointer' : 'default' }}
-          title={upcomingClass ? "Click to calculate transit to upcoming class" : undefined}
-        >
-          <span style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: '#30D158',
-            boxShadow: '0 0 8px #30D158',
-            flexShrink: 0
-          }} />
-          {upcomingClass ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Navigation size={12} color="#FF375F" />
-              <span>Next: <strong>{upcomingClass.course}</strong> ({upcomingClass.campus}) • Tap to Route</span>
-            </span>
-          ) : selectedRoute ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Navigation size={12} color="#30D158" />
-              <span>Navigating: <strong>{selectedRoute.name}</strong> • ~{selectedRoute.estimated_minutes}m to {destCampus}</span>
-            </span>
-          ) : (
-            <span>TripShot Telemetry • {buses.length} Vehicles Tracked Live</span>
-          )}
-        </div>
 
         {/* Right: Clean Apple Controls Group */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Siri Copilot Drawer Trigger */}
           <button
             onClick={() => setShowCopilotModal(prev => !prev)}
             className="apple-btn-secondary"
-            style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
-            title="Ask ScarletHop Copilot"
+            style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
+            title="Ask Transit Copilot"
           >
             <Sparkles size={13} color="#BF5AF2" />
-            <span>Copilot</span>
+            <span className="btn-label-desktop">Copilot</span>
           </button>
 
           {/* Location button */}
           <button
             onClick={() => requestLocationPermission(true)}
             className="apple-btn-secondary"
-            style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
+            style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
             title="Update your current campus location"
           >
-            <LocateFixed size={12} color={geoStatus === "granted" ? "#30D158" : "rgba(235, 235, 245, 0.6)"} />
-            <span>{geoStatus === "granted" ? `GPS: ${originCampus}` : "Location"}</span>
+            <LocateFixed size={12} color={geoStatus === "granted" ? "#30D158" : "var(--apple-label-secondary)"} />
+            <span className="btn-label-desktop">{geoStatus === "granted" ? originCampus : "Location"}</span>
           </button>
 
           {/* Widget trigger */}
@@ -445,10 +569,11 @@ export function App() {
               ref={widgetTriggerRef}
               onClick={() => setShowWidgetOverlay(prev => !prev)}
               className="apple-btn-secondary"
-              style={{ fontSize: '12px', padding: '5px 12px', gap: '6px' }}
+              style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
+              title="Quick Widget Overlay"
             >
-              <Code size={12} color="#FF375F" />
-              <span>Widget</span>
+              <Code size={12} color="var(--apple-accent)" />
+              <span className="btn-label-desktop">Widget</span>
             </button>
 
             <TransitWidget
@@ -459,13 +584,66 @@ export function App() {
               nextClass={upcomingClass || undefined}
             />
           </div>
+
+          {/* Profile Menu Trigger */}
+          <div style={{ position: 'relative' }}>
+            <button
+              ref={profileTriggerRef}
+              onClick={() => setShowProfileMenu(prev => !prev)}
+              className="apple-btn-secondary"
+              style={{
+                fontSize: '12px',
+                padding: '5px 10px',
+                gap: '5px',
+                background: showProfileMenu ? 'var(--apple-accent-subtle)' : undefined,
+                borderColor: showProfileMenu ? 'var(--apple-accent)' : undefined
+              }}
+              title="Profile & Settings (Sign Up / Login, Light / Dark Mode)"
+            >
+              <User size={13} color="var(--apple-accent)" />
+              <span className="btn-label-desktop">Profile</span>
+            </button>
+
+            <ProfileMenu
+              isOpen={showProfileMenu}
+              onClose={() => setShowProfileMenu(false)}
+              triggerRef={profileTriggerRef}
+              theme={theme}
+              onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+              onSelectTheme={(t) => setTheme(t)}
+              onSyncCalendar={handleSyncCalendar}
+              onClassesLoaded={(loadedClasses) => setClasses(sortClassesByDateAndTime(loadedClasses))}
+            />
+          </div>
         </div>
       </header>
 
+      {/* Mobile Segmented View Control: Apple HIG View Switcher */}
+      <div className="apple-mobile-tab-bar">
+        <div className="apple-segmented-control" style={{ width: '100%', maxWidth: '340px' }}>
+          <button
+            onClick={() => setMobileTab('map')}
+            className={`apple-segment-btn ${mobileTab === 'map' ? 'active' : ''}`}
+            style={{ flex: 1, padding: '6px 12px' }}
+          >
+            <Navigation size={13} />
+            <span>Live Map</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('routes')}
+            className={`apple-segment-btn ${mobileTab === 'routes' ? 'active' : ''}`}
+            style={{ flex: 1, padding: '6px 12px' }}
+          >
+            <Calendar size={13} />
+            <span>Routes & Schedule</span>
+          </button>
+        </div>
+      </div>
+
       {/* 2. Apple Dual-Pane Workspace */}
       <main className="apple-main-workspace">
-        {/* Left Sheet: Combined Directions & Schedule with Apple Ideology */}
-        <div className="apple-sidebar-sheet">
+        {/* Left Sheet: Combined Directions & Schedule with Apple HIG */}
+        <div className={`apple-sidebar-sheet ${mobileTab === 'routes' ? 'mobile-active' : ''}`}>
           <div className="apple-panel" style={{
             padding: '16px',
             height: '100%',
@@ -487,8 +665,8 @@ export function App() {
                 marginBottom: '10px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <Calendar size={15} color="#FF375F" />
-                  <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+                  <Calendar size={15} color="var(--apple-accent)" />
+                  <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--apple-label-primary)', margin: 0, letterSpacing: '-0.015em' }}>
                     Course Schedule
                   </h2>
                 </div>
@@ -507,11 +685,6 @@ export function App() {
                       Clear
                     </button>
                   )}
-                  <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    {uploading ? "Importing..." : "Import"}
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
                 </div>
               </div>
 
@@ -536,18 +709,29 @@ export function App() {
                 <div style={{
                   padding: '16px',
                   borderRadius: '14px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  background: 'var(--apple-surface-card)',
+                  border: '1px dashed var(--apple-border)',
                   textAlign: 'center'
                 }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 10px', maxWidth: '240px' }}>
-                    Upload an .ics schedule or WebReg screenshot to view classes and auto-navigate between them.
+                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 12px', maxWidth: '240px' }}>
+                    Connect your default calendar or upload an .ics / WebReg screenshot to view classes and auto-navigate.
                   </p>
-                  <label className="apple-btn-primary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    Choose File
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleSyncCalendar}
+                      disabled={isCalendarSyncing}
+                      className="apple-btn-primary"
+                      style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
+                    >
+                      {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
+                      <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
+                    </button>
+                    <label className="apple-btn-secondary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
+                      <Upload size={11} />
+                      <span>{uploading ? "Importing..." : "Choose File"}</span>
+                      <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -563,8 +747,8 @@ export function App() {
                         style={{
                           padding: '9px 12px',
                           borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.06)',
+                          background: 'var(--apple-surface-card)',
+                          border: '1px solid var(--apple-border-subtle)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
@@ -572,28 +756,81 @@ export function App() {
                         }}
                       >
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--apple-label-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {cls.course}
                           </div>
                           <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <MapPin size={10} color="#FF375F" />
-                            <span>{cls.location || cls.building} ({cls.campus})</span>
+                            <MapPin size={10} color="var(--apple-accent)" />
+                            {cls.zoom_link ? (
+                              <a
+                                href={cls.zoom_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
+                                title="Open Zoom meeting in new tab"
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                📹 Join Zoom Call
+                              </a>
+                            ) : cls.location === '(Online)' || cls.campus === '(Online)' ? (
+                              <span style={{ color: 'var(--apple-label-tertiary)', fontStyle: 'italic' }}>(Online)</span>
+                            ) : (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cls.location || cls.building)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: 'inherit', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={`Search on Google Maps: ${cls.location || cls.building}`}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                {cls.location || cls.building}
+                              </a>
+                            )}
                           </div>
                         </div>
 
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#0A84FF', fontVariantNumeric: 'tabular-nums' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--apple-accent)', fontVariantNumeric: 'tabular-nums' }}>
                             {cls.startTime} - {cls.endTime}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => handleGetToNextClass(cls)}
-                              className="apple-btn-secondary"
-                              style={{ padding: '3px 8px', fontSize: '10.5px' }}
-                              title="Calculate transit & start map navigation to this class"
-                            >
-                              Route ➔
-                            </button>
+                            {cls.zoom_link ? (
+                              <a
+                                href={cls.zoom_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="apple-btn-primary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '10.5px',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                                  color: '#fff',
+                                  borderRadius: '6px'
+                                }}
+                                title="Open Zoom meeting in new tab"
+                              >
+                                📹 Zoom
+                              </a>
+                            ) : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
+                              <button
+                                onClick={() => handleGetToNextClass(cls)}
+                                className="apple-btn-secondary"
+                                style={{ padding: '3px 8px', fontSize: '10.5px' }}
+                                title="Calculate transit & start map navigation to this class"
+                              >
+                                Route ➔
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '10px', color: 'var(--apple-label-tertiary)', padding: '2px 6px', borderRadius: '4px', background: 'var(--apple-card-bg-inset)' }}>
+                                Online
+                              </span>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -620,7 +857,7 @@ export function App() {
               )}
 
               {/* Subtle Divider */}
-              <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '2px 0' }} />
+              <div style={{ height: '1px', background: 'var(--apple-border-subtle)', margin: '2px 0' }} />
 
               {/* ========================================================
                 SECTION 2: DIRECTIONS & TRANSIT OPTIONS (BELOW SCHEDULE)
@@ -633,27 +870,25 @@ export function App() {
                   marginBottom: '10px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <Navigation size={15} color="#FF375F" />
-                    <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+                    <Navigation size={15} color="var(--apple-accent)" />
+                    <h2 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--apple-label-primary)', margin: 0, letterSpacing: '-0.015em' }}>
                       Directions
                     </h2>
                   </div>
-                  {selectedRoute && (
-                    <span style={{ fontSize: '10.5px', color: '#30D158', fontWeight: 600 }}>
-                      ● Active on Map
-                    </span>
-                  )}
                 </div>
 
                 {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
                 {upcomingClass && (
                   <div
-                    onClick={() => handleGetToNextClass()}
+                    onClick={() => {
+                      handleGetToNextClass();
+                      setMobileTab('map');
+                    }}
                     style={{
                       padding: '9px 12px',
                       borderRadius: '12px',
-                      background: 'rgba(255, 55, 95, 0.1)',
-                      border: '1px solid rgba(255, 55, 95, 0.3)',
+                      background: 'var(--apple-accent-subtle)',
+                      border: '1px solid var(--apple-border-focus)',
                       marginBottom: '10px',
                       cursor: 'pointer',
                       display: 'flex',
@@ -663,10 +898,10 @@ export function App() {
                     }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '10.5px', color: '#FF375F', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      <div style={{ fontSize: '10.5px', color: 'var(--apple-accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         Next Class
                       </div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--apple-label-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {upcomingClass.course} • {upcomingClass.startTime} ({upcomingClass.campus})
                       </div>
                     </div>
@@ -678,10 +913,10 @@ export function App() {
 
                 {/* Apple Maps Origin / Destination Form Card (Minimized by Default) */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
+                  background: 'var(--apple-card-bg)',
                   borderRadius: '14px',
                   padding: isRouteFormExpanded ? '12px' : '9px 12px',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  border: '1px solid var(--apple-border)',
                   marginBottom: '10px',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}>
@@ -702,20 +937,20 @@ export function App() {
                         width: '22px',
                         height: '22px',
                         borderRadius: '6px',
-                        background: 'rgba(255, 55, 95, 0.15)',
+                        background: 'var(--apple-accent-subtle)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0
                       }}>
-                        <Navigation size={11} color="#FF375F" />
+                        <Navigation size={11} color="var(--apple-accent)" />
                       </div>
 
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{
                           fontSize: '12px',
                           fontWeight: 650,
-                          color: '#fff',
+                          color: 'var(--apple-label-primary)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -723,7 +958,7 @@ export function App() {
                           alignItems: 'center',
                           gap: '5px'
                         }}>
-                          <span style={{ color: '#fff' }}>{originCampus}</span>
+                          <span style={{ color: 'var(--apple-label-primary)' }}>{originCampus}</span>
                           <span style={{ color: 'var(--apple-label-tertiary)', fontSize: '10px' }}>➔</span>
                           <span style={{ color: '#30D158' }}>{destCampus}</span>
                         </div>
@@ -736,7 +971,7 @@ export function App() {
                             textOverflow: 'ellipsis',
                             marginTop: '1px'
                           }}>
-                            To: {targetLocation} • Stop: {resolvedNearestStop.name}
+                            From: {currentLocation} ➔ To: {targetLocation}
                           </div>
                         )}
                       </div>
@@ -746,10 +981,10 @@ export function App() {
                       <span style={{
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: isRouteFormExpanded ? '#FF375F' : 'var(--apple-label-secondary)',
+                        color: isRouteFormExpanded ? 'var(--apple-accent)' : 'var(--apple-label-secondary)',
                         padding: '2px 7px',
                         borderRadius: '6px',
-                        background: 'rgba(255, 255, 255, 0.05)'
+                        background: 'var(--apple-surface-subtle)'
                       }}>
                         {isRouteFormExpanded ? 'Collapse' : 'Change'}
                       </span>
@@ -769,119 +1004,266 @@ export function App() {
                     <div style={{
                       marginTop: '10px',
                       paddingTop: '10px',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.07)',
+                      borderTop: '1px solid var(--apple-border-subtle)',
                       animation: 'apple-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}>
-                      {/* Origin */}
-                      <div style={{ marginBottom: '8px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                          Departing From
-                        </label>
-                        <select
-                          value={originCampus}
-                          onChange={(e) => setOriginCampus(e.target.value)}
-                          className="apple-select-box"
-                        >
-                          <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
-                          <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
-                          <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
-                          <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
-                        </select>
+                      {/* Departure Group Card */}
+                      <div style={{
+                        background: 'var(--apple-surface-card)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--apple-border-subtle)',
+                        padding: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#30D158', boxShadow: '0 0 6px #30D158', flexShrink: 0 }} />
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#30D158', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Departing From
+                          </span>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '4px' }}>
+                            Campus
+                          </label>
+                          <select
+                            value={originCampus}
+                            onChange={(e) => {
+                              const newCamp = e.target.value;
+                              setOriginCampus(newCamp);
+                              if (resolvedGeo && matchCampus(resolvedGeo.campus, newCamp)) {
+                                setCurrentLocation(resolvedGeo.locationName);
+                              } else if (newCamp === "College Ave") {
+                                setCurrentLocation("College Ave Student Center");
+                              } else if (newCamp === "Busch") {
+                                setCurrentLocation("Busch Student Center");
+                              } else if (newCamp === "Livingston") {
+                                setCurrentLocation("Livingston Student Center");
+                              } else if (newCamp === "Cook") {
+                                setCurrentLocation("College Hall");
+                              }
+                            }}
+                            className="apple-select-box"
+                          >
+                            <option value="Busch" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Busch Campus</option>
+                            <option value="Livingston" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Livingston Campus</option>
+                            <option value="College Ave" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>College Ave Campus</option>
+                            <option value="Cook" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Cook / Douglass Campus</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '4px' }}>
+                            Starting Location / Building
+                          </label>
+                          <select
+                            value={currentLocation}
+                            onChange={(e) => setCurrentLocation(e.target.value)}
+                            className="apple-select-box"
+                          >
+                            {/* GPS Current Location if detected on this campus */}
+                            {resolvedGeo && matchCampus(resolvedGeo.campus, originCampus) && (
+                              <option value={resolvedGeo.locationName} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                📍 Current Location ({resolvedGeo.locationName})
+                              </option>
+                            )}
+
+                            {/* Primary Student Center / Hub */}
+                            <option value={
+                              originCampus === "College Ave" ? "College Ave Student Center" :
+                                originCampus === "Busch" ? "Busch Student Center" :
+                                  originCampus === "Livingston" ? "Livingston Student Center" : "College Hall"
+                            } style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                              {originCampus === "College Ave" ? "College Ave Student Center (CASC)" :
+                                originCampus === "Busch" ? "Busch Student Center (BSC)" :
+                                  originCampus === "Livingston" ? "Livingston Student Center (LSC)" : "College Hall"}
+                            </option>
+
+                            {/* Fallback for custom or resolved location name if not already listed */}
+                            {currentLocation &&
+                              currentLocation !== (resolvedGeo?.locationName) &&
+                              currentLocation !== (originCampus === "College Ave" ? "College Ave Student Center" : originCampus === "Busch" ? "Busch Student Center" : originCampus === "Livingston" ? "Livingston Student Center" : "College Hall") &&
+                              !RUTGERS_BUILDINGS.some(b => b.name === currentLocation) &&
+                              !RUTGERS_BUS_STOPS.some(s => s.name === currentLocation) && (
+                                <option value={currentLocation} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                  📍 {currentLocation}
+                                </option>
+                              )}
+
+                            {/* All Campus Buildings */}
+                            {RUTGERS_BUILDINGS.filter(b => matchCampus(b.campus, originCampus) && !b.name.includes("Student Center")).map(b => (
+                              <option key={b.name} value={b.name} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                {b.name} {b.code ? `(${b.code})` : ''}
+                              </option>
+                            ))}
+
+                            {/* All Campus Bus Stops */}
+                            {RUTGERS_BUS_STOPS.filter(s => matchCampus(s.campus, originCampus) && !s.name.includes("Student Center")).map(s => (
+                              <option key={s.name} value={s.name} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                Bus Stop: {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
-                      {/* Swap Button */}
-                      <div style={{ display: 'flex', justifyContent: 'center', margin: '-4px 0 4px' }}>
+                      {/* Apple Hairline Swap Divider */}
+                      <div style={{
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '6px 0',
+                        height: '26px'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          left: '12px',
+                          right: '12px',
+                          height: '1px',
+                          background: 'var(--apple-border-subtle)'
+                        }} />
                         <button
                           onClick={handleSwapCampuses}
                           className="apple-icon-btn"
                           title="Swap origin and destination"
-                          style={{ width: '26px', height: '26px' }}
+                          style={{
+                            position: 'relative',
+                            zIndex: 1,
+                            width: '26px',
+                            height: '26px',
+                            background: 'var(--apple-surface-elevated)',
+                            border: '1px solid var(--apple-border)',
+                            boxShadow: 'var(--apple-shadow-sm)'
+                          }}
                         >
-                          <ArrowDownUp size={12} />
+                          <ArrowDownUp size={12} color="var(--apple-label-primary)" />
                         </button>
                       </div>
 
-                      {/* Destination Campus */}
-                      <div style={{ marginBottom: '8px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                          Going To Campus
-                        </label>
-                        <select
-                          value={destCampus}
-                          onChange={(e) => {
-                            const newCamp = e.target.value;
-                            setDestCampus(newCamp);
-                            if (newCamp === "College Ave") setTargetLocation("College Ave Student Center");
-                            else if (newCamp === "Busch") setTargetLocation("Busch Student Center");
-                            else if (newCamp === "Livingston") setTargetLocation("Livingston Student Center");
-                            else if (newCamp === "Cook") setTargetLocation("College Hall");
-                          }}
-                          className="apple-select-box"
-                        >
-                          <option value="College Ave" style={{ background: '#1c1c1e' }}>College Ave Campus</option>
-                          <option value="Livingston" style={{ background: '#1c1c1e' }}>Livingston Campus</option>
-                          <option value="Busch" style={{ background: '#1c1c1e' }}>Busch Campus</option>
-                          <option value="Cook" style={{ background: '#1c1c1e' }}>Cook / Douglass Campus</option>
-                        </select>
-                      </div>
-
-                      {/* Target Location / Building (Dynamic Nearest Stop Resolver) */}
-                      <div style={{ marginBottom: '8px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '3px' }}>
-                          Next Location / Building
-                        </label>
-                        <select
-                          value={targetLocation}
-                          onChange={(e) => setTargetLocation(e.target.value)}
-                          className="apple-select-box"
-                        >
-                          {/* Primary Student Center / Hub */}
-                          <option value={
-                            destCampus === "College Ave" ? "College Ave Student Center" :
-                              destCampus === "Busch" ? "Busch Student Center" :
-                                destCampus === "Livingston" ? "Livingston Student Center" : "College Hall"
-                          } style={{ background: '#1c1c1e' }}>
-                            {destCampus === "College Ave" ? "College Ave Student Center (CASC)" :
-                              destCampus === "Busch" ? "Busch Student Center (BSC)" :
-                                destCampus === "Livingston" ? "Livingston Student Center (LSC)" : "College Hall"}
-                          </option>
-
-                          {/* All Campus Buildings */}
-                          {RUTGERS_BUILDINGS.filter(b => matchCampus(b.campus, destCampus) && !b.name.includes("Student Center")).map(b => (
-                            <option key={b.name} value={b.name} style={{ background: '#1c1c1e' }}>
-                              {b.name} {b.code ? `(${b.code})` : ''}
-                            </option>
-                          ))}
-
-                          {/* All Campus Bus Stops */}
-                          {RUTGERS_BUS_STOPS.filter(s => matchCampus(s.campus, destCampus) && !s.name.includes("Student Center")).map(s => (
-                            <option key={s.name} value={s.name} style={{ background: '#1c1c1e' }}>
-                              Bus Stop: {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Dynamic Nearest Bus Stop Display (ZERO HARDCODING) */}
+                      {/* Destination Group Card */}
                       <div style={{
+                        background: 'var(--apple-surface-card)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--apple-border-subtle)',
+                        padding: '10px',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '6px',
-                        padding: '7px 10px',
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        borderRadius: '9px',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        marginBottom: '10px',
-                        fontSize: '11px'
+                        flexDirection: 'column',
+                        gap: '8px',
+                        marginBottom: '10px'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Bus size={12} color="#30D158" />
-                          <span style={{ color: 'var(--apple-label-secondary)' }}>Nearest Bus Stop:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--apple-accent)', boxShadow: '0 0 6px var(--apple-accent)', flexShrink: 0 }} />
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--apple-accent)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                            Going To
+                          </span>
                         </div>
-                        <span style={{ fontWeight: 700, color: '#30D158' }}>
-                          {resolvedNearestStop.name}
-                        </span>
+
+                        <div>
+                          <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '4px' }}>
+                            Campus
+                          </label>
+                          <select
+                            value={destCampus}
+                            onChange={(e) => {
+                              const newCamp = e.target.value;
+                              setDestCampus(newCamp);
+                              if (newCamp === "College Ave") setTargetLocation("College Ave Student Center");
+                              else if (newCamp === "Busch") setTargetLocation("Busch Student Center");
+                              else if (newCamp === "Livingston") setTargetLocation("Livingston Student Center");
+                              else if (newCamp === "Cook") setTargetLocation("College Hall");
+                            }}
+                            className="apple-select-box"
+                          >
+                            <option value="College Ave" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>College Ave Campus</option>
+                            <option value="Livingston" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Livingston Campus</option>
+                            <option value="Busch" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Busch Campus</option>
+                            <option value="Cook" style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>Cook / Douglass Campus</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', display: 'block', marginBottom: '4px' }}>
+                            Next Location / Building
+                          </label>
+                          <select
+                            value={targetLocation}
+                            onChange={(e) => {
+                              const newLoc = e.target.value;
+                              setTargetLocation(newLoc);
+                              const res = resolveLocationCoords(newLoc, destCampus);
+                              if (res && res.campus && res.campus !== destCampus) {
+                                setDestCampus(res.campus);
+                              }
+                            }}
+                            className="apple-select-box"
+                          >
+                            {/* Primary Student Center / Hub */}
+                            <option value={
+                              destCampus === "College Ave" ? "College Ave Student Center" :
+                                destCampus === "Busch" ? "Busch Student Center" :
+                                  destCampus === "Livingston" ? "Livingston Student Center" : "College Hall"
+                            } style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                              {destCampus === "College Ave" ? "College Ave Student Center (CASC)" :
+                                destCampus === "Busch" ? "Busch Student Center (BSC)" :
+                                  destCampus === "Livingston" ? "Livingston Student Center (LSC)" : "College Hall"}
+                            </option>
+
+                            {/* All Campus Buildings */}
+                            {RUTGERS_BUILDINGS.filter(b => matchCampus(b.campus, destCampus) && !b.name.includes("Student Center")).map(b => (
+                              <option key={b.name} value={b.name} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                {b.name} {b.code ? `(${b.code})` : ''}
+                              </option>
+                            ))}
+
+                            {/* All Campus Bus Stops */}
+                            {RUTGERS_BUS_STOPS.filter(s => matchCampus(s.campus, destCampus) && !s.name.includes("Student Center")).map(s => (
+                              <option key={s.name} value={s.name} style={{ background: 'var(--apple-option-bg)', color: 'var(--apple-label-primary)' }}>
+                                Bus Stop: {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Boarding & Drop-off Stops */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '6px',
+                        marginBottom: '10px'
+                      }}>
+                        <div style={{
+                          padding: '6px 8px',
+                          background: 'var(--apple-surface-card)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--apple-border-subtle)',
+                          fontSize: '10.5px'
+                        }}>
+                          <div style={{ color: 'var(--apple-accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                            <span>▲ Board Stop:</span>
+                          </div>
+                          <div style={{ fontWeight: 600, color: 'var(--apple-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={resolvedBoardingStop.name}>
+                            {resolvedBoardingStop.name}
+                          </div>
+                        </div>
+
+                        <div style={{
+                          padding: '6px 8px',
+                          background: 'var(--apple-surface-card)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--apple-border-subtle)',
+                          fontSize: '10.5px'
+                        }}>
+                          <div style={{ color: '#30D158', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                            <span>▼ Drop-off Stop:</span>
+                          </div>
+                          <div style={{ fontWeight: 600, color: 'var(--apple-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={resolvedNearestStop.name}>
+                            {resolvedNearestStop.name}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Compute Route Button */}
@@ -952,16 +1334,20 @@ export function App() {
                           return (
                             <div
                               key={idx}
-                              onClick={() => setSelectedRoute(route)}
+                              onClick={() => {
+                                const nextSel = isSelected ? null : route;
+                                setSelectedRoute(nextSel);
+                                if (nextSel) setMobileTab('map');
+                              }}
                               style={{
                                 padding: '11px 13px',
                                 borderRadius: '13px',
                                 background: isSelected
-                                  ? 'rgba(255, 255, 255, 0.08)'
-                                  : 'rgba(255, 255, 255, 0.03)',
+                                  ? 'var(--apple-surface-subtle)'
+                                  : 'var(--apple-card-bg)',
                                 border: isSelected
                                   ? `1.5px solid ${colorInfo.bg}`
-                                  : '1px solid rgba(255, 255, 255, 0.07)',
+                                  : '1px solid var(--apple-border-subtle)',
                                 cursor: 'pointer',
                                 transition: 'all 0.18s ease',
                                 boxShadow: isSelected ? `0 0 16px ${colorInfo.bg}44` : 'none'
@@ -989,9 +1375,33 @@ export function App() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
-                                  ~{route.estimated_minutes} min
-                                </div>
+
+                                {isSelected && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedRoute(null);
+                                    }}
+                                    title="Deselect route / End navigation"
+                                    className="apple-btn-dark-glass"
+                                    style={{
+                                      width: '22px',
+                                      height: '22px',
+                                      padding: 0,
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: 'var(--apple-surface-subtle)',
+                                      border: '1px solid var(--apple-border)',
+                                      color: 'var(--apple-label-primary)',
+                                      cursor: 'pointer',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    <X size={12} strokeWidth={2.8} />
+                                  </button>
+                                )}
                               </div>
                               <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: '3px 0 0', lineHeight: 1.35 }}>
                                 {route.description}
@@ -1002,7 +1412,7 @@ export function App() {
                                 <div style={{
                                   marginTop: '9px',
                                   paddingTop: '8px',
-                                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                                  borderTop: '1px solid var(--apple-border-subtle)'
                                 }}>
                                   <div style={{
                                     display: 'flex',
@@ -1016,12 +1426,35 @@ export function App() {
                                     letterSpacing: '0.04em'
                                   }}>
                                     <span>Stops ({stops.length})</span>
-                                    <span style={{ color: '#0A84FF', fontWeight: 600 }}>Tap to Route</span>
+                                    <span style={{ color: 'var(--apple-accent)', fontWeight: 600 }}>Tap to Set Destination Stop</span>
                                   </div>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                                     {stops.map((st) => {
-                                      const isStopActive = targetLocation?.toLowerCase().includes(st.name.toLowerCase()) ||
-                                        st.name.toLowerCase().includes(targetLocation?.toLowerCase() || '');
+                                      const isBoarding = resolvedBoardingStop?.name.toLowerCase() === st.name.toLowerCase();
+                                      const isDropoff = targetLocation?.toLowerCase().includes(st.name.toLowerCase()) ||
+                                        st.name.toLowerCase().includes(targetLocation?.toLowerCase() || '') ||
+                                        resolvedNearestStop?.name.toLowerCase() === st.name.toLowerCase();
+
+                                      let badgeIcon = '🚏';
+                                      let btnBg = 'var(--apple-surface-subtle)';
+                                      let btnBorder = '1px solid var(--apple-border-subtle)';
+                                      let btnColor = 'var(--apple-label-primary)';
+                                      let btnShadow = 'none';
+
+                                      if (isDropoff) {
+                                        badgeIcon = '▼';
+                                        btnBg = colorInfo.bg;
+                                        btnBorder = `1.5px solid ${colorInfo.bg}`;
+                                        btnColor = colorInfo.text;
+                                        btnShadow = `0 0 10px ${colorInfo.bg}66`;
+                                      } else if (isBoarding) {
+                                        badgeIcon = '▲';
+                                        btnBg = 'rgba(48, 209, 88, 0.25)';
+                                        btnBorder = '1.5px solid #30D158';
+                                        btnColor = '#30D158';
+                                        btnShadow = '0 0 10px rgba(48, 209, 88, 0.35)';
+                                      }
+
                                       return (
                                         <button
                                           key={st.name}
@@ -1029,24 +1462,25 @@ export function App() {
                                             e.stopPropagation();
                                             setTargetLocation(st.name);
                                             if (st.campus) setDestCampus(st.campus);
+                                            setMobileTab('map');
                                           }}
-                                          title={`${st.name} (${st.campus})`}
+                                          title={isBoarding ? `${st.name} (▲ Boarding Stop near you)` : isDropoff ? `${st.name} (▼ Selected Drop-off Stop)` : `Tap to set destination to ${st.name}`}
                                           className="apple-btn-secondary"
                                           style={{
                                             padding: '3px 7px',
                                             fontSize: '10.5px',
                                             borderRadius: '7px',
-                                            background: isStopActive ? colorInfo.bg : 'rgba(255, 255, 255, 0.06)',
-                                            color: isStopActive ? colorInfo.text : 'rgba(255, 255, 255, 0.9)',
-                                            border: isStopActive ? `1.5px solid ${colorInfo.bg}` : '1px solid rgba(255, 255, 255, 0.1)',
-                                            fontWeight: isStopActive ? 800 : 500,
-                                            boxShadow: isStopActive ? `0 0 10px ${colorInfo.bg}66` : 'none',
+                                            background: btnBg,
+                                            color: btnColor,
+                                            border: btnBorder,
+                                            fontWeight: (isBoarding || isDropoff) ? 800 : 500,
+                                            boxShadow: btnShadow,
                                             display: 'inline-flex',
                                             alignItems: 'center',
                                             gap: '4px'
                                           }}
                                         >
-                                          <span>{isStopActive ? '▼' : '🚏'}</span>
+                                          <span>{badgeIcon}</span>
                                           <span>{getStopShortCode(st.name)}</span>
                                         </button>
                                       );
@@ -1073,13 +1507,13 @@ export function App() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                background: 'var(--apple-surface-card)',
+                                border: '1px solid var(--apple-border-subtle)',
                                 cursor: 'pointer',
                                 transition: 'all 0.18s ease'
                               }}
                             >
-                              <span style={{ color: '#fff' }}>
+                              <span style={{ color: 'var(--apple-label-primary)' }}>
                                 {showAllRoutes ? 'Show Fewer Options' : `More Transit Options (${remainingCount} more)`}
                               </span>
                               <ChevronDown
@@ -1103,8 +1537,9 @@ export function App() {
         </div>
 
         {/* Right Canvas: Replaced with Interactive Transit Map with Navigation */}
-        <div className="apple-canvas-area">
+        <div className={`apple-canvas-area ${mobileTab === 'map' ? 'mobile-active' : ''}`}>
           <TransitMap
+            appTheme={theme}
             buses={buses}
             originCampus={originCampus}
             destCampus={destCampus}
@@ -1129,6 +1564,17 @@ export function App() {
             onClearSelectedRoute={() => setSelectedRoute(null)}
             onSelectRoute={(rt) => setSelectedRoute(rt)}
             planResult={planResult}
+            onSwitchToRoutes={() => setMobileTab('routes')}
+            classes={classes}
+            upcomingClassInfo={upcomingClassInfo}
+            onAutoRouteToNextClass={() => handleGetToNextClass()}
+          />
+          <input
+            ref={scheduleFileInputRef}
+            type="file"
+            accept="image/*,.ics,text/calendar"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
           />
         </div>
       </main>
@@ -1167,12 +1613,17 @@ export function App() {
                 zIndex: 10,
                 width: '30px',
                 height: '30px',
-                background: 'rgba(255, 255, 255, 0.15)'
+                background: 'var(--apple-surface-elevated)',
+                border: '1px solid var(--apple-border)'
               }}
             >
-              <X size={15} color="#fff" />
+              <X size={15} color="var(--apple-label-primary)" />
             </button>
-            <AICopilotChat currentCampus={currentLocation} />
+            <AICopilotChat
+              currentCampus={originCampus}
+              currentLocation={currentLocation}
+              userCoords={resolvedGeo ? [resolvedGeo.coords.lat, resolvedGeo.coords.lon] : undefined}
+            />
           </div>
         </div>
       )}

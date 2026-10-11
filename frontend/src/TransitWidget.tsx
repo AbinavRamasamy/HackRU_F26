@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, MapPin, Copy, Check } from 'lucide-react';
 import { getRouteColor } from './CampusRadar';
+import { API_BASE_URL } from './apiConfig';
 
 interface BusItem {
   id: string;
@@ -55,7 +56,7 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
 
     const fetchTelemetry = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/telemetry");
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
         if (res.ok) {
           const data = await res.json();
           setBuses(data.buses || []);
@@ -98,12 +99,12 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
         width: '380px',
         maxWidth: 'calc(100vw - 32px)',
         zIndex: 9999,
-        background: 'rgba(28, 28, 30, 0.94)',
+        background: 'var(--apple-surface-elevated)',
         backdropFilter: 'blur(32px) saturate(190%)',
         WebkitBackdropFilter: 'blur(32px) saturate(190%)',
         borderRadius: '20px',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+        border: '1px solid var(--apple-border)',
+        boxShadow: 'var(--apple-shadow-lg)',
         padding: '18px',
         animation: 'fadeIn 0.2s ease-in-out'
       }}
@@ -115,16 +116,17 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
             width: '28px',
             height: '28px',
             borderRadius: '8px',
-            background: 'linear-gradient(135deg, #FF375F 0%, #D71A43 100%)',
+            background: 'linear-gradient(135deg, var(--apple-accent) 0%, var(--apple-accent-dark) 100%)',
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px var(--apple-accent-glow)'
           }}>
             <Sparkles size={15} />
           </div>
           <div>
-            <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.015em' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--apple-label-primary)', margin: 0, letterSpacing: '-0.015em' }}>
               Transit Glance
             </h4>
             <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 600 }}>● Live Telemetry</span>
@@ -135,17 +137,17 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       {/* Departing Location Pill */}
       <div style={{
         fontSize: '11.5px',
-        color: '#fff',
+        color: 'var(--apple-label-primary)',
         marginBottom: '12px',
         padding: '7px 10px',
-        background: 'rgba(255, 255, 255, 0.05)',
+        background: 'var(--apple-surface-subtle)',
         borderRadius: '10px',
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        border: '1px solid rgba(255, 255, 255, 0.08)'
+        border: '1px solid var(--apple-border-subtle)'
       }}>
-        <MapPin size={13} color="#FF375F" />
+        <MapPin size={13} color="var(--apple-accent)" />
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Origin: <strong>{currentCampus}</strong>
         </span>
@@ -154,31 +156,31 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       {/* Next Class Destination */}
       {nextClass && (
         <div style={{
-          background: 'rgba(255, 55, 95, 0.08)',
+          background: 'var(--apple-accent-subtle)',
           borderRadius: '12px',
           padding: '10px 12px',
           marginBottom: '12px',
-          border: '1px solid rgba(255, 55, 95, 0.25)'
+          border: '1px solid var(--apple-border)'
         }}>
-          <div style={{ fontSize: '10px', color: '#FF375F', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 700 }}>
+          <div style={{ fontSize: '10px', color: 'var(--apple-accent)', textTransform: 'uppercase', letterSpacing: '0.4px', fontWeight: 700 }}>
             Next Destination
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginTop: '1px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--apple-label-primary)', marginTop: '1px' }}>
             {nextClass.course}
           </div>
-          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.65)', marginTop: '2px' }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', marginTop: '2px' }}>
             {nextClass.building} ({nextClass.campus}) at {nextClass.startTime}
           </div>
         </div>
       )}
 
       {/* Incoming Buses List */}
-      <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(235, 235, 245, 0.6)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--apple-label-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
         Arriving Soon ({buses.length})
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '2px' }}>
         {buses.length === 0 ? (
-          <div style={{ fontSize: '11.5px', color: 'rgba(235, 235, 245, 0.5)', textAlign: 'center', padding: '14px' }}>
+          <div style={{ fontSize: '11.5px', color: 'var(--apple-label-tertiary)', textAlign: 'center', padding: '14px' }}>
             Syncing live arrivals...
           </div>
         ) : (
@@ -188,9 +190,9 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '8px 10px',
-              background: 'rgba(255, 255, 255, 0.03)',
+              background: 'var(--apple-card-bg)',
               borderRadius: '10px',
-              border: '1px solid rgba(255, 255, 255, 0.06)'
+              border: '1px solid var(--apple-border-subtle)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, marginRight: '8px' }}>
                 <div style={{
@@ -210,16 +212,16 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
                   {bus.route === "Weekend 1" ? "WKND 1" : bus.route === "Weekend 2" ? "WKND 2" : bus.route}
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--apple-label-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     To {bus.destination}
                   </div>
-                  <div style={{ fontSize: '10.5px', color: 'rgba(235, 235, 245, 0.6)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {bus.next_stop} • {bus.occupancy}
                   </div>
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{bus.eta_mins}m</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--apple-label-primary)' }}>{bus.eta_mins}m</span>
               </div>
             </div>
           ))
@@ -230,12 +232,12 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
       <div style={{
         marginTop: '12px',
         paddingTop: '10px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        borderTop: '1px solid var(--apple-border-subtle)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <span style={{ fontSize: '11px', color: 'rgba(235, 235, 245, 0.6)' }}>Embed in Canvas</span>
+        <span style={{ fontSize: '11px', color: 'var(--apple-label-secondary)' }}>Embed in Canvas</span>
         <button
           onClick={copyEmbedCode}
           className="apple-btn-secondary"

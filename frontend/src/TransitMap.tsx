@@ -7,18 +7,11 @@ import {
   ExternalLink,
   X,
   MapPin,
-  ChevronRight,
-  ChevronLeft,
-  List,
   Clock,
-  Footprints,
-  Bike,
-  Car,
-  Bus as BusIcon,
-  Loader2
+  GraduationCap
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
-import { fetchLiveRoute, type LiveRouteResult, type RouteStep } from './routingService';
+import { fetchLiveRoute, type LiveRouteResult } from './routingService';
 import {
   findNearestBusStop,
   resolveLocationCoords,
@@ -26,9 +19,11 @@ import {
   getRouteColorInfo,
   getStopShortCode,
   getStopsForRoute,
+  getRouteSegmentStops,
   RUTGERS_BUS_STOPS,
   type BusStop
 } from './transitDirectory';
+import type { ClassItem, UpcomingClassResult } from './calendarSync';
 
 export interface TransitMapProps {
   buses: any[];
@@ -43,6 +38,11 @@ export interface TransitMapProps {
   onSelectRoute?: (route: any) => void;
   planResult?: any;
   googleMapsApiKey?: string;
+  appTheme?: 'dark' | 'light';
+  onSwitchToRoutes?: () => void;
+  classes?: ClassItem[];
+  upcomingClassInfo?: UpcomingClassResult;
+  onAutoRouteToNextClass?: () => void;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -64,7 +64,27 @@ export const getCampusKey = (campusName: string): string => {
 };
 
 // Fallback path coordinates connecting campuses along Rutgers transit highways
-export const getFallbackRouteGeometry = (origin: string, dest: string, isBike: boolean = false): [number, number][] => {
+export const getFallbackRouteGeometry = (
+  origin: string,
+  dest: string,
+  isBike: boolean = false,
+  boardingStop?: BusStop,
+  dropoffStop?: BusStop,
+  routeName?: string
+): [number, number][] => {
+  if (boardingStop && dropoffStop) {
+    const segmentStops = getRouteSegmentStops(routeName, boardingStop.name, dropoffStop.name);
+    if (segmentStops.length >= 2) {
+      return segmentStops.map(s => [s.lat, s.lon] as [number, number]);
+    }
+    if (boardingStop.lat !== dropoffStop.lat || boardingStop.lon !== dropoffStop.lon) {
+      return [
+        [boardingStop.lat, boardingStop.lon],
+        [dropoffStop.lat, dropoffStop.lon]
+      ];
+    }
+  }
+
   const o = getCampusKey(origin);
   const d = getCampusKey(dest);
 
@@ -158,7 +178,12 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   onClearSelectedRoute,
   onSelectRoute,
   planResult,
-  googleMapsApiKey
+  googleMapsApiKey,
+  appTheme = 'dark',
+  onSwitchToRoutes,
+  classes: _classes = [],
+  upcomingClassInfo,
+  onAutoRouteToNextClass
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -166,16 +191,19 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // Map Provider Themes: Google Maps Dark (default), Google Maps Standard, Google Satellite
-  const [mapTheme, setMapTheme] = useState<'google-dark' | 'google-standard' | 'google-satellite'>('google-dark');
-  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
-  const [showStepsDrawer, setShowStepsDrawer] = useState<boolean>(false);
-  const prevRouteNameRef = useRef<string | null>(null);
-  const prevRouteFitKeyRef = useRef<string | null>(null);
+  // Map Provider Themes: Google Maps Dark (default in dark mode), Google Maps Standard (default in light mode), Google Satellite
+  const [mapTheme, setMapTheme] = useState<'google-dark' | 'google-standard' | 'google-satellite'>(
+    appTheme === 'light' ? 'google-standard' : 'google-dark'
+  );
 
+  // Automatically sync map style when app theme toggles
+  useEffect(() => {
+    setMapTheme(appTheme === 'light' ? 'google-standard' : 'google-dark');
+  }, [appTheme]);
+
+  const prevRouteFitKeyRef = useRef<string | null>(null);
   // Live real-time road route fetched via Google Maps API or free OSRM engine
   const [liveRoute, setLiveRoute] = useState<LiveRouteResult | null>(null);
-  const [isRoutingLoading, setIsRoutingLoading] = useState<boolean>(false);
   const [currentZoom, setCurrentZoom] = useState<number>(13);
   const currentZoomThreshold = 14.5;
   const isZoomedOut = currentZoom < currentZoomThreshold;
@@ -192,7 +220,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
   // Geodesic distance minimization against all candidate stops served by the route
   const boardingStop: BusStop = React.useMemo(() => {
-    return findNearestBusStop(origTarget, originCampus, selectedRoute?.name);
+    return findNearestBusStop(origTarget, origTarget.campus || originCampus, selectedRoute?.name);
   }, [origTarget, originCampus, selectedRoute?.name]);
 
   const dropoffStop: BusStop = React.useMemo(() => {
@@ -205,17 +233,22 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     return getStopsForRoute(selectedRoute.name);
   }, [selectedRoute?.name]);
 
+  // Stops strictly on the active journey segment between boarding and drop-off
+  const routeSegmentStops = React.useMemo(() => {
+    if (!selectedRoute?.name) return [];
+    return getRouteSegmentStops(selectedRoute.name, boardingStop.name, dropoffStop.name);
+  }, [selectedRoute?.name, boardingStop.name, dropoffStop.name]);
+
+  const isBike = React.useMemo(() => {
+    return (selectedRoute?.type || '').toLowerCase().includes('bike') ||
+      (selectedRoute?.name || '').toLowerCase().includes('bike') ||
+      (selectedRoute?.name || '').toLowerCase().includes('scooter');
+  }, [selectedRoute]);
+
   const walkDistMeters = React.useMemo(() => {
     return getHaversineDistanceMeters(dropoffStop.lat, dropoffStop.lon, destTarget.lat, destTarget.lon);
   }, [dropoffStop, destTarget]);
 
-  const walkMins = Math.max(1, Math.round(walkDistMeters / 80));
-
-  if (selectedRoute?.name !== prevRouteNameRef.current) {
-    prevRouteNameRef.current = selectedRoute?.name || null;
-    if (currentStepIndex !== 0) setCurrentStepIndex(0);
-    if (showStepsDrawer) setShowStepsDrawer(false);
-  }
 
   // Global click delegate for Leaflet HTML popups
   useEffect(() => {
@@ -243,7 +276,6 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       (selectedRoute.name || '').toLowerCase().includes('escort');
     const mode = isBike ? 'bike' : isCar ? 'car' : 'bus';
 
-    setIsRoutingLoading(true);
     // Route directly between the dynamically calculated bus stops (e.g. into College Ave Student Center Stop)
     fetchLiveRoute(boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon, mode, selectedRoute.name)
       .then((res) => {
@@ -251,67 +283,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       })
       .catch((err) => {
         console.warn("Failed to fetch live route:", err);
-      })
-      .finally(() => {
-        setIsRoutingLoading(false);
       });
   }, [selectedRoute, boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon]);
 
-  const effectiveDurationMinutes = liveRoute?.durationMinutes || selectedRoute?.estimated_minutes || 16;
+  const effectiveDurationMinutes = selectedRoute?.estimated_minutes || liveRoute?.durationMinutes || 16;
   const effectiveDistanceMiles = liveRoute?.distanceMiles || 2.4;
-
-  // Ultra-intuitive Apple transit steps showing board, ride, dropoff, and walk
-  const steps: RouteStep[] = React.useMemo(() => {
-    if (!selectedRoute) return [];
-
-    const list: RouteStep[] = [
-      {
-        instruction: `Board ${selectedRoute.name} at ${boardingStop.name}`,
-        subText: `Departing from ${originCampus} • Near ${origTarget.name}`,
-        distance: '0.1 mi',
-        duration: '2 min',
-        iconType: 'bus',
-        distanceMeters: 160,
-        durationSeconds: 120
-      },
-      {
-        instruction: `Ride to ${dropoffStop.name}`,
-        subText: `Direct express transit along Route 18 into College Ave`,
-        distance: `${effectiveDistanceMiles} mi`,
-        duration: `${effectiveDurationMinutes} min`,
-        iconType: 'bus',
-        distanceMeters: Math.round(effectiveDistanceMiles * 1609),
-        durationSeconds: effectiveDurationMinutes * 60
-      },
-      {
-        instruction: `Alight at ${dropoffStop.name}`,
-        subText: walkDistMeters > 35 && destTarget.name !== dropoffStop.name
-          ? `Alight bus and proceed on foot to ${destTarget.name}`
-          : `Arrive at destination (${destTarget.name})`,
-        distance: 'Arrival',
-        duration: '1 min',
-        iconType: 'destination',
-        distanceMeters: 0,
-        durationSeconds: 60
-      }
-    ];
-
-    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
-      list.push({
-        instruction: `Walk to ${destTarget.name}`,
-        subText: `${Math.round(walkDistMeters * 3.28084)} ft • Approx ${walkMins} min walk from stop`,
-        distance: `${(walkDistMeters / 1609.34).toFixed(1)} mi`,
-        duration: `${walkMins} min`,
-        iconType: 'walk',
-        distanceMeters: walkDistMeters,
-        durationSeconds: walkMins * 60
-      });
-    }
-
-    return list;
-  }, [selectedRoute, boardingStop, dropoffStop, origTarget, destTarget, walkDistMeters, walkMins, effectiveDistanceMiles, effectiveDurationMinutes, originCampus]);
-
-  const currentStep = steps[currentStepIndex] || steps[0];
 
   // Helper to create Google Maps tile layer
   const createGoogleTileLayer = (theme: typeof mapTheme) => {
@@ -370,7 +346,26 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     routeLayerRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
+    // Responsive: Invalidate map bounds on container resize (mobile tab changes / orientation changes)
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
+    const onWindowResize = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener('resize', onWindowResize);
+
     return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', onWindowResize);
       map.off('zoomend', onZoom);
       map.off('zoom', onZoom);
       map.remove();
@@ -401,13 +396,21 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
     markersGroup.clearLayers();
 
-    // 1. When Zoomed Out (< 14.75): HIDE inner locations and ONLY show overall campus names
-    if (isZoomedOut) {
+    const isLight = appTheme === 'light';
+    const markerBg = isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(28, 28, 30, 0.94)';
+    const textPrimary = isLight ? '#0F172A' : '#FFFFFF';
+    const textSecondary = isLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
+    const shadowColor = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.65)';
+    const destAccent = isLight ? '#0A84FF' : '#FF375F';
+
+    // 1. When Zoomed Out (< 14.5) AND no specific route is active: show overall campus names overview
+    const showCampusOverview = !selectedRoute && isZoomedOut;
+    if (showCampusOverview) {
       Object.entries(CAMPUS_COORDINATES).forEach(([key, info]) => {
         const isOrigin = getCampusKey(originCampus) === key;
         const isDest = getCampusKey(destCampus) === key;
 
-        const badgeColor = isOrigin ? '#30D158' : isDest ? '#FF375F' : '#0A84FF';
+        const badgeColor = isOrigin ? '#30D158' : isDest ? destAccent : '#0A84FF';
         const label = isOrigin ? 'START' : isDest ? 'DEST' : 'CAMPUS';
 
         const campusIcon = L.divIcon({
@@ -418,11 +421,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 6px;
               padding: 5px 12px;
-              background: rgba(28, 28, 30, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid ${isOrigin || isDest ? badgeColor : 'rgba(255,255,255,0.2)'};
-              box-shadow: 0 4px 18px rgba(0,0,0,0.65), 0 0 14px ${isOrigin || isDest ? badgeColor + '77' : 'transparent'};
+              border: 1.5px solid ${isOrigin || isDest ? badgeColor : (isLight ? 'rgba(15,23,42,0.14)' : 'rgba(255,255,255,0.2)')};
+              box-shadow: 0 4px 18px ${shadowColor}, 0 0 14px ${isOrigin || isDest ? badgeColor + '77' : 'transparent'};
               border-radius: 9999px;
               cursor: pointer;
               white-space: nowrap;
@@ -435,7 +438,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 background: ${badgeColor};
                 box-shadow: 0 0 10px ${badgeColor};
               "></span>
-              <span style="font-size: 12.5px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 12.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${key}
               </span>
               ${(isOrigin || isDest) && selectedRoute ? `
@@ -473,11 +476,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 3.5px;
               padding: 2.5px 7px 2.5px 3.5px;
-              background: rgba(20, 20, 22, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
               border: 1.5px solid #30D158;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(48, 209, 88, 0.4);
+              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(48, 209, 88, 0.4);
               border-radius: 9999px;
               cursor: pointer;
               transform: translate(-50%, -50%);
@@ -495,7 +498,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 color: #000;
                 font-weight: 900;
               ">▲</span>
-              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${boardingCode}
               </span>
             </div>
@@ -523,11 +526,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
               align-items: center;
               gap: 3.5px;
               padding: 2.5px 7px 2.5px 3.5px;
-              background: rgba(20, 20, 22, 0.94);
+              background: ${markerBg};
               backdrop-filter: blur(20px);
               -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid #FF375F;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(255, 55, 95, 0.4);
+              border: 1.5px solid ${destAccent};
+              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px ${destAccent}66;
               border-radius: 9999px;
               cursor: pointer;
               transform: translate(-50%, -50%);
@@ -537,7 +540,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 width: 17px;
                 height: 17px;
                 border-radius: 50%;
-                background: #FF375F;
+                background: ${destAccent};
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
@@ -545,7 +548,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 color: #fff;
                 font-weight: 900;
               ">▼</span>
-              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                 ${dropoffCode}
               </span>
             </div>
@@ -556,7 +559,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
         const dMarker = L.marker([dropoffStop.lat, dropoffStop.lon], { icon: dropoffIcon });
         dMarker.bindPopup(`
           <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
-            <div style="font-size: 12.5px; font-weight: 700; color: #FF375F;">🔴 Drop-off Stop</div>
+            <div style="font-size: 12.5px; font-weight: 700; color: ${destAccent};">📍 Drop-off Stop</div>
             <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${dropoffStop.name}</div>
             <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${dropoffStop.campus} Campus</div>
           </div>
@@ -567,6 +570,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
         routeStops.forEach((st) => {
           if (st.name === boardingStop.name || st.name === dropoffStop.name) return;
           const code = getStopShortCode(st.name);
+          const isOnSegment = routeSegmentStops.some(s => s.name.toLowerCase() === st.name.toLowerCase());
 
           const stopGlyphIcon = L.divIcon({
             className: 'apple-stop-glyph-marker',
@@ -576,17 +580,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 3px;
                 padding: 2.5px 6px;
-                background: rgba(28, 28, 30, 0.92);
+                background: ${markerBg};
                 backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.22);
+                border: ${isOnSegment ? '1.5px solid #0A84FF' : (isLight ? '1px solid rgba(15, 23, 42, 0.14)' : '1px solid rgba(255, 255, 255, 0.22)')};
                 border-radius: 9999px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                box-shadow: ${isOnSegment ? `0 2px 10px rgba(10, 132, 255, 0.4), 0 2px 8px ${shadowColor}` : `0 2px 8px ${shadowColor}`};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.85); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9.5px; font-weight: ${isOnSegment ? '700' : '600'}; color: ${isOnSegment ? '#0A84FF' : textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -635,15 +639,15 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 4px;
                 padding: 2.5px 7px;
-                background: rgba(28, 28, 30, 0.94);
+                background: ${markerBg};
                 border: 1.5px solid #0A84FF;
                 border-radius: 9999px;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+                box-shadow: 0 4px 14px ${shadowColor};
                 white-space: nowrap;
                 transform: translate(-50%, -50%);
               ">
                 <span style="font-size: 10px;">🏁</span>
-                <span style="font-size: 10.5px; font-weight: 700; color: #fff; font-family: -apple-system, sans-serif;">
+                <span style="font-size: 10.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, sans-serif;">
                   ${destCode}
                 </span>
               </div>
@@ -674,17 +678,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 2.5px;
                 padding: 2px 5.5px;
-                background: rgba(28, 28, 30, 0.88);
+                background: ${markerBg};
                 backdrop-filter: blur(14px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.2)'};
                 border-radius: 9999px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+                box-shadow: 0 2px 6px ${shadowColor};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 8.5px;">🚏</span>
-                <span style="font-size: 9px; font-weight: 600; color: rgba(235, 235, 245, 0.85); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -734,17 +738,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 align-items: center;
                 gap: 3px;
                 padding: 2.5px 6px;
-                background: rgba(28, 28, 30, 0.92);
+                background: ${markerBg};
                 backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.22);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.14)' : 'rgba(255, 255, 255, 0.22)'};
                 border-radius: 9999px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                box-shadow: 0 2px 8px ${shadowColor};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
                 <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.9); font-family: -apple-system, sans-serif;">
+                <span style="font-size: 9.5px; font-weight: 600; color: ${textSecondary}; font-family: -apple-system, sans-serif;">
                   ${code}
                 </span>
               </div>
@@ -828,7 +832,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       `);
       markersGroup.addLayer(marker);
     });
-  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, walkDistMeters, routeStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
+  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
 
   // Handle Route Navigation Layer with Real Road Geometry & Walking Connectors
   useEffect(() => {
@@ -847,7 +851,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     // Use actual road coordinates from live routing engine if loaded, else fallback
     const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
       ? liveRoute.coordinates
-      : getFallbackRouteGeometry(originCampus, destCampus, isBike);
+      : getFallbackRouteGeometry(originCampus, destCampus, isBike, boardingStop, dropoffStop, selectedRoute?.name);
 
     // Glowing navigation route line (transitstat.us route color or bike green)
     const routeColor = isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
@@ -875,8 +879,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     routeGroup.addLayer(corePolyline);
 
     // If destination building is a separate walk from the drop-off bus stop, render dotted walking line
-    // HIDE inner walking line when zoomed out!
-    if (!isZoomedOut && walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
       const walkPolyline = L.polyline([
         [dropoffStop.lat, dropoffStop.lon],
         [destTarget.lat, destTarget.lon]
@@ -934,41 +937,52 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     const travelerMarker = L.marker([midCoord[0], midCoord[1]], { icon: travelerIcon });
     routeGroup.addLayer(travelerMarker);
 
-    // Animate bounds to smoothly fit the real road coordinates when route or destination changes
-    const routeFitKey = `${selectedRoute?.name}_${originCampus}_${destCampus}_${destTarget.name}`;
+    // Animate bounds to smoothly fit the entire route path and its stops
+    const liveCoordCount = liveRoute?.coordinates?.length || 0;
+    const routeFitKey = `${selectedRoute?.name}_${originCampus}_${destCampus}_${boardingStop?.name}_${dropoffStop?.name}_${destTarget.name}_${origTarget.name}_${liveCoordCount}_${pathCoords.length}`;
     if (prevRouteFitKeyRef.current !== routeFitKey) {
       prevRouteFitKeyRef.current = routeFitKey;
       const bounds = L.latLngBounds(pathCoords);
-      if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
-        bounds.extend([destTarget.lat, destTarget.lon]);
-      }
-      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16, animate: true, duration: 0.8 });
+      bounds.extend([boardingStop.lat, boardingStop.lon]);
+      bounds.extend([dropoffStop.lat, dropoffStop.lon]);
+      bounds.extend([origTarget.lat, origTarget.lon]);
+      bounds.extend([destTarget.lat, destTarget.lon]);
+      routeSegmentStops.forEach((st) => bounds.extend([st.lat, st.lon]));
+
+      const isMobile = window.innerWidth <= 768;
+      const paddingOptions = isMobile
+        ? {
+          paddingTopLeft: [24, 95] as [number, number],
+          paddingBottomRight: [24, 110] as [number, number]
+        }
+        : {
+          paddingTopLeft: [50, 70] as [number, number],
+          paddingBottomRight: [50, 80] as [number, number]
+        };
+
+      map.fitBounds(bounds, {
+        ...paddingOptions,
+        maxZoom: 17,
+        animate: true,
+        duration: 0.8
+      });
     }
-  }, [selectedRoute, liveRoute, originCampus, destCampus, dropoffStop, destTarget, walkDistMeters, isZoomedOut]);
+  }, [
+    selectedRoute,
+    liveRoute,
+    originCampus,
+    destCampus,
+    boardingStop,
+    dropoffStop,
+    origTarget,
+    destTarget,
+    routeSegmentStops,
+    walkDistMeters,
+    isBike
+  ]);
 
   // Deep links to Google Maps directly between the dynamic transit stops
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${boardingStop.lat},${boardingStop.lon}&destination=${dropoffStop.lat},${dropoffStop.lon}&travelmode=transit`;
-
-  // Render Maneuver Icon
-  const renderManeuverIcon = (type: RouteStep['iconType']) => {
-    switch (type) {
-      case 'walk':
-        return <Footprints size={19} />;
-      case 'bike':
-        return <Bike size={19} />;
-      case 'car':
-        return <Car size={19} />;
-      case 'destination':
-        return <MapPin size={19} />;
-      case 'turn-left':
-        return <Navigation size={19} style={{ transform: 'rotate(-45deg)' }} />;
-      case 'turn-right':
-        return <Navigation size={19} style={{ transform: 'rotate(45deg)' }} />;
-      case 'bus':
-      default:
-        return <BusIcon size={19} />;
-    }
-  };
 
   return (
     <div style={{
@@ -986,360 +1000,154 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       {/* Map Canvas */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
-      {/* ========================================================
-          TOP FLOATING GOOGLE MAPS NAVIGATION HEADER
-          (Triggered when routing option is selected)
-          ======================================================== */}
-      {selectedRoute ? (
+      {/* Top HUD: Auto-Select Route to Next Class (Only shown once a calendar/schedule is connected) */}
+      {!selectedRoute && upcomingClassInfo?.nextClass && (
         <div style={{
           position: 'absolute',
           top: '12px',
           left: '12px',
           right: '12px',
           zIndex: 1000,
-          background: 'rgba(20, 20, 22, 0.94)',
-          backdropFilter: 'blur(30px) saturate(190%)',
-          WebkitBackdropFilter: 'blur(30px) saturate(190%)',
-          border: '1px solid rgba(255, 255, 255, 0.16)',
-          borderRadius: '16px',
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(26, 115, 232, 0.25)',
-          padding: '12px 16px',
-          animation: 'fadeIn 0.2s ease-in-out'
-        }}>
-          {/* Top Line: Google Maps Badge + Routing Provider Status + Steps & Exit */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* Google Maps Navigation Badge */}
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '3px 10px',
-                borderRadius: '9999px',
-                background: 'rgba(28, 28, 30, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                fontSize: '11px',
-                fontWeight: 700,
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
-              }}>
-                <span>🗺️</span>
-                <span>Google Maps Navigation</span>
-              </div>
-
-              {/* Real Road Routing Provider Indicator */}
-              <span style={{
-                fontSize: '10.5px',
-                padding: '3px 9px',
-                borderRadius: '6px',
-                background: 'rgba(28, 28, 30, 0.92)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: '#fff',
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                {isRoutingLoading ? (
-                  <>
-                    <Loader2 size={10} className="animate-spin" />
-                    Calculating Live Roads...
-                  </>
-                ) : (
-                  <>
-                    <span style={{ color: '#34A853' }}>●</span>
-                    {liveRoute?.provider === 'google' ? 'Google Directions API' : 'Free Live Road GPS'}
-                  </>
-                )}
-              </span>
-            </div>
-
-            {/* Step Counter & Itinerary Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => setShowStepsDrawer(!showStepsDrawer)}
-                className="apple-btn-dark-glass"
-                style={{ fontSize: '11px', padding: '4px 10px', height: '26px', gap: '4px' }}
-              >
-                <List size={12} />
-                <span>{showStepsDrawer ? 'Hide Steps' : `Steps (${steps.length})`}</span>
-              </button>
-
-              <button
-                onClick={onClearSelectedRoute}
-                title="End Navigation"
-                className="apple-btn-dark-glass"
-                style={{ width: '26px', height: '26px', padding: 0, borderRadius: '50%' }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-          </div>
-
-          {/* Maneuver Banner: Maneuver Icon + Current Instruction */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
-              background: '#1A73E8',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              boxShadow: '0 4px 14px rgba(26, 115, 232, 0.4)'
-            }}>
-              {renderManeuverIcon(currentStep?.iconType)}
-            </div>
-
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{
-                fontSize: '14.5px',
-                fontWeight: 700,
-                color: '#fff',
-                lineHeight: 1.25,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {currentStep?.instruction || `Board ${selectedRoute.name}`}
-              </div>
-              <div style={{
-                fontSize: '11.5px',
-                color: 'var(--apple-label-secondary)',
-                marginTop: '2px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {currentStep?.subText || `${originCampus} to ${destCampus} • ${selectedRoute.description}`}
-              </div>
-            </div>
-
-            {/* Step Advance Chevrons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-              <button
-                disabled={currentStepIndex <= 0}
-                onClick={() => setCurrentStepIndex(prev => Math.max(0, prev - 1))}
-                className="apple-btn-dark-glass"
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  padding: 0,
-                  borderRadius: '7px',
-                  opacity: currentStepIndex <= 0 ? 0.35 : 1
-                }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                disabled={currentStepIndex >= steps.length - 1}
-                onClick={() => setCurrentStepIndex(prev => Math.min(steps.length - 1, prev + 1))}
-                className="apple-btn-dark-glass"
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  padding: 0,
-                  borderRadius: '7px',
-                  opacity: currentStepIndex >= steps.length - 1 ? 0.35 : 1
-                }}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive Stop Selection Ribbon for Selected Route */}
-          {routeStops && routeStops.length > 0 && (
-            <div style={{
-              marginTop: '10px',
-              paddingTop: '8px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '10px',
-                fontWeight: 700,
-                color: 'rgba(235, 235, 245, 0.65)',
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase'
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span>Route Stops</span>
-                  <span style={{
-                    background: 'rgba(255, 255, 255, 0.12)',
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    color: '#fff',
-                    fontWeight: 700
-                  }}>
-                    {routeStops.length}
-                  </span>
-                </span>
-                <span style={{ color: '#0A84FF', fontWeight: 600, fontSize: '10px' }}>
-                  Tap stop to route
-                </span>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '6px',
-                overflowX: 'auto',
-                paddingBottom: '2px',
-                scrollbarWidth: 'none',
-                WebkitOverflowScrolling: 'touch'
-              }}>
-                {routeStops.map((st) => {
-                  const isBoarding = st.name === boardingStop.name;
-                  const isDropoff = st.name === dropoffStop.name;
-                  const shortCode = getStopShortCode(st.name);
-
-                  let badgeIcon = '🚏';
-                  let btnBg = 'rgba(255, 255, 255, 0.08)';
-                  let btnBorder = '1px solid rgba(255, 255, 255, 0.12)';
-                  let btnColor = '#ffffff';
-
-                  if (isDropoff) {
-                    badgeIcon = '▼';
-                    btnBg = 'rgba(255, 55, 95, 0.28)';
-                    btnBorder = '1.5px solid #FF375F';
-                    btnColor = '#FF375F';
-                  } else if (isBoarding) {
-                    badgeIcon = '▲';
-                    btnBg = 'rgba(48, 209, 88, 0.28)';
-                    btnBorder = '1.5px solid #30D158';
-                    btnColor = '#30D158';
-                  }
-
-                  return (
-                    <button
-                      key={st.name}
-                      onClick={() => onSelectTargetLocation?.(st.name)}
-                      title={`${st.name} (${st.campus} Campus) - Tap to route`}
-                      className="apple-btn-dark-glass"
-                      style={{
-                        padding: '4px 9px',
-                        fontSize: '11px',
-                        fontWeight: (isBoarding || isDropoff) ? 700 : 500,
-                        borderRadius: '9999px',
-                        flexShrink: 0,
-                        gap: '5px',
-                        background: btnBg,
-                        border: btnBorder,
-                        color: btnColor,
-                        transition: 'all 0.15s ease',
-                        boxShadow: isDropoff ? '0 0 10px rgba(255, 55, 95, 0.35)' : isBoarding ? '0 0 10px rgba(48, 209, 88, 0.35)' : 'none'
-                      }}
-                    >
-                      <span style={{ fontSize: '10px' }}>{badgeIcon}</span>
-                      <span>{shortCode}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Expandable Step-by-Step Itinerary Sheet */}
-          {showStepsDrawer && (
-            <div style={{
-              marginTop: '10px',
-              paddingTop: '10px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              maxHeight: '220px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              {steps.map((st, idx) => {
-                const isCurrent = idx === currentStepIndex;
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => setCurrentStepIndex(idx)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '9px',
-                      padding: '6px 9px',
-                      borderRadius: '8px',
-                      background: isCurrent ? 'rgba(26, 115, 232, 0.22)' : 'rgba(28, 28, 30, 0.75)',
-                      border: isCurrent ? '1px solid rgba(26, 115, 232, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '6px',
-                      background: isCurrent ? '#1A73E8' : 'rgba(255, 255, 255, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#fff',
-                      flexShrink: 0
-                    }}>
-                      {renderManeuverIcon(st.iconType)}
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '11.5px', fontWeight: isCurrent ? 700 : 500, color: '#fff' }}>
-                        {st.instruction}
-                      </div>
-                      <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                        {st.subText}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)', flexShrink: 0 }}>
-                      {st.distance} ({st.duration})
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Top HUD when idle / viewing corridor */
-        <div style={{
-          position: 'absolute',
-          top: '12px',
-          left: '12px',
-          right: '12px',
-          zIndex: 1000,
-          background: 'rgba(28, 28, 30, 0.92)',
+          background: 'var(--apple-glass-overlay)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: '14px',
-          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
-          padding: '8px 14px',
+          border: '1px solid var(--apple-border)',
+          borderRadius: '16px',
+          boxShadow: 'var(--apple-shadow-md)',
+          padding: '9px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
           pointerEvents: 'auto'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px' }}>🗺️</span>
-            <div>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#fff' }}>
-                Google Maps • Rutgers Transit Corridor
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 230px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '11px',
+              background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.22), rgba(10, 132, 255, 0.22))',
+              border: '1px solid var(--apple-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <GraduationCap size={18} color={appTheme === 'light' ? '#CC0033' : '#FF375F'} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '1px' }}>
+                <span style={{
+                  fontSize: '9.5px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: appTheme === 'light' ? '#CC0033' : '#FF375F'
+                }}>
+                  {upcomingClassInfo.dayLabel} Next Class
+                </span>
+                {upcomingClassInfo.minutesUntil !== null && (
+                  <span style={{
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    background: upcomingClassInfo.minutesUntil <= 30 ? 'rgba(255, 59, 48, 0.18)' : 'rgba(48, 209, 88, 0.18)',
+                    color: upcomingClassInfo.minutesUntil <= 30 ? '#FF3B30' : '#30D158'
+                  }}>
+                    {upcomingClassInfo.minutesUntil <= 0 ? 'Starting now' : `in ${upcomingClassInfo.minutesUntil}m`}
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
-                Select any route on the left to start live Google Maps turn-by-turn navigation
+              <div style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--apple-glass-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {upcomingClassInfo.nextClass.course}
+              </div>
+              <div style={{
+                fontSize: '10.5px',
+                color: 'var(--apple-label-secondary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {upcomingClassInfo.nextClass.location === '(Online)' || upcomingClassInfo.nextClass.campus === '(Online)' ? (
+                  <span>💻 (Online Class) • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
+                ) : (
+                  <span>📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
+                )}
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10.5px', color: '#34A853', fontWeight: 700 }}>
-              ● {buses.length} Active Rutgers Buses
-            </span>
+
+          {/* Action Button: Auto-Select Route to Next Class OR Join Zoom */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {upcomingClassInfo.nextClass.zoom_link ? (
+              <a
+                href={upcomingClassInfo.nextClass.zoom_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apple-btn-primary"
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  borderRadius: '9999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(11, 132, 254, 0.35)',
+                  border: 'none',
+                  textDecoration: 'none'
+                }}
+                title="Open Zoom video conference in new tab"
+              >
+                📹 Join Zoom
+              </a>
+            ) : upcomingClassInfo.nextClass.location !== '(Online)' && upcomingClassInfo.nextClass.campus !== '(Online)' ? (
+              <button
+                onClick={onAutoRouteToNextClass}
+                className="apple-btn-primary"
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  borderRadius: '9999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
+                  border: 'none'
+                }}
+                title="Auto-select transit route directly to this class"
+              >
+                <Navigation size={13} />
+                <span>Route to Class</span>
+              </button>
+            ) : (
+              <span style={{
+                padding: '6px 12px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '9999px',
+                background: 'var(--apple-card-bg-inset)',
+                color: 'var(--apple-label-secondary)'
+              }}>
+                💻 Online
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -1349,7 +1157,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           ======================================================== */}
       <div style={{
         position: 'absolute',
-        bottom: '12px',
+        bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
         left: '12px',
         right: '12px',
         zIndex: 1000,
@@ -1366,17 +1174,17 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: 'rgba(28, 28, 30, 0.94)',
+            background: 'var(--apple-glass-overlay)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
+            border: '1px solid var(--apple-border)',
             borderRadius: '14px',
             padding: '7px 14px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--apple-glass-text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
                 ~{effectiveDurationMinutes} min
               </div>
               <div style={{ fontSize: '10px', color: 'var(--apple-label-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1413,13 +1221,13 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            background: 'rgba(28, 28, 30, 0.92)',
+            background: 'var(--apple-glass-overlay)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             padding: '4px 6px',
             borderRadius: '9999px',
-            border: '1px solid rgba(255, 255, 255, 0.14)',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
+            border: '1px solid var(--apple-border)',
+            boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
             {["Busch", "Livingston", "College Ave", "Cook"].map((camp) => (
@@ -1433,7 +1241,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                   }
                 }}
                 className="apple-segment-btn"
-                style={{ padding: '3px 9px', fontSize: '11px', height: '24px', color: '#fff' }}
+                style={{ padding: '3px 9px', fontSize: '11px', height: '24px', color: 'var(--apple-glass-text)' }}
               >
                 {camp}
               </button>
@@ -1448,6 +1256,18 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           gap: '6px',
           pointerEvents: 'auto'
         }}>
+          {/* Quick toggle to Routes & Schedule view on mobile */}
+          {onSwitchToRoutes && (
+            <button
+              onClick={onSwitchToRoutes}
+              className="apple-btn-dark-glass"
+              style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
+              title="Open Directions & Schedule"
+            >
+              <span>📋 Routes</span>
+            </button>
+          )}
+
           {/* Quick Route Switcher if planResult is present and idle */}
           {planResult && planResult.routes && onSelectRoute && !selectedRoute && (
             <button
@@ -1469,9 +1289,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
             title="Switch Google Maps Style"
           >
-            <Layers size={13} color="#FFFFFF" />
+            <Layers size={13} color={appTheme === 'light' ? '#0A84FF' : '#FFFFFF'} />
             <span>
-              {mapTheme === 'google-dark' ? 'Google Dark' : mapTheme === 'google-standard' ? 'Google Road' : 'Google Satellite'}
+              {mapTheme === 'google-dark' ? 'Google Dark' : mapTheme === 'google-standard' ? 'Google Light' : 'Google Satellite'}
             </span>
           </button>
 
@@ -1484,9 +1304,9 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px', textDecoration: 'none' }}
             title="Open transit directions in Google Maps app"
           >
-            <MapPin size={13} color="#EA4335" />
+            <MapPin size={13} color={appTheme === 'light' ? '#0A84FF' : '#EA4335'} />
             <span>Google Maps</span>
-            <ExternalLink size={10} style={{ opacity: 0.7 }} />
+            <ExternalLink size={10} color={appTheme === 'light' ? '#0A84FF' : 'currentColor'} style={{ opacity: 0.7 }} />
           </a>
         </div>
       </div>

@@ -577,3 +577,32 @@ export function getStopsForRoute(routeName: string): BusStop[] {
   }
   return RUTGERS_BUS_STOPS.filter(s => s.routes.some(r => norm.includes(r.toLowerCase()) || r.toLowerCase().includes(norm)));
 }
+
+/**
+ * Returns all stops on a given route strictly between the boarding stop and drop-off stop
+ */
+export function getRouteSegmentStops(
+  routeName?: string,
+  boardingStopName?: string,
+  dropoffStopName?: string
+): BusStop[] {
+  if (!routeName) return [];
+  const allStops = getStopsForRoute(routeName);
+  if (allStops.length === 0) return [];
+  if (!boardingStopName || !dropoffStopName) return allStops;
+
+  const bNorm = boardingStopName.toLowerCase();
+  const dNorm = dropoffStopName.toLowerCase();
+
+  const idx1 = allStops.findIndex(s => s.name.toLowerCase().includes(bNorm) || bNorm.includes(s.name.toLowerCase()));
+  const idx2 = allStops.findIndex(s => s.name.toLowerCase().includes(dNorm) || dNorm.includes(s.name.toLowerCase()));
+
+  if (idx1 === -1 || idx2 === -1) return allStops;
+
+  if (idx1 <= idx2) {
+    return allStops.slice(idx1, idx2 + 1);
+  } else {
+    // Loop route wrapping around
+    return [...allStops.slice(idx1), ...allStops.slice(0, idx2 + 1)];
+  }
+}
