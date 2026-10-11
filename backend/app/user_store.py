@@ -1,7 +1,8 @@
 import json;
 import os;
 
-USERS_NAME = "users.json"
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+USERS_NAME = os.path.join(BACKEND_DIR, "users.json")
 
 #checks if the user file area exists or not, (account exists or not)
 def load_users():

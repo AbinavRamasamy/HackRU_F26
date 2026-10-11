@@ -2,9 +2,11 @@
 import json;
 import os;
 import hashlib;
-from app.schedule_parser import parse_schedule_with_gemini
-from app.ics_parser import parse_ics_schedule
+#from app.schedule_parser import parse_schedule_with_gemini
+#from app.ics_parser import parse_ics_schedule
 from app.user_store import load_users, save_users
+from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
+
 
 #creates user, password, and prefrences
 def sign_up(users):
@@ -31,16 +33,16 @@ def sign_up(users):
             break
 
     Hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    speed_options = ["Mosey", "Wander", "Stroll", "Dash", "Zoom"]
+    speed_labels = list(SPEED_OPTIONS.keys())
     while True:
         print("Choose a walking speed:")
-        for i in range(len(speed_options)):
-            print(i + 1, "-", speed_options[i])
+        for i in range(len(SPEED_OPTIONS)):
+            print(i + 1, "-", speed_labels[i])
         choice = input("Enter a number (1-5): ")
-        if choice.isdigit() and  1 <= int(choice) <= len(speed_options):
+        if choice.isdigit() and  1 <= int(choice) <= len(SPEED_OPTIONS):
             break
         print("Please enter a value from 1-5: ")
-    walking_speed = speed_options[int(choice) - 1]
+    walking_speed = speed_labels[int(choice) - 1]
 
     while(True):
         prefer_walking = input("Do you prefer to walk? (yes/no): ").strip().lower()
@@ -48,17 +50,16 @@ def sign_up(users):
             break
         else:
             print("Please enter yes or no:")
-
-    distance_options = [ "Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "A Mile or More"]
+    distance_labels = list(DISTANCE_OPTIONS.keys())
     while(True):
         print("How far are you willing to walk: ")
-        for i in range(len(distance_options)):
-            print(i + 1, "-", distance_options[i])
+        for i in range(len(DISTANCE_OPTIONS)):
+            print(i + 1, "-", distance_labels[i])
         choice = input("Enter a number (1-4): ")
-        if choice.isdigit() and 1 <= int(choice) <= len(distance_options):
+        if choice.isdigit() and 1 <= int(choice) <= len(DISTANCE_OPTIONS):
             break
         print("Please enter a value from 1-4: ")
-    max_walking_distance = distance_options[int(choice) - 1]
+    max_walking_distance = distance_labels[int(choice) - 1]
 
     while(True):
         avoid_bad_weather = input("Do you want to avoid bad weather(rain,snow, etc.)? (yes/no): ").strip().lower()
@@ -73,6 +74,7 @@ def sign_up(users):
     users[username]["max_walking_distance"] = max_walking_distance
     users[username]["avoid_bad_weather"] = avoid_bad_weather == "yes"
     users[username]["password"] = Hashed_password
+    users[username]["classes"] = []
 
     save_users(users)
     print("New account created! Welcome,", username)
@@ -81,5 +83,6 @@ def sign_up(users):
 
 
 #runs program
-users = load_users()
-sign_up(users)
+if __name__ == "__main__":
+    users = load_users()
+    sign_up(users)

@@ -13,7 +13,8 @@ def normalize_campus(campus: str) -> str:
         return "Cook/Douglass"
     return campus.strip()
 
-def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str] = None,
+                       walking_speed_mph: float = 3.0, max_walk_miles: Optional[float] = None) -> List[Dict[str, Any]]:
     origin = normalize_campus(origin_raw)
     dest = normalize_campus(dest_raw)
     is_weekend = datetime.now().weekday() >= 5
@@ -35,6 +36,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 "name": "Campus Pedestrian Walk",
                 "type": "Walking Path",
                 "estimated_minutes": 6,
+                "walk_miles": 0.3,
                 "rush_hour_minutes": 8,
                 "badge": "Direct Walk",
                 "description": f"Direct pedestrian walk between buildings on {origin}. No bus wait required."
@@ -93,6 +95,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walk via Landing Lane Bridge",
                     "type": "Walking Path",
                     "estimated_minutes": 32,
+                    "walk_miles": 1.6,
                     "rush_hour_minutes": 32,
                     "badge": "Pedestrian",
                     "description": "Paved scenic sidewalk route across the Raritan River via Landing Lane into College Ave."
@@ -136,6 +139,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walk via Landing Lane Bridge",
                     "type": "Walking Path",
                     "estimated_minutes": 32,
+                    "walk_miles": 1.6,
                     "rush_hour_minutes": 32,
                     "badge": "Pedestrian",
                     "description": "Direct pedestrian walk crossing Landing Lane into College Ave."
@@ -181,6 +185,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walk via Landing Lane Bridge",
                     "type": "Walking Path",
                     "estimated_minutes": 32,
+                    "walk_miles": 1.6,
                     "rush_hour_minutes": 32,
                     "badge": "Pedestrian",
                     "description": "Sidewalk route from College Ave across Landing Lane Bridge to Busch."
@@ -224,6 +229,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walk via Landing Lane Bridge",
                     "type": "Walking Path",
                     "estimated_minutes": 32,
+                    "walk_miles": 1.6,
                     "rush_hour_minutes": 32,
                     "badge": "Pedestrian",
                     "description": "Sidewalk route across Landing Lane Bridge."
@@ -253,6 +259,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via Cedar Lane",
                     "type": "Walking Path",
                     "estimated_minutes": 20,
+                    "walk_miles": 1.0,
                     "rush_hour_minutes": 20,
                     "badge": "Pedestrian",
                     "description": "Direct flat 1-mile sidewalk between Busch and Livingston campus centers."
@@ -288,6 +295,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via Cedar Lane",
                     "type": "Walking Path",
                     "estimated_minutes": 20,
+                    "walk_miles": 1.0,
                     "rush_hour_minutes": 20,
                     "badge": "Pedestrian",
                     "description": "Straightforward 1-mile pedestrian sidewalk connecting Busch and Livingston."
@@ -325,6 +333,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via Cedar Lane",
                     "type": "Walking Path",
                     "estimated_minutes": 20,
+                    "walk_miles": 1.0,
                     "rush_hour_minutes": 20,
                     "badge": "Pedestrian",
                     "description": "Direct 1-mile pedestrian sidewalk from Livingston into Busch."
@@ -360,6 +369,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via Cedar Lane",
                     "type": "Walking Path",
                     "estimated_minutes": 20,
+                    "walk_miles": 1.0,
                     "rush_hour_minutes": 20,
                     "badge": "Pedestrian",
                     "description": "Safe sidewalk connection between Livingston and Busch."
@@ -413,6 +423,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walking Route",
                     "type": "Walking Path",
                     "estimated_minutes": 42,
+                    "walk_miles": 2.1,
                     "rush_hour_minutes": 42,
                     "badge": "Pedestrian",
                     "description": "Walking path along River Road and Avenue E corridor."
@@ -448,6 +459,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walking Route",
                     "type": "Walking Path",
                     "estimated_minutes": 42,
+                    "walk_miles": 2.1,
                     "rush_hour_minutes": 42,
                     "badge": "Pedestrian",
                     "description": "Long sidewalk route through Landing Lane and Avenue E."
@@ -493,6 +505,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walking Route",
                     "type": "Walking Path",
                     "estimated_minutes": 42,
+                    "walk_miles": 2.1,
                     "rush_hour_minutes": 42,
                     "badge": "Pedestrian",
                     "description": "Sidewalk route via Avenue E and Landing Lane Bridge."
@@ -528,6 +541,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Pedestrian Walking Route",
                     "type": "Walking Path",
                     "estimated_minutes": 42,
+                    "walk_miles": 2.1,
                     "rush_hour_minutes": 42,
                     "badge": "Pedestrian",
                     "description": "Sidewalk route from Livingston into College Ave."
@@ -565,6 +579,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path down George Street",
                     "type": "Walking Path",
                     "estimated_minutes": 22,
+                    "walk_miles": 1.1,
                     "rush_hour_minutes": 22,
                     "badge": "Pedestrian",
                     "description": "Direct walk along George Street through Downtown New Brunswick into Douglass."
@@ -608,6 +623,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path down George Street",
                     "type": "Walking Path",
                     "estimated_minutes": 22,
+                    "walk_miles": 1.1,
                     "rush_hour_minutes": 22,
                     "badge": "Pedestrian",
                     "description": "Direct sidewalk through downtown New Brunswick into Douglass Campus."
@@ -645,6 +661,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via George Street",
                     "type": "Walking Path",
                     "estimated_minutes": 22,
+                    "walk_miles": 1.1,
                     "rush_hour_minutes": 22,
                     "badge": "Pedestrian",
                     "description": "Direct pedestrian walk up George Street into College Ave."
@@ -688,6 +705,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                     "name": "Walking Path via George Street",
                     "type": "Walking Path",
                     "estimated_minutes": 22,
+                    "walk_miles": 1.1,
                     "rush_hour_minutes": 22,
                     "badge": "Pedestrian",
                     "description": "Direct sidewalk route to College Ave."

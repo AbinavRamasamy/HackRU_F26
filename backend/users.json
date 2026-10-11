@@ -1,0 +1,9 @@
+{
+    "testuser1": {
+        "password": "ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae",
+        "walking_speed": "Stride",
+        "prefer_walking": true,
+        "max_walking_distance": "1/2 A Mile",
+        "avoid_bad_weather": false
+    }
+}

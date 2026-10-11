@@ -9,6 +9,7 @@ import httpx
 from dotenv import load_dotenv, find_dotenv
 import hashlib
 from app.user_store import load_users, save_users
+from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
@@ -185,33 +186,6 @@ async def get_live_telemetry(route: Optional[str] = None):
 from app.schedule_parser import parse_schedule_with_gemini
 from app.ics_parser import parse_ics_schedule
 
-@app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...)):
-    """
-    Uploads a class schedule screenshot (via Gemini Vision OCR) or an .ics calendar file.
-    Extracts meetings for the current week and returns them sorted by date and time.
-    """
-    contents = await file.read()
-    filename = (file.filename or "").lower()
-    content_type = (file.content_type or "").lower()
-
-    # Check if uploaded file is an iCalendar (.ics) file
-    if filename.endswith(".ics") or "calendar" in content_type:
-        try:
-            text = contents.decode("utf-8", errors="ignore")
-            result = parse_ics_schedule(text)
-            return result
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to parse .ics calendar file: {str(e)}",
-                "classes": []
-            }
-
-    # Otherwise parse as image OCR via Gemini Vision
-    result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-    return result
-
 class ChatQueryRequest(BaseModel):
     query: str
     current_campus: Optional[str] = "College Ave"
@@ -296,8 +270,6 @@ def calculate_commute(plan: CommutePlanRequest):
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
 
-SPEED_OPTIONS = ["Mosey", "Wander", "Stroll", "Dash", "Zoom"]
-DISTANCE_OPTIONS = ["Less Than 1/4 A Mile", "1/2 A Mile", "3/4 A Mile", "A Mile or More"]
 class SignupRequest(BaseModel):
     username: str
     password: str
@@ -334,6 +306,7 @@ def signup(req: SignupRequest):
         "prefer_walking": req.prefer_walking,
         "max_walking_distance": req.max_walking_distance,
         "avoid_bad_weather": req.avoid_bad_weather,
+        "classes": []
     }
     save_users(users)
 
@@ -358,38 +331,69 @@ def login(req: LoginRequest):
 
     return {"status": "success", "username": username}
 
-#endpoint: POST /api/schedule/upload
-#   receives: a file AND a username
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...), username: str = Form(...))
-#   1. Clean the username (same cleanup you do in signup and login)
+async def upload_schedule(file: UploadFile = File(...), username: str = Form(...)):
     username = username.strip().lower()
-#   2. Load all users from the file
-#      If the username is not one of them:
-#          stop and send back a "user not found" error
-    if username not in load_users:
+    if username not in load_users():
         raise HTTPException(status_code= 404, detail = "User not Found.")
     contents = await file.read()
-    # 3. Read the uploaded file's contents
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
-#   4. Decide which scanner to use:
-#      If it's an .ics file:
-#          run the .ics scanner
-#          (if that crashes, send back an error with empty classes)
-    if filenames.endwith(".ics") or "calander" in conent_type:
-
-#      Otherwise:
+    if filename.endswith(".ics") or "calendar" in content_type:
+        try:
+            text = contents.decode("utf-8", errors="ignore")
+            result = parse_ics_schedule(text)
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to parse .ics calendar file: {str(e)}",
+                "classes": []
+            }
     else:
         result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-#   5. Look at the scanner's result:
-#      If its status says it worked:
-        if results.get("status") == "success" :
-            #load the users AGAIN (fresh copy)
-            users = load_users
-            #put the result's classes list inside that user's data
-            users[username]["classes"] = result["classes"]
-            #save all users back to the file
-            save_users(users)
-#   6. Send the scanner's result back to the website
-    return results
+    if result.get("status") == "success" :
+        users = load_users()
+        users[username]["classes"] = result["classes"]
+        save_users(users)
+    return result
+class CalendarSyncRequest(BaseModel):
+    username: str
+    calendar_url: str
+
+@app.post("/api/calendar/sync")
+async def sync_calendar_feed(req: CalendarSyncRequest):
+    username = req.username.strip().lower()
+    users = load_users()
+    if username not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    url = req.calendar_url.strip()
+    if url.startswith("webcal://"):
+        url = "https://" + url[9:]
+
+    if not url.startswith("https://") and not url.startswith("http://"):
+        raise HTTPException(status_code=400, detail="Invalid calendar feed URL. Must begin with https:// or webcal://")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": "ScarletHop-CalendarSync/1.0"})
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch calendar from provider (HTTP {resp.status_code}).")
+
+            ics_text = resp.text
+            result = parse_ics_schedule(ics_text)
+            
+            if result.get("status") == "success":
+                users = load_users()
+                users[username]["classes"] = result.get("classes", [])
+                users[username]["calendar_url"] = url
+                save_users(users)
+                return {
+                    "status": "success",
+                    "message": f"Successfully synced {len(result.get('classes', []))} classes from calendar feed.",
+                    "classes": result.get("classes", [])
+                }
+            else:
+                return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calendar sync error: {str(e)}")

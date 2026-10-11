@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from google import genai
 from google.genai import types
 
-from app.rutgers_data import CAMPUS_BUILDINGS
+from app.rutgers_data import CAMPUS_BUILDINGS, find_building
 
 DAY_MAP = {
     "M": "M", "MON": "M", "MONDAY": "M",
@@ -192,14 +192,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
         # Enrich with Rutgers campus, stop resolution, formatted location, and days_display
         for item in consolidated_classes:
             item["days_display"] = ", ".join(item["days"])
-            b_clean = item.get("building", "").lower()
-            matched_building = None
-            
-            # Match against known Rutgers campus buildings
-            for key, data in CAMPUS_BUILDINGS.items():
-                if key in b_clean or (data.get("code") and data["code"].lower() in b_clean.split()):
-                    matched_building = data
-                    break
+            matched_building = find_building(item.get("building", ""))
             
             if matched_building:
                 item["campus"] = matched_building["campus"]

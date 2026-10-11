@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 
-from app.rutgers_data import CAMPUS_BUILDINGS
+from app.rutgers_data import CAMPUS_BUILDINGS, find_building
 from app.schedule_parser import DAY_ORDER, normalize_time, normalize_days
 
 ICS_DAY_MAP = {
@@ -274,28 +274,36 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
     # Enrich with Rutgers campus and location formatting
     for item in consolidated:
         item["days_display"] = ", ".join(item["days"])
-        b_clean = item.get("building", "").lower()
-        matched_building = None
+        raw_bldg = (item.get("building") or "").strip()
 
-        for key, data in CAMPUS_BUILDINGS.items():
-            if key in b_clean or (data.get("code") and data["code"].lower() in b_clean.split()):
-                matched_building = data
-                break
+        #check if the event is online or virtual
+        is_online = any(term in raw_bldg.lower() for term in ["online","virtual","canvas","zoom", "asynchronous", "remote" , "website", "webex"])
+        has_real_location = bool(raw_bldg) and not is_online
+        item["is_online"] = is_online
+        item["has_real_location"] = has_real_location
 
+        matched_building = find_building(raw_bldg) if has_real_location else None
         if matched_building:
             item["campus"] = matched_building["campus"]
-        else:
+            item["coords"] = matched_building["coords"]
+            item["stop"] = matched_building["stop"]
+            item["location"] = f"{raw_bldg} ({matched_building['campus']})" if matched_building['campus'].lower() not in raw_bldg.lower() else raw_bldg
+        elif is_online:
+            item["campus"] = "Online"
+            item["coords"] = None
+            item["stop"] = None
+            item["location"] = "Online / Virtual Lecture"
+        elif has_real_location:
+            # Has a custom building/location name not yet in the Rutgers dictionary
             item["campus"] = "College Ave"
-
-        bldg = item.get("building", "")
-        campus = item.get("campus", "")
-        if bldg:
-            if campus and campus.lower() not in bldg.lower():
-                item["location"] = f"{bldg} ({campus})"
-            else:
-                item["location"] = bldg
+            item["coords"] = None
+            item["stop"] = None
+            item["location"] = raw_bldg
         else:
-            item["location"] = f"Campus Classroom ({campus})"
+            item["campus"] = None
+            item["coords"] = None
+            item["stop"] = None
+            item["location"] = "No Location Specified"
 
     # Order strictly by Date (earliest day of the week) and Time
     def class_sort_key(cls_item):
