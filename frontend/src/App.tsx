@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, Sun, Moon, RefreshCw } from 'lucide-react';
+import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, Sun, Moon, RefreshCw, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
 import { AICopilotChat } from './AICopilotChat';
+import { ProfileMenu } from './ProfileMenu';
 import { requestBrowserLocation, type ResolvedLocation } from './geolocation';
 import {
   RUTGERS_BUILDINGS,
@@ -110,6 +111,8 @@ export function App() {
   const [showAllRoutes, setShowAllRoutes] = useState(false);
   const [mobileTab, setMobileTab] = useState<'map' | 'routes'>('map');
   const widgetTriggerRef = useRef<HTMLButtonElement>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
 
   const requestLocationPermission = (isManual = false) => {
@@ -568,6 +571,36 @@ export function App() {
               triggerRef={widgetTriggerRef}
               currentCampus={currentLocation}
               nextClass={upcomingClass || undefined}
+            />
+          </div>
+
+          {/* Profile Menu Trigger */}
+          <div style={{ position: 'relative' }}>
+            <button
+              ref={profileTriggerRef}
+              onClick={() => setShowProfileMenu(prev => !prev)}
+              className="apple-btn-secondary"
+              style={{
+                fontSize: '12px',
+                padding: '5px 10px',
+                gap: '5px',
+                background: showProfileMenu ? 'var(--apple-accent-subtle)' : undefined,
+                borderColor: showProfileMenu ? 'var(--apple-accent)' : undefined
+              }}
+              title="Profile & Settings (Sign Up / Login, Light / Dark Mode)"
+            >
+              <User size={13} color="var(--apple-accent)" />
+              <span className="btn-label-desktop">Profile</span>
+            </button>
+
+            <ProfileMenu
+              isOpen={showProfileMenu}
+              onClose={() => setShowProfileMenu(false)}
+              triggerRef={profileTriggerRef}
+              theme={theme}
+              onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+              onSelectTheme={(t) => setTheme(t)}
+              onSyncCalendar={handleSyncCalendar}
             />
           </div>
         </div>
