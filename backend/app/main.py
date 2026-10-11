@@ -14,14 +14,8 @@ from app.user_store import load_users, save_users, save_user_classes
 from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
-from app.schedule_parser import parse_schedule_with_gemini
-<<<<<<< HEAD
-from app.commute_planner import get_commute_routes
-from app.weather import get_commute_weather_guidance
-=======
 from app.commute_planner import get_commute_routes, plan_multimodal_route
 from app.weather import get_commute_weather_guidance, get_forecast, evaluate_weather
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -532,8 +526,6 @@ def calculate_commute(plan: CommutePlanRequest):
         "walking_speed_mph": walking_speed_mph,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
-<<<<<<< HEAD
-=======
 
 # ─── Multi-Modal Plan v2 ─────────────────────────────────────────────────────
 
@@ -1009,4 +1001,3 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
 
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8

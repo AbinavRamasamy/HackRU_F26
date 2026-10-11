@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-#import asynchat
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 import os
 import httpx
 from fastapi import HTTPException
@@ -12,57 +8,14 @@ load_dotenv(find_dotenv())
 
 api_key = os.getenv("WEATHER_API")
 
-<<<<<<< HEAD
-
-# =====================================================================
-# STEP 1: FETCH RAW WEATHER FROM THE API
-# =====================================================================
-=======
 COLD_F = 35  # feels-like temp at or below this counts as "cold"; tune as you like
 SNOW_WORDS = ["snow", "sleet", "blizzard", "ice pellets"]
 
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> dict:
     if not api_key:
         raise RuntimeError("WEATHER_API is not set in .env")
 
     url = "https://api.weatherapi.com/v1/current.json"
-<<<<<<< HEAD
-    params = {
-        "key": api_key,
-        "q": f"{lat},{lon}"
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, params=params)
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Weather API error: {response.text}"
-                )
-                
-            data = response.json()
-            
-            # Pull out only the fields you need
-            return {
-                "temp": data["current"]["temp_f"],
-                "feels_like": data["current"]["feelslike_f"],
-                "condition": data["current"]["condition"]["text"],
-                "is_raining": data["current"]["precip_in"] > 0,
-            }
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Unable to reach Weather API service: {str(exc)}"
-        )
-
-
-# =====================================================================
-# STEP 2: TURN WEATHER DATA INTO ACTIONABLE ADVICE
-# =====================================================================
-=======
     params = {"key": api_key, "q": f"{lat},{lon}"}
 
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -118,7 +71,6 @@ async def get_forecast(lat: float = 40.501986, lon: float = -74.4474, hours: int
         for h in upcoming
     ]
 
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 def make_advice(weather: dict) -> dict:
     temp = weather["temp"]
     is_raining = weather["is_raining"]
@@ -137,7 +89,6 @@ def make_advice(weather: dict) -> dict:
         clothing = "Pleasant weather. Normal campus clothes are fine."
 
     # 2. Transit advice and delay buffer for Rutgers buses
-        # 2. Transit advice and delay buffer for Rutgers buses
     if is_snowing:
         commute = "Snow slows buses and sidewalks may be slick. Take the closest stop and leave 10 minutes early."
         delay_buffer = 10
