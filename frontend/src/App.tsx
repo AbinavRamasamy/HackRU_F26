@@ -1133,40 +1133,6 @@ export function App() {
                   </div>
                 </div>
 
-                {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
-                {upcomingClass && (
-                  <div
-                    onClick={() => {
-                      handleGetToNextClass();
-                      setMobileTab('map');
-                    }}
-                    style={{
-                      padding: '9px 12px',
-                      borderRadius: '12px',
-                      background: 'var(--apple-accent-subtle)',
-                      border: '1px solid var(--apple-border-focus)',
-                      marginBottom: '10px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '10.5px', color: 'var(--apple-accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                        Next Class
-                      </div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--apple-label-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {upcomingClass.course} • {upcomingClass.startTime} ({upcomingClass.campus})
-                      </div>
-                    </div>
-                    <div className="apple-btn-primary" style={{ padding: '4px 10px', fontSize: '11px', flexShrink: 0 }}>
-                      Route <ArrowRight size={11} />
-                    </div>
-                  </div>
-                )}
-
                 {/* Apple Maps Origin / Destination Form Card (Minimized by Default) */}
                 <div style={{
                   background: 'var(--apple-card-bg)',

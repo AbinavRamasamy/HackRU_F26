@@ -663,3 +663,26 @@ button:active {
   background-color: var(--apple-glass-overlay-hover) !important;
   color: var(--apple-accent) !important;
 }
+
+/* Responsive Position for Next Class Map Button: Top-Left on Desktop/Localhost, Top on Mobile */
+.next-class-map-btn {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: auto;
+  max-width: 440px;
+  width: auto;
+  z-index: 1000;
+  pointer-events: auto;
+  user-select: none;
+}
+
+@media (max-width: 900px) {
+  .next-class-map-btn {
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    width: auto;
+  }
+}
