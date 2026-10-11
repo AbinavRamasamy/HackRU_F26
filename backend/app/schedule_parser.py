@@ -2,7 +2,16 @@ import os
 import json
 import base64
 import re
+import io
 from typing import List, Dict, Any, Optional
+from PIL import Image
+
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except Exception:
+    pass
+
 from google import genai
 from google.genai import types
 
@@ -83,6 +92,22 @@ def normalize_time(time_str: str) -> str:
         return f"{hours:02d}:{mins}"
     return t
 
+def prepare_image_for_gemini(image_bytes: bytes, mime_type: str = "image/png") -> tuple[bytes, str]:
+    """
+    Normalizes any input image (HEIC, PNG, WEBP, JPEG, etc.) into standard RGB JPEG bytes
+    to ensure full compatibility with the Google Gemini Vision API.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=92)
+        return buf.getvalue(), "image/jpeg"
+    except Exception as e:
+        print(f"[ScheduleOCR] Image conversion fallback to original format: {e}")
+        return image_bytes, mime_type or "image/png"
+
 def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png") -> Dict[str, Any]:
     """
     Uses Gemini Vision API to parse Rutgers Course Schedule screenshots (WebReg, Canvas, CSP).
@@ -100,61 +125,77 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             "classes": []
         }
 
+    # Normalize image to standard JPEG bytes
+    safe_image_bytes, safe_mime = prepare_image_for_gemini(image_bytes, mime_type)
+
+    model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+    print(f"[ScheduleOCR] Analyzing image with Gemini model: {model_name}...")
+
+    prompt = """
+    You are an expert Rutgers University academic assistant.
+    Analyze this Rutgers course schedule image (from WebReg, Canvas, or Course Schedule Planner) and extract all scheduled class meetings.
+    
+    CRITICAL EXTRACTION & GROUPING RULES:
+    1. Extract the course title and code (e.g. "Intro to Computer Science (01:198:111)").
+    2. Extract meeting days using standard abbreviations: "M", "T", "W", "TH", "F", "S", "SU" (or "Online"). Note: 'H' or 'R' at Rutgers stands for 'TH' (Thursday).
+    3. Extract start and end times in 24-hour format (e.g. "10:20", "11:40").
+    4. Extract the physical classroom location, building name, and room number (e.g. "Hill Center 114", "Tillett Hall 254", "SEC 111", "Academic Building 1180").
+    5. CRITICAL GROUPING: When a course meets at the same time and in the same location/building on multiple days (for example, Monday and Thursday 10:20-11:40 in Hill Center 114), GROUP THEM INTO A SINGLE ENTRY with all days combined (e.g. ["M", "TH"] and "M, TH"). Do NOT return separate entries for M and TH!
+    
+    Return a strictly valid JSON array of objects with the following schema:
+    [
+      {
+        "course": "string (e.g. Intro to Computer Science 01:198:111)",
+        "days": ["M", "TH"],
+        "days_display": "M, TH",
+        "startTime": "HH:MM in 24-hour format (e.g. 10:20)",
+        "endTime": "HH:MM in 24-hour format (e.g. 11:40)",
+        "building": "string (e.g. Hill Center 114)",
+        "room": "string (e.g. 114)",
+        "location": "string (e.g. Hill Center 114)"
+      }
+    ]
+    
+    Do not include markdown fences or explanation. Return only valid JSON.
+    """
+
+    client = genai.Client(api_key=api_key.strip())
     try:
-        client = genai.Client(api_key=api_key.strip())
-        model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
-        print(f"[ScheduleOCR] Analyzing image with Gemini model: {model_name}...")
-
-        prompt = """
-        You are an expert Rutgers University academic assistant.
-        Analyze this Rutgers course schedule image (from WebReg, Canvas, or Course Schedule Planner) and extract all scheduled class meetings.
-        
-        CRITICAL EXTRACTION & GROUPING RULES:
-        1. Extract the course title and code (e.g. "Intro to Computer Science (01:198:111)").
-        2. Extract meeting days using standard abbreviations: "M", "T", "W", "TH", "F", "S", "SU" (or "Online"). Note: 'H' or 'R' at Rutgers stands for 'TH' (Thursday).
-        3. Extract start and end times in 24-hour format (e.g. "10:20", "11:40").
-        4. Extract the physical classroom location, building name, and room number (e.g. "Hill Center 114", "Tillett Hall 254", "SEC 111", "Academic Building 1180").
-        5. CRITICAL GROUPING: When a course meets at the same time and in the same location/building on multiple days (for example, Monday and Thursday 10:20-11:40 in Hill Center 114), GROUP THEM INTO A SINGLE ENTRY with all days combined (e.g. ["M", "TH"] and "M, TH"). Do NOT return separate entries for M and TH!
-        
-        Return a strictly valid JSON array of objects with the following schema:
-        [
-          {
-            "course": "string (e.g. Intro to Computer Science 01:198:111)",
-            "days": ["M", "TH"],
-            "days_display": "M, TH",
-            "startTime": "HH:MM in 24-hour format (e.g. 10:20)",
-            "endTime": "HH:MM in 24-hour format (e.g. 11:40)",
-            "building": "string (e.g. Hill Center 114)",
-            "room": "string (e.g. 114)",
-            "location": "string (e.g. Hill Center 114)"
-          }
-        ]
-        
-        Do not include markdown fences or explanation. Return only valid JSON.
-        """
-
         response = client.models.generate_content(
             model=model_name,
             contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                types.Part.from_bytes(data=safe_image_bytes, mime_type=safe_mime),
                 prompt
             ]
         )
-        text = response.text.strip()
-        print(f"[ScheduleOCR] Gemini response text preview: {text[:150]}")
+        raw_text = response.text.strip()
+    except Exception as e:
+        print(f"[ScheduleOCR] Gemini parsing error: {e}")
+        return {
+            "status": "error",
+            "message": f"Gemini Vision parsing failed: {str(e)}",
+            "classes": []
+        }
 
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-        parsed = json.loads(text)
-        
+    try:
+        # Robust JSON extraction using regex
+        json_match = re.search(r"(\[[\s\S]*\]|\{[\s\S]*\})", raw_text)
+        if json_match:
+            parsed = json.loads(json_match.group(1))
+        else:
+            parsed = json.loads(raw_text)
+
+        if isinstance(parsed, dict):
+            parsed = parsed.get("classes") or parsed.get("schedule") or parsed.get("courses") or [parsed]
+
+        if not isinstance(parsed, list):
+            parsed = []
+
         # Post-processing: Group identical (course, building, time) across separate day entries
         grouped_dict = {}
         for item in parsed:
+            if not isinstance(item, dict):
+                continue
             course = item.get("course", "").strip()
             building = item.get("building", "").strip() or item.get("location", "").strip()
             start = normalize_time(item.get("startTime", ""))
@@ -163,7 +204,7 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             raw_days = item.get("days", [])
             normalized_d = normalize_days(raw_days)
 
-            # Course key normalization (remove section suffix like :01 for grouping identical meetings)
+            # Course key normalization
             norm_course = re.sub(r":\d{2,3}$", "", course.lower()).strip()
             norm_bldg = building.lower()
             key = (norm_course, norm_bldg, start, end)
@@ -214,6 +255,13 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
 
         consolidated_classes.sort(key=class_sort_key)
 
+        if not consolidated_classes:
+            return {
+                "status": "success",
+                "message": "No courses could be detected in this screenshot. Please ensure the image clearly shows your class schedule, times, and classrooms.",
+                "classes": []
+            }
+
         return {"status": "success", "classes": consolidated_classes}
     except Exception as e:
         print(f"[ScheduleOCR] Gemini parsing error: {e}")
@@ -222,4 +270,3 @@ def parse_schedule_with_gemini(image_bytes: bytes, mime_type: str = "image/png")
             "message": f"Gemini Vision parsing failed: {str(e)}",
             "classes": []
         }
-

@@ -52,3 +52,6 @@ venv.bak/
 logs/
 tmp/
 temp/
+*.db
+*.sqlite3
+*.sqlite

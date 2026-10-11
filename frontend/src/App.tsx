@@ -22,6 +22,7 @@ import {
   syncDefaultDeviceCalendar,
   sortClassesByDateAndTime
 } from './calendarSync';
+import { API_BASE_URL } from './apiConfig';
 
 const WingedSneakerIcon = ({ size = 21, color = "#fff" }: { size?: number; color?: string }) => (
   <svg
@@ -141,7 +142,7 @@ export function App() {
   useEffect(() => {
     const fetchBuses = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/telemetry");
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
         if (res.ok) {
           const data = await res.json();
           if (data.buses && data.buses.length > 0) {
@@ -168,7 +169,7 @@ export function App() {
 
   const handleCalculateRoute = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -307,7 +308,7 @@ export function App() {
     setMobileTab('map');
 
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -431,29 +432,58 @@ export function App() {
     const formData = new FormData();
     formData.append("file", file);
 
+    // Pass logged in username if authenticated
     try {
-      const res = await fetch("http://localhost:8000/api/schedule/upload", {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u?.netId) {
+          formData.append("username", u.netId);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 35000);
+
+    try {
+      console.log(`[Upload] Uploading ${file.name} (${file.type || 'file'}) to ${API_BASE_URL}/api/schedule/upload...`);
+      const res = await fetch(`${API_BASE_URL}/api/schedule/upload`, {
         method: "POST",
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (data.status === "missing_api_key") {
           alert("Notice: GEMINI_API_KEY is not set in your .env file.\n\nTo parse your custom WebReg screenshot, add GEMINI_API_KEY=your_key to your .env file and restart the backend.");
         } else if (data.status === "error") {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
-        }
-
-        if (data.classes && data.classes.length > 0) {
-          setClasses(sortClassesByDateAndTime(data.classes));
+        } else if (data.classes && data.classes.length > 0) {
+          const sorted = sortClassesByDateAndTime(data.classes);
+          setClasses(sorted);
+          alert(`Successfully imported ${sorted.length} class meetings!`);
+        } else {
+          alert(data.message || "No classes were detected. Please make sure the uploaded image or .ics file contains class schedule details.");
         }
       } else {
-        alert("Server returned error during schedule upload. Please verify backend is running on port 8000.");
+        alert(`Server returned an error during schedule upload (${res.status}). Please verify backend is running on ${API_BASE_URL}.`);
       }
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error("Upload error:", err);
-      alert("Could not connect to backend server at http://localhost:8000/api/schedule/upload.");
+      if (err.name === 'AbortError') {
+        alert(`Schedule upload timed out after 35 seconds. Please check that the backend server is reachable at ${API_BASE_URL}.`);
+      } else {
+        alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload: ${err?.message || err}`);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setUploading(false);
       e.target.value = "";
     }
@@ -576,6 +606,7 @@ export function App() {
               onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               onSelectTheme={(t) => setTheme(t)}
               onSyncCalendar={handleSyncCalendar}
+              onClassesLoaded={(loadedClasses) => setClasses(sortClassesByDateAndTime(loadedClasses))}
             />
           </div>
         </div>
