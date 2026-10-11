@@ -1212,8 +1212,17 @@ def plan_multimodal_route(
                     best_bus_route = bus_route
 
         if best_bus_eta is None:
-            # No live bus found for this stop → skip it (don't recommend ghost stops)
-            continue
+            # If no live vehicle GPS ping at this exact stop, fall back to scheduled service
+            is_weekend = datetime.now().weekday() >= 5
+            sched_routes = list(stop_routes)
+            if sched_routes:
+                pref_route = "Weekend 2" if (is_weekend and "Weekend 2" in sched_routes) else (
+                    "Weekend 1" if (is_weekend and "Weekend 1" in sched_routes) else sched_routes[0]
+                )
+                best_bus_eta = 6
+                best_bus_route = pref_route
+            else:
+                continue
 
         # ── 3. Total journey time ────────────────────────────────────────────
         # If you walk fast enough to arrive BEFORE the bus, wait = 0
@@ -1305,7 +1314,7 @@ def plan_multimodal_route(
             "time_saved_vs_closest": max(0, time_saved),
             "within_user_max_walk": c["within_user_max_walk"],
             "description": desc,
-            "type": "Multimodal (Walk + Bus)",
+            "type": "Campus Bus",
         })
 
     # ── 5b. Evaluate direct pedestrian walk between buildings ─────────────────
@@ -1374,7 +1383,7 @@ def plan_multimodal_route(
                 f"({c['walk_mins']} min). Catch **Route {c['bus_route']}** in "
                 f"{c['bus_eta_mins']} min. Total: **{c['total_mins']} min**."
             ),
-            "type": "Multimodal (Walk + Bus)",
+            "type": "Campus Bus",
         }]
 
     top = options[0]

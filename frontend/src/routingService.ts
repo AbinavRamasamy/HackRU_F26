@@ -191,57 +191,72 @@ export async function fetchLiveRoute(
 
   // 2. Free High-Precision OSRM / OpenStreetMap Live Routing Engine (Zero API Key, 100% Free)
   try {
-    let osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+    const urlsToTry: string[] = [];
     if (transitType === 'walk') {
-      // Use OpenStreetMap dedicated pedestrian footway & campus trail engine
-      osrmUrl = `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+      urlsToTry.push(
+        `https://router.project-osrm.org/route/v1/foot/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`,
+        `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`
+      );
     } else if (transitType === 'bike') {
-      osrmUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+      urlsToTry.push(
+        `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`,
+        `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`
+      );
+    } else {
+      urlsToTry.push(
+        `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`
+      );
     }
 
-    const res = await fetch(osrmUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.routes && data.routes.length > 0) {
-        const route = data.routes[0];
-        const leg = route.legs[0];
+    for (const osrmUrl of urlsToTry) {
+      try {
+        const res = await fetch(osrmUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            const leg = route.legs[0];
 
-        // Convert [lon, lat] GeoJSON coordinates to [lat, lon] for Leaflet
-        const coordinates: [number, number][] = (route.geometry?.coordinates || []).map(
-          ([lon, lat]: [number, number]) => [lat, lon]
-        );
+            // Convert [lon, lat] GeoJSON coordinates to [lat, lon] for Leaflet
+            const coordinates: [number, number][] = (route.geometry?.coordinates || []).map(
+              ([lon, lat]: [number, number]) => [lat, lon]
+            );
 
-        const totalSteps = (leg.steps || []).length;
-        const steps: RouteStep[] = (leg.steps || []).map((s: any, idx: number) => {
-          const { instruction, subText, iconType } = parseOsrmManeuver(s, idx, totalSteps, transitType);
-          return {
-            instruction: (idx === 1 && routeName && transitType === 'bus') ? `Board ${routeName}` : instruction,
-            subText,
-            distance: formatDistance(s.distance || 0),
-            duration: formatDuration(s.duration || 60),
-            iconType: (idx === 1 && transitType === 'bus') ? 'bus' : iconType,
-            distanceMeters: s.distance || 0,
-            durationSeconds: s.duration || 60
-          };
-        });
+            const totalSteps = (leg.steps || []).length;
+            const steps: RouteStep[] = (leg.steps || []).map((s: any, idx: number) => {
+              const { instruction, subText, iconType } = parseOsrmManeuver(s, idx, totalSteps, transitType);
+              return {
+                instruction: (idx === 1 && routeName && transitType === 'bus') ? `Board ${routeName}` : instruction,
+                subText,
+                distance: formatDistance(s.distance || 0),
+                duration: formatDuration(s.duration || 60),
+                iconType: (idx === 1 && transitType === 'bus') ? 'bus' : iconType,
+                distanceMeters: s.distance || 0,
+                durationSeconds: s.duration || 60
+              };
+            });
 
-        const totalDistanceMiles = Number(((leg.distance || 4000) * 0.000621371).toFixed(1));
-        const totalDurationMins = transitType === 'bus' 
-          ? Math.max(8, Math.round((leg.duration || 600) / 60) + 4) // include bus dwell & stops
-          : transitType === 'walk'
-          ? Math.max(1, Math.round((leg.distance || 400) / 80)) // ~3.0 mph walking pace
-          : Math.max(4, Math.round((leg.duration || 600) / 60));
+            const totalDistanceMiles = Number(((leg.distance || 4000) * 0.000621371).toFixed(1));
+            const totalDurationMins = transitType === 'bus' 
+              ? Math.max(8, Math.round((leg.duration || 600) / 60) + 4) // include bus dwell & stops
+              : transitType === 'walk'
+              ? Math.max(1, Math.round((leg.distance || 400) / 80)) // ~3.0 mph walking pace
+              : Math.max(4, Math.round((leg.duration || 600) / 60));
 
-        const result: LiveRouteResult = {
-          coordinates,
-          distanceMiles: totalDistanceMiles,
-          durationMinutes: totalDurationMins,
-          steps,
-          provider: 'osrm'
-        };
+            const result: LiveRouteResult = {
+              coordinates,
+              distanceMiles: totalDistanceMiles,
+              durationMinutes: totalDurationMins,
+              steps,
+              provider: 'osrm'
+            };
 
-        routeCache.set(cacheKey, result);
-        return result;
+            routeCache.set(cacheKey, result);
+            return result;
+          }
+        }
+      } catch {
+        // try next endpoint in urlsToTry
       }
     }
   } catch (err) {

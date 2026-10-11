@@ -559,10 +559,17 @@ async def calculate_commute(plan: CommutePlanRequest):
     if mm_result and mm_result.get("options"):
         routes = []
         for i, opt in enumerate(mm_result["options"]):
+            bus_route_name = opt.get("bus_route") or "Campus Route"
+            opt_type = opt.get("type") or "Campus Bus"
+            if "walk" in bus_route_name.lower():
+                opt_type = "Walking Path"
+            elif opt_type == "Multimodal (Walk + Bus)":
+                opt_type = "Campus Bus"
+
             routes.append({
-                "id": f"mm_{opt.get('bus_route')}_{opt.get('stop_name')}_{opt.get('total_mins')}_{i}",
-                "name": opt.get("bus_route") or "Campus Route",
-                "type": opt.get("type", "Multimodal (Walk + Bus)"),
+                "id": f"mm_{bus_route_name}_{opt.get('stop_name')}_{opt.get('total_mins')}_{i}",
+                "name": bus_route_name,
+                "type": opt_type,
                 "estimated_minutes": opt.get("total_mins", 10),
                 "rush_hour_minutes": opt.get("total_mins", 10) + 3,
                 "badge": opt.get("badge"),
