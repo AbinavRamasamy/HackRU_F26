@@ -223,10 +223,18 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     return resolveLocationCoords(targetLocation || destCampus, destCampus);
   }, [targetLocation, destCampus]);
 
-  // Geodesic distance minimization against all candidate stops served by the route
+  // Geodesic distance minimization against all candidate stops served by the route (or explicit stop from selected itinerary)
   const boardingStop: BusStop = React.useMemo(() => {
+    if (selectedRoute?.stop_name) {
+      const explicitStop = RUTGERS_BUS_STOPS.find(s =>
+        s.name.toLowerCase() === selectedRoute.stop_name.toLowerCase() ||
+        s.name.toLowerCase().includes(selectedRoute.stop_name.toLowerCase()) ||
+        selectedRoute.stop_name.toLowerCase().includes(s.name.toLowerCase())
+      );
+      if (explicitStop) return explicitStop;
+    }
     return findNearestBusStop(origTarget, origTarget.campus || originCampus, selectedRoute?.name);
-  }, [origTarget, originCampus, selectedRoute?.name]);
+  }, [origTarget, originCampus, selectedRoute?.name, selectedRoute?.stop_name]);
 
   const dropoffStop: BusStop = React.useMemo(() => {
     return findNearestBusStop(destTarget, destTarget.campus || destCampus, selectedRoute?.name);
