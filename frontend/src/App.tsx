@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, Sun, Moon } from 'lucide-react';
+import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, Sun, Moon, RefreshCw } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
 import { AICopilotChat } from './AICopilotChat';
@@ -14,35 +15,12 @@ import {
   getStopShortCode,
   getRouteColorInfo
 } from './transitDirectory';
-
-interface ClassItem {
-  course: string;
-  days: string[] | string;
-  days_display?: string;
-  startTime: string;
-  endTime: string;
-  building: string;
-  location?: string;
-  campus: string;
-}
-
-const DAY_ORDER: Record<string, number> = {
-  "M": 1, "T": 2, "W": 3, "TH": 4, "F": 5, "S": 6, "SU": 7
-};
-
-export const sortClassesByDateAndTime = (items: ClassItem[]): ClassItem[] => {
-  return [...items].sort((a, b) => {
-    const aDays = Array.isArray(a.days) ? a.days : [a.days];
-    const bDays = Array.isArray(b.days) ? b.days : [b.days];
-    const aMinDay = Math.min(...aDays.map(d => DAY_ORDER[d] || 99));
-    const bMinDay = Math.min(...bDays.map(d => DAY_ORDER[d] || 99));
-
-    if (aMinDay !== bMinDay) {
-      return aMinDay - bMinDay;
-    }
-    return (a.startTime || "00:00").localeCompare(b.startTime || "00:00");
-  });
-};
+import {
+  type ClassItem,
+  getNextUpcomingClass,
+  syncDefaultDeviceCalendar,
+  sortClassesByDateAndTime
+} from './calendarSync';
 
 const WingedSneakerIcon = ({ size = 21, color = "#fff" }: { size?: number; color?: string }) => (
   <svg
@@ -94,7 +72,27 @@ export function App() {
     localStorage.setItem('scarlethop_theme', theme);
   }, [theme]);
 
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('scarlethop_classes');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+    } catch (err) {
+      console.warn("Failed to persist classes to localStorage:", err);
+    }
+  }, [classes]);
+
+  const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
+  const scheduleFileInputRef = useRef<HTMLInputElement>(null);
+  const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
+
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>("ALL");
 
   const [originCampus, setOriginCampus] = useState("Busch");
@@ -281,29 +279,12 @@ export function App() {
   const handleGetToNextClass = async (specificClass?: ClassItem) => {
     let targetClass = specificClass;
     if (!targetClass) {
-      if (classes.length === 0) {
-        alert("Please upload your course schedule first (.ics or screenshot).");
+      const up = getNextUpcomingClass(classes);
+      if (!up.nextClass) {
+        alert("Please connect your default calendar or upload your course schedule first.");
         return;
       }
-
-      const now = new Date();
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-      const daysArr = ["SU", "M", "T", "W", "TH", "F", "S"];
-      const currentDayCode = daysArr[now.getDay()];
-
-      const parseTimeToMins = (timeStr: string) => {
-        if (!timeStr) return 0;
-        const parts = timeStr.split(":");
-        return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || "0", 10);
-      };
-
-      const todayClasses = classes.filter(cls => {
-        const days = Array.isArray(cls.days) ? cls.days : [cls.days];
-        return days.includes(currentDayCode);
-      });
-      todayClasses.sort((a, b) => parseTimeToMins(a.startTime) - parseTimeToMins(b.startTime));
-
-      targetClass = todayClasses.find(cls => parseTimeToMins(cls.startTime) >= currentMins) || (todayClasses.length > 0 ? todayClasses[0] : classes[0]);
+      targetClass = up.nextClass;
     }
 
     const targetCampus = targetClass.campus || "College Ave";
@@ -320,6 +301,7 @@ export function App() {
 
     setOriginCampus(currentOrigin);
     setDestCampus(targetCampus);
+    setMobileTab('map');
 
     try {
       const res = await fetch("http://localhost:8000/api/plan", {
@@ -398,6 +380,46 @@ export function App() {
   const resolvedBoardingStop = useMemo(() => {
     return findNearestBusStop(resolvedOrigCoords, originCampus, selectedRoute?.name);
   }, [resolvedOrigCoords, originCampus, selectedRoute?.name]);
+
+  const handleSyncCalendar = async () => {
+    setIsCalendarSyncing(true);
+    try {
+      const result = await syncDefaultDeviceCalendar();
+      if (result.success && result.classes && result.classes.length > 0) {
+        setClasses(result.classes);
+        alert(`Successfully synced ${result.classes.length} classes from your device calendar!`);
+        const up = getNextUpcomingClass(result.classes);
+        if (up.nextClass) {
+          handleGetToNextClass(up.nextClass);
+        }
+      } else if (result.source === 'web') {
+        alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
+        scheduleFileInputRef.current?.click();
+      } else if (result.success && result.classes && result.classes.length === 0) {
+        alert("Connected to calendar, but no classes with Rutgers locations were found. Please verify your calendar events or upload your schedule.");
+      } else if (result.error) {
+        alert("Calendar Notice: " + result.error);
+      }
+    } catch (err: any) {
+      console.warn("Calendar sync error:", err);
+      alert("Calendar sync error: " + (err?.message || "Failed to access calendar."));
+    } finally {
+      setIsCalendarSyncing(false);
+    }
+  };
+
+  // Mobile Device: Auto-sync default calendar on app launch
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      syncDefaultDeviceCalendar().then(res => {
+        if (res.success && res.classes && res.classes.length > 0) {
+          setClasses(res.classes);
+        }
+      }).catch(err => {
+        console.log("Background calendar auto-sync skipped:", err);
+      });
+    }
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -618,6 +640,16 @@ export function App() {
                       Clear
                     </button>
                   )}
+                  <button
+                    onClick={handleSyncCalendar}
+                    disabled={isCalendarSyncing}
+                    className="apple-btn-secondary"
+                    style={{ fontSize: '11px', padding: '4px 9px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
+                    title="Connect and sync your device calendar"
+                  >
+                    {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
+                    <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
+                  </button>
                   <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
                     <Upload size={11} />
                     {uploading ? "Importing..." : "Import"}
@@ -651,14 +683,25 @@ export function App() {
                   border: '1px dashed var(--apple-border)',
                   textAlign: 'center'
                 }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 10px', maxWidth: '240px' }}>
-                    Upload an .ics schedule or WebReg screenshot to view classes and auto-navigate between them.
+                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 12px', maxWidth: '240px' }}>
+                    Connect your default calendar or upload an .ics / WebReg screenshot to view classes and auto-navigate.
                   </p>
-                  <label className="apple-btn-primary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    Choose File
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleSyncCalendar}
+                      disabled={isCalendarSyncing}
+                      className="apple-btn-primary"
+                      style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
+                    >
+                      {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
+                      <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
+                    </button>
+                    <label className="apple-btn-secondary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
+                      <Upload size={11} />
+                      Choose File
+                      <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -1456,6 +1499,19 @@ export function App() {
             onSelectRoute={(rt) => setSelectedRoute(rt)}
             planResult={planResult}
             onSwitchToRoutes={() => setMobileTab('routes')}
+            classes={classes}
+            upcomingClassInfo={upcomingClassInfo}
+            onAutoRouteToNextClass={() => handleGetToNextClass()}
+            onUploadSchedule={() => scheduleFileInputRef.current?.click()}
+            onSyncDefaultCalendar={handleSyncCalendar}
+            isCalendarSyncing={isCalendarSyncing}
+          />
+          <input
+            ref={scheduleFileInputRef}
+            type="file"
+            accept="image/*,.ics,text/calendar"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
           />
         </div>
       </main>

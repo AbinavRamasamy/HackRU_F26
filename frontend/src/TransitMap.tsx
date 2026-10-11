@@ -7,7 +7,11 @@ import {
   ExternalLink,
   X,
   MapPin,
-  Clock
+  Clock,
+  GraduationCap,
+  Calendar,
+  Upload,
+  RefreshCw
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
 import { fetchLiveRoute, type LiveRouteResult } from './routingService';
@@ -22,6 +26,7 @@ import {
   RUTGERS_BUS_STOPS,
   type BusStop
 } from './transitDirectory';
+import type { ClassItem, UpcomingClassResult } from './calendarSync';
 
 export interface TransitMapProps {
   buses: any[];
@@ -38,6 +43,12 @@ export interface TransitMapProps {
   googleMapsApiKey?: string;
   appTheme?: 'dark' | 'light';
   onSwitchToRoutes?: () => void;
+  classes?: ClassItem[];
+  upcomingClassInfo?: UpcomingClassResult;
+  onAutoRouteToNextClass?: () => void;
+  onUploadSchedule?: () => void;
+  onSyncDefaultCalendar?: () => void;
+  isCalendarSyncing?: boolean;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -175,7 +186,13 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   planResult,
   googleMapsApiKey,
   appTheme = 'dark',
-  onSwitchToRoutes
+  onSwitchToRoutes,
+  classes: _classes = [],
+  upcomingClassInfo,
+  onAutoRouteToNextClass,
+  onUploadSchedule,
+  onSyncDefaultCalendar,
+  isCalendarSyncing = false
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -992,7 +1009,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       {/* Map Canvas */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
-      {/* Top HUD when idle / viewing corridor */}
+      {/* Top HUD: Auto-Select Route to Next Class / Connect Schedule */}
       {!selectedRoute && (
         <div style={{
           position: 'absolute',
@@ -1004,30 +1021,183 @@ export const TransitMap: React.FC<TransitMapProps> = ({
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           border: '1px solid var(--apple-border)',
-          borderRadius: '14px',
+          borderRadius: '16px',
           boxShadow: 'var(--apple-shadow-md)',
-          padding: '8px 14px',
+          padding: '9px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px',
           pointerEvents: 'auto'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={15} color={appTheme === 'light' ? '#0A84FF' : '#FF375F'} />
-            <div>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
-                Google Maps • Rutgers Transit Corridor
+          {upcomingClassInfo?.nextClass ? (
+            /* HAS SCHEDULE & UPCOMING CLASS */
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 230px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '11px',
+                  background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.22), rgba(10, 132, 255, 0.22))',
+                  border: '1px solid var(--apple-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <GraduationCap size={18} color={appTheme === 'light' ? '#CC0033' : '#FF375F'} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '1px' }}>
+                    <span style={{
+                      fontSize: '9.5px',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      color: appTheme === 'light' ? '#CC0033' : '#FF375F'
+                    }}>
+                      {upcomingClassInfo.dayLabel} Next Class
+                    </span>
+                    {upcomingClassInfo.minutesUntil !== null && (
+                      <span style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        background: upcomingClassInfo.minutesUntil <= 30 ? 'rgba(255, 59, 48, 0.18)' : 'rgba(48, 209, 88, 0.18)',
+                        color: upcomingClassInfo.minutesUntil <= 30 ? '#FF3B30' : '#30D158'
+                      }}>
+                        {upcomingClassInfo.minutesUntil <= 0 ? 'Starting now' : `in ${upcomingClassInfo.minutesUntil}m`}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: 'var(--apple-glass-text)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {upcomingClassInfo.nextClass.course}
+                  </div>
+                  <div style={{
+                    fontSize: '10.5px',
+                    color: 'var(--apple-label-secondary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • {upcomingClassInfo.nextClass.campus} Campus • ⏰ {upcomingClassInfo.nextClass.startTime}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
-                Select any route on the left to start live Google Maps turn-by-turn navigation
+
+              {/* Action Button: Auto-Select Route to Next Class */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <button
+                  onClick={onAutoRouteToNextClass}
+                  className="apple-btn-primary"
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
+                    color: '#fff',
+                    boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
+                    border: 'none'
+                  }}
+                  title="Auto-select transit route directly to this class"
+                >
+                  <Navigation size={13} />
+                  <span>Route to Class</span>
+                </button>
               </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10.5px', color: '#34A853', fontWeight: 700 }}>
-              ● {buses.length} Active Rutgers Buses
-            </span>
-          </div>
+            </>
+          ) : (
+            /* NO SCHEDULE CONNECTED */
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 210px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '11px',
+                  background: 'rgba(255, 149, 0, 0.15)',
+                  border: '1px solid rgba(255, 149, 0, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Calendar size={18} color="#FF9500" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--apple-glass-text)' }}>
+                    Auto-Select Route to Next Class
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
+                    Connect default calendar or upload schedule to auto-navigate
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: Connect Calendar & Upload Schedule */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', flexShrink: 0 }}>
+                <button
+                  onClick={onSyncDefaultCalendar}
+                  disabled={isCalendarSyncing}
+                  className="apple-btn-primary"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: isCalendarSyncing ? 'wait' : 'pointer',
+                    background: 'linear-gradient(135deg, #0A84FF 0%, #0066CC 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    boxShadow: '0 3px 10px rgba(10, 132, 255, 0.3)'
+                  }}
+                  title="Connect and sync your device's default calendar"
+                >
+                  {isCalendarSyncing ? <RefreshCw size={12} className="spin" /> : <Calendar size={12} />}
+                  <span>{isCalendarSyncing ? 'Syncing...' : 'Connect Calendar'}</span>
+                </button>
+
+                <button
+                  onClick={onUploadSchedule}
+                  className="apple-btn-secondary"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    background: 'var(--apple-surface-card)',
+                    color: 'var(--apple-label-primary)',
+                    border: '1px solid var(--apple-border)',
+                    boxShadow: 'var(--apple-shadow-sm)'
+                  }}
+                  title="Upload course schedule (.ics or screenshot)"
+                >
+                  <Upload size={12} />
+                  <span>Upload</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
