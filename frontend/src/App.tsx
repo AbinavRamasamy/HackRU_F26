@@ -74,8 +74,23 @@ export function App() {
     localStorage.setItem('scarlethop_theme', theme);
   }, [theme]);
 
+  const [isSessionUploaded, setIsSessionUploaded] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [classes, setClasses] = useState<ClassItem[]>(() => {
     try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      // On desktop, only restore persisted classes if authenticated
+      if (!Capacitor.isNativePlatform() && !savedUser) {
+        return [];
+      }
       const saved = localStorage.getItem('scarlethop_classes');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -85,19 +100,27 @@ export function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+      // Only persist to localStorage if authenticated or native or user uploaded in session
+      if (Capacitor.isNativePlatform() || currentUser || isSessionUploaded) {
+        localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+      } else {
+        localStorage.removeItem('scarlethop_classes');
+      }
     } catch (err) {
       console.warn("Failed to persist classes to localStorage:", err);
     }
-  }, [classes]);
+  }, [classes, currentUser, isSessionUploaded]);
 
-  // On startup, pull latest synced classes from backend SQLite database
+  // On startup or login, pull latest synced classes from backend SQLite database if user is authenticated
   useEffect(() => {
     const syncProfileClasses = async () => {
+      // On desktop laptop, do not fetch from app.db unless user is signed in
+      if (!Capacitor.isNativePlatform() && !currentUser?.netId) {
+        return;
+      }
       try {
-        const savedUser = localStorage.getItem('scarlethop_auth_user');
-        const u = savedUser ? JSON.parse(savedUser) : null;
-        const url = `${API_BASE_URL}/api/calendar/device-sync${u?.netId ? `?username=${u.netId}` : ''}`;
+        const username = currentUser?.netId;
+        const url = `${API_BASE_URL}/api/calendar/device-sync${username ? `?username=${username}` : ''}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -110,7 +133,7 @@ export function App() {
       }
     };
     syncProfileClasses();
-  }, []);
+  }, [currentUser]);
 
   const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
@@ -557,6 +580,7 @@ export function App() {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
         } else if (data.classes && data.classes.length > 0) {
           const sorted = sortClassesByDateAndTime(data.classes);
+          setIsSessionUploaded(true);
           setClasses(sorted);
           alert(`Successfully imported ${sorted.length} class meetings!`);
         } else {
@@ -723,13 +747,30 @@ export function App() {
 
             <ProfileMenu
               isOpen={showProfileMenu}
-              onClose={() => setShowProfileMenu(false)}
+              onClose={() => {
+                setShowProfileMenu(false);
+                try {
+                  const saved = localStorage.getItem('scarlethop_auth_user');
+                  setCurrentUser(saved ? JSON.parse(saved) : null);
+                } catch {}
+              }}
               triggerRef={profileTriggerRef}
               theme={theme}
               onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               onSelectTheme={(t) => setTheme(t)}
               onSyncCalendar={handleSyncCalendar}
-              onClassesLoaded={(loadedClasses) => setClasses(sortClassesByDateAndTime(loadedClasses))}
+              onClassesLoaded={(loadedClasses) => {
+                try {
+                  const saved = localStorage.getItem('scarlethop_auth_user');
+                  setCurrentUser(saved ? JSON.parse(saved) : null);
+                } catch {}
+                setClasses(sortClassesByDateAndTime(loadedClasses));
+              }}
+              onLogout={() => {
+                setCurrentUser(null);
+                setIsSessionUploaded(false);
+                setClasses([]);
+              }}
             />
           </div>
         </div>
@@ -820,28 +861,56 @@ export function App() {
               {/* Class List */}
               {classes.length === 0 ? (
                 <div style={{
-                  padding: '16px',
+                  padding: '18px 16px',
                   borderRadius: '14px',
                   background: 'var(--apple-surface-card)',
                   border: '1px dashed var(--apple-border)',
                   textAlign: 'center'
                 }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 12px', maxWidth: '240px' }}>
-                    Connect your default calendar or upload an .ics / WebReg screenshot to view classes and auto-navigate.
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'var(--apple-accent-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 10px'
+                  }}>
+                    <Calendar size={18} color="var(--apple-accent)" />
+                  </div>
+                  <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--apple-label-primary)', margin: '0 0 4px' }}>
+                    {!currentUser && !Capacitor.isNativePlatform() ? "Sign in to view schedule" : "No classes loaded yet"}
+                  </h3>
+                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.45, margin: '0 auto 14px', maxWidth: '270px' }}>
+                    {!currentUser && !Capacitor.isNativePlatform()
+                      ? "Sign in with your Rutgers NetID to sync your saved classes from the database, or upload your .ics calendar file."
+                      : "Sync your device calendar or upload an .ics file / WebReg screenshot to view your schedule and bus routes."}
                   </p>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={handleSyncCalendar}
-                      disabled={isCalendarSyncing}
-                      className="apple-btn-primary"
-                      style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
-                    >
-                      {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
-                      <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
-                    </button>
+                    {!currentUser && !Capacitor.isNativePlatform() ? (
+                      <button
+                        onClick={() => setShowProfileMenu(true)}
+                        className="apple-btn-primary"
+                        style={{ fontSize: '11.5px', padding: '6px 14px' }}
+                      >
+                        <User size={12} />
+                        <span>Sign In</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSyncCalendar}
+                        disabled={isCalendarSyncing}
+                        className="apple-btn-primary"
+                        style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
+                      >
+                        {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
+                        <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
+                      </button>
+                    )}
                     <label className="apple-btn-secondary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
                       <Upload size={11} />
-                      <span>{uploading ? "Importing..." : "Choose File"}</span>
+                      <span>{uploading ? "Importing..." : "Upload .ics / Image"}</span>
                       <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
                     </label>
                   </div>

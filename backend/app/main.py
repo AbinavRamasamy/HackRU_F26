@@ -854,22 +854,18 @@ class DeviceSyncRequest(BaseModel):
 @app.post("/api/calendar/device-sync")
 def save_device_synced_classes(req: DeviceSyncRequest):
     """
-    Saves classes from either iOS or macOS localhost into SQLite.
-    If a username is provided, associates with that user profile.
-    Also ensures the primary demo user (ar2783) and active state stay in sync.
+    Saves classes into SQLite for iOS and macOS localhost.
+    If a username is provided and exists in the database, associates with that user profile.
     """
     users = load_users()
     target_user = req.username.strip().lower() if req.username else None
 
-    if not target_user or target_user not in users:
-        target_user = "ar2783" if "ar2783" in users else (list(users.keys())[0] if users else None)
-
-    if target_user:
+    if target_user and target_user in users:
         save_user_classes(target_user, req.classes)
 
     return {
         "status": "success",
-        "username": target_user,
+        "username": target_user if (target_user and target_user in users) else None,
         "classes_count": len(req.classes),
         "classes": req.classes
     }
@@ -879,33 +875,23 @@ def save_device_synced_classes(req: DeviceSyncRequest):
 def get_device_synced_classes(username: Optional[str] = None):
     """
     Returns latest synced classes from SQLite for iOS and macOS localhost.
+    Requires a valid user_id/username in the database to retrieve saved schedules,
+    ensuring unauthenticated users do not see others' schedules on desktop.
     """
-    users = load_users()
-    target_user = username.strip().lower() if username else None
+    if not username:
+        return {"status": "unauthenticated", "username": None, "classes": []}
 
-    if target_user and target_user in users:
+    users = load_users()
+    target_user = username.strip().lower()
+
+    if target_user in users:
         return {
             "status": "success",
             "username": target_user,
             "classes": users[target_user].get("classes", [])
         }
 
-    if "ar2783" in users and users["ar2783"].get("classes"):
-        return {
-            "status": "success",
-            "username": "ar2783",
-            "classes": users["ar2783"]["classes"]
-        }
-
-    for u, data in users.items():
-        if data.get("classes"):
-            return {
-                "status": "success",
-                "username": u,
-                "classes": data["classes"]
-            }
-
-    return {"status": "success", "username": None, "classes": []}
+    return {"status": "not_found", "username": target_user, "classes": []}
 
 
 class DeleteClassRequest(BaseModel):
@@ -922,10 +908,7 @@ def delete_class_endpoint(req: DeleteClassRequest):
     users = load_users()
     target_user = req.username.strip().lower() if req.username else None
     if not target_user or target_user not in users:
-        target_user = "ar2783" if "ar2783" in users else (list(users.keys())[0] if users else None)
-
-    if not target_user:
-        return {"status": "error", "message": "No user found"}
+        return {"status": "error", "message": "User not authenticated or not found"}
 
     current_classes = users.get(target_user, {}).get("classes", [])
     new_classes = [

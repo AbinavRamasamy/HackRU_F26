@@ -50,6 +50,7 @@ interface ProfileMenuProps {
   onSelectTheme: (t: 'dark' | 'light') => void;
   onSyncCalendar?: () => void;
   onClassesLoaded?: (classes: any[]) => void;
+  onLogout?: () => void;
 }
 
 const DEFAULT_GUEST: UserProfile | null = null;
@@ -71,7 +72,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   onToggleTheme: _onToggleTheme,
   onSelectTheme,
   onSyncCalendar,
-  onClassesLoaded
+  onClassesLoaded,
+  onLogout
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -327,6 +329,15 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   const handleLogout = () => {
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('scarlethop_classes');
+      localStorage.removeItem('scarlethop_auth_user');
+    } catch {
+      // ignore
+    }
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   // Save Preferences to LocalStorage & Backend SQL if Logged In
