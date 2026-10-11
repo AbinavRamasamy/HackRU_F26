@@ -777,23 +777,6 @@ export function App() {
                       Directions
                     </h2>
                   </div>
-                  {selectedRoute && (
-                    <button
-                      onClick={() => setMobileTab('map')}
-                      className="apple-segment-btn"
-                      style={{
-                        padding: '3px 9px',
-                        fontSize: '11px',
-                        color: '#30D158',
-                        background: 'rgba(48, 209, 88, 0.12)',
-                        border: '1px solid rgba(48, 209, 88, 0.3)',
-                        fontWeight: 600
-                      }}
-                      title="View active route on map"
-                    >
-                      ● Active on Map ➔
-                    </button>
-                  )}
                 </div>
 
                 {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
