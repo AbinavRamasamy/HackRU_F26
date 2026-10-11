@@ -640,21 +640,6 @@ export function App() {
                       Clear
                     </button>
                   )}
-                  <button
-                    onClick={handleSyncCalendar}
-                    disabled={isCalendarSyncing}
-                    className="apple-btn-secondary"
-                    style={{ fontSize: '11px', padding: '4px 9px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
-                    title="Connect and sync your device calendar"
-                  >
-                    {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
-                    <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
-                  </button>
-                  <label className="apple-btn-secondary" style={{ fontSize: '11px', padding: '4px 9px', cursor: 'pointer' }}>
-                    <Upload size={11} />
-                    {uploading ? "Importing..." : "Import"}
-                    <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  </label>
                 </div>
               </div>
 
@@ -698,7 +683,7 @@ export function App() {
                     </button>
                     <label className="apple-btn-secondary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
                       <Upload size={11} />
-                      Choose File
+                      <span>{uploading ? "Importing..." : "Choose File"}</span>
                       <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
                     </label>
                   </div>
@@ -1502,6 +1487,9 @@ export function App() {
             classes={classes}
             upcomingClassInfo={upcomingClassInfo}
             onAutoRouteToNextClass={() => handleGetToNextClass()}
+            onUploadSchedule={() => scheduleFileInputRef.current?.click()}
+            onSyncDefaultCalendar={handleSyncCalendar}
+            isCalendarSyncing={isCalendarSyncing}
           />
           <input
             ref={scheduleFileInputRef}
