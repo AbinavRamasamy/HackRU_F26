@@ -14,7 +14,7 @@ from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
-from app.commute_planner import get_commute_routes
+from app.commute_planner import get_commute_routes, plan_multimodal_route
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -42,7 +42,9 @@ class ClassItem(BaseModel):
 class CommutePlanRequest(BaseModel):
     origin_campus: str
     destination_campus: str
-    target_arrival_time: str # e.g. "10:20"
+    target_arrival_time: str                    # e.g. "10:20"
+    username: Optional[str] = None              # load walking prefs from users.json
+    walking_speed_mph: Optional[float] = None   # override walking speed directly
 
 @app.get("/")
 def health_check():
@@ -112,8 +114,46 @@ async def get_stops():
 def get_buildings():
     return CAMPUS_BUILDINGS
 
+import time
+# 1. In-memory cache for live telemetry: keeps data fresh for 10 seconds without spamming the API
+TELEMETRY_CACHE = {
+    "timestamp": 0,
+    "buses": [],
+    "is_weekend": False,
+    "source": "live_transitstat_tripshot"
+}
+CACHE_TTL_SECONDS = 10  # Refresh every 10 seconds
+def get_scheduled_fallback_buses(is_weekend: bool) -> List[Dict[str, Any]]:
+    """Returns realistic scheduled Rutgers buses when live API is down or has 0 active buses."""
+    if is_weekend:
+        return [
+            {"id": "wknd-101", "route": "Weekend 1", "destination": "Busch / Livingston", "lat": 40.5233, "lon": -74.4586, "campus": "Busch", "speed_mph": 18, "occupancy": "Seats Available", "eta_mins": 4, "next_stop": "Busch Student Center"},
+            {"id": "wknd-201", "route": "Weekend 2", "destination": "College Ave / Cook", "lat": 40.5015, "lon": -74.4485, "campus": "College Ave", "speed_mph": 15, "occupancy": "Seats Available", "eta_mins": 6, "next_stop": "The Yard"}
+        ]
+    return [
+        {"id": "b-101", "route": "B", "destination": "Busch Student Center", "lat": 40.5273, "lon": -74.4398, "campus": "Livingston", "speed_mph": 19, "occupancy": "Seats Available", "eta_mins": 5, "next_stop": "Livingston Plaza"},
+        {"id": "lx-201", "route": "LX", "destination": "College Ave (The Yard)", "lat": 40.5241, "lon": -74.4357, "campus": "Livingston", "speed_mph": 22, "occupancy": "Seats Available", "eta_mins": 3, "next_stop": "Livingston Student Center"},
+        {"id": "a-301", "route": "A", "destination": "Busch (Hill Center)", "lat": 40.5028, "lon": -74.4518, "campus": "College Ave", "speed_mph": 16, "occupancy": "Seats Available", "eta_mins": 4, "next_stop": "College Avenue Student Center"},
+        {"id": "f-401", "route": "F", "destination": "Cook / Douglass", "lat": 40.4991, "lon": -74.4478, "campus": "College Ave", "speed_mph": 14, "occupancy": "Seats Available", "eta_mins": 7, "next_stop": "Student Activities Center"},
+        {"id": "rexb-501", "route": "REXB", "destination": "Busch Campus", "lat": 40.4851, "lon": -74.4376, "campus": "Cook / Douglass", "speed_mph": 25, "occupancy": "Seats Available", "eta_mins": 8, "next_stop": "College Hall"}
+    ]
+
 @app.get("/api/telemetry")
 async def get_live_telemetry(route: Optional[str] = None):
+    global TELEMETRY_CACHE
+    now = time.time()
+    is_weekend = datetime.now().weekday() >= 5
+    # Check cache first: if data is under 10 seconds old, return it instantly!
+    if (now - TELEMETRY_CACHE["timestamp"]) < CACHE_TTL_SECONDS and TELEMETRY_CACHE["buses"]:
+        buses = TELEMETRY_CACHE["buses"]
+        if route and route.upper() != "ALL":
+            buses = [b for b in buses if route.upper() in b["route"].upper()]
+        return {
+            "source": TELEMETRY_CACHE["source"],
+            "cached": True,
+            "buses": buses,
+            "is_weekend": is_weekend
+        }
     """
     Fetches real-time live Rutgers telemetry from store.transitstat.us/tripshot/rutgers.
     Correctly recognizes active Weekend 1 / Weekend 2 buses on weekends and regular routes on weekdays!
@@ -238,19 +278,37 @@ async def get_live_telemetry(route: Optional[str] = None):
                         "upcoming_stops": upcoming_stops
                     })
 
+                source = "live_transitstat_tripshot"
+                if not live_buses:
+                    live_buses = get_scheduled_fallback_buses(is_weekend)
+                    source = "scheduled_fallback"
+
+                TELEMETRY_CACHE["timestamp"] = now
+                TELEMETRY_CACHE["buses"] = live_buses
+                TELEMETRY_CACHE["source"] = source
+                TELEMETRY_CACHE["is_weekend"] = is_weekend
+
+                filtered = live_buses
+                if route and route.upper() != "ALL":
+                    filtered = [b for b in live_buses if route.upper() in b["route"].upper()]
+
                 return {
-                    "source": "live_transitstat_tripshot",
-                    "buses": live_buses,
-                    "is_weekend": datetime.now().weekday() >= 5
+                    "source": source,
+                    "cached": False,
+                    "buses": filtered,
+                    "is_weekend": is_weekend
                 }
     except Exception as e:
         print(f"Transitstat live query error: {e}")
     
+    fallback_buses = get_scheduled_fallback_buses(is_weekend)
     return {
-        "source": "live_transitstat_tripshot",
-        "buses": [],
-        "is_weekend": datetime.now().weekday() >= 5
+        "source": "scheduled_fallback",
+        "cached": False,
+        "buses": fallback_buses,
+        "is_weekend": is_weekend
     }
+
 
 from app.schedule_parser import parse_schedule_with_gemini
 from app.ics_parser import parse_ics_schedule
@@ -408,13 +466,27 @@ Real-Time Vehicles & Upcoming Arrivals:
 
 @app.post("/api/plan")
 def calculate_commute(plan: CommutePlanRequest):
-    routes = get_commute_routes(plan.origin_campus, plan.destination_campus, plan.target_arrival_time)
-    
+    # Load walking speed from user profile if username is provided
+    walking_speed_mph = plan.walking_speed_mph or 3.0
+    if plan.username:
+        users = load_users()
+        user_data = users.get(plan.username.strip().lower(), {})
+        stored_speed = user_data.get("walking_speed")
+        if stored_speed and stored_speed in SPEED_OPTIONS:
+            walking_speed_mph = SPEED_OPTIONS[stored_speed]
+
+    routes = get_commute_routes(
+        plan.origin_campus,
+        plan.destination_campus,
+        plan.target_arrival_time,
+        walking_speed_mph=walking_speed_mph
+    )
+
     primary = routes[0]["name"] if routes else "Direct Route"
     alts = [r["name"] for r in routes[1:]] if len(routes) > 1 else []
     base_mins = routes[0]["estimated_minutes"] if routes else 10
     rush_mins = routes[0]["rush_hour_minutes"] if routes else 15
-    
+
     return {
         "origin": plan.origin_campus,
         "destination": plan.destination_campus,
@@ -423,8 +495,98 @@ def calculate_commute(plan: CommutePlanRequest):
         "alternative_routes": alts,
         "base_minutes": base_mins,
         "rush_hour_minutes": rush_mins,
+        "walking_speed_mph": walking_speed_mph,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
+
+# ─── Multi-Modal Plan v2 ─────────────────────────────────────────────────────
+
+class MultimodalPlanRequest(BaseModel):
+    origin_name: str                           # e.g. "Jersey Mike's"
+    destination_name: str                      # e.g. "Busch Student Center"
+    origin_coords: Optional[List[float]] = None    # [lat, lon] – overrides building lookup
+    dest_coords: Optional[List[float]] = None      # [lat, lon] – overrides building lookup
+    username: Optional[str] = None             # if provided, load prefs from users.json
+    walking_speed_mph: Optional[float] = None  # override walking speed
+    max_walk_miles: Optional[float] = None     # override max walk distance
+    prefer_walking: Optional[bool] = None      # override walking preference
+
+@app.post("/api/plan/v2")
+async def multimodal_plan(req: MultimodalPlanRequest):
+    """
+    Real multi-modal commute planner.
+    Finds nearby bus stops, computes walk time using user's exact walking speed,
+    fetches live bus ETAs from transitstat.us, evaluates the farther-stop trade-off,
+    and returns ranked options respecting user walking preferences.
+    """
+    from app.rutgers_data import find_building
+
+    # ── Load user prefs ───────────────────────────────────────────────────────
+    walking_speed_mph = req.walking_speed_mph or 3.0
+    max_walk_miles    = req.max_walk_miles or 0.5
+    prefer_walking    = req.prefer_walking if req.prefer_walking is not None else True
+
+    if req.username:
+        users = load_users()
+        user_data = users.get(req.username.strip().lower(), {})
+        if user_data:
+            # Convert stored label → mph value using SPEED_OPTIONS
+            stored_speed = user_data.get("walking_speed")
+            if stored_speed and stored_speed in SPEED_OPTIONS:
+                walking_speed_mph = SPEED_OPTIONS[stored_speed]
+            # Convert stored distance label → miles value using DISTANCE_OPTIONS
+            stored_dist = user_data.get("max_walking_distance")
+            if stored_dist and stored_dist in DISTANCE_OPTIONS:
+                max_walk_miles = DISTANCE_OPTIONS[stored_dist]
+            if req.prefer_walking is None:
+                prefer_walking = user_data.get("prefer_walking", True)
+
+    # ── Resolve origin coords ─────────────────────────────────────────────────
+    origin_coords = req.origin_coords
+    if not origin_coords:
+        bldg = find_building(req.origin_name)
+        if bldg and bldg.get("coords"):
+            origin_coords = bldg["coords"]
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not resolve coords for origin '{req.origin_name}'. "
+                       f"Pass origin_coords explicitly."
+            )
+
+    # ── Resolve destination coords ────────────────────────────────────────────
+    dest_coords = req.dest_coords
+    if not dest_coords:
+        bldg = find_building(req.destination_name)
+        if bldg and bldg.get("coords"):
+            dest_coords = bldg["coords"]
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not resolve coords for destination '{req.destination_name}'. "
+                       f"Pass dest_coords explicitly."
+            )
+
+    # ── Fetch live bus telemetry ──────────────────────────────────────────────
+    telemetry = await get_live_telemetry()
+    live_buses = telemetry.get("buses", []) if isinstance(telemetry, dict) else []
+
+    # ── Run multi-modal planner ───────────────────────────────────────────────
+    result = plan_multimodal_route(
+        origin_coords=origin_coords,
+        dest_coords=dest_coords,
+        origin_name=req.origin_name,
+        dest_name=req.destination_name,
+        live_buses=live_buses,
+        walking_speed_mph=walking_speed_mph,
+        max_walk_miles=max_walk_miles,
+        prefer_walking=prefer_walking,
+    )
+
+    result["telemetry_source"] = telemetry.get("source", "unknown")
+    result["active_bus_count"] = len(live_buses)
+    return result
+
 
 class SignupRequest(BaseModel):
     username: str
@@ -433,6 +595,7 @@ class SignupRequest(BaseModel):
     prefer_walking: bool
     max_walking_distance: str
     avoid_bad_weather: bool
+
 
 @app.post("/api/signup")
 def signup(req: SignupRequest):

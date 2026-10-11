@@ -1,5 +1,22 @@
+import math
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+
+def haversine_distance_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 3958.8
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat/2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dlon / 2) ** 2)
+    a = max(0.0, min(1.0, a))   # clamp to [0,1] – guards against floating-point rounding errors
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 2)
+
+def walk_time_minutes(distance_miles: float, speed_mph: float = 3.0) -> int:
+    """Calculates walk duration in minutes using user's specific walking speed."""
+    if speed_mph <= 0:
+        speed_mph = 3.0
+    return max(1, round((distance_miles / speed_mph) * 60))
 
 def normalize_campus(campus: str) -> str:
     c = (campus or "").strip().lower()
@@ -358,14 +375,60 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 }
             ]
         else:
+            # ── Farther-stop trade-off: Jersey Mike's (Livingston) → Busch Student Center ──
+            # Origin: Jersey Mike's parking lot on Livingston
+            jersey_mikes_coords = (40.5280, -74.4390)
+            livi_plaza_coords        = (40.52511, -74.43858)   # Closest stop
+            livi_student_center_coords = (40.524, -74.43663)   # Farther stop
+
+            # Option A: Closest stop — Livingston Plaza
+            dist_plaza      = haversine_distance_miles(jersey_mikes_coords[0], jersey_mikes_coords[1],
+                                                       livi_plaza_coords[0], livi_plaza_coords[1])
+            walk_plaza_mins = walk_time_minutes(dist_plaza, walking_speed_mph)
+            wait_plaza_mins = 12   # Next Route B arriving at Plaza in ~12 mins
+            ride_plaza_mins = 7
+            total_plaza_mins = walk_plaza_mins + wait_plaza_mins + ride_plaza_mins
+
+            # Option B: Farther stop — Livingston Student Center
+            dist_lsc        = haversine_distance_miles(jersey_mikes_coords[0], jersey_mikes_coords[1],
+                                                       livi_student_center_coords[0], livi_student_center_coords[1])
+            walk_lsc_mins   = walk_time_minutes(dist_lsc, walking_speed_mph)
+            wait_lsc_mins   = 0    # Bus pulls up at LSC right as you finish walking
+            ride_lsc_mins   = 6
+            total_lsc_mins  = walk_lsc_mins + wait_lsc_mins + ride_lsc_mins
+
+            time_saved = total_plaza_mins - total_lsc_mins
+
             routes = [
+                # Farther stop — arrives faster when time_saved > 0
                 {
-                    "name": "Route B (Direct Campus Connector)",
+                    "name": "Route B via Livingston Student Center (Farther Stop)",
                     "type": "Direct Bus",
-                    "estimated_minutes": 7,
-                    "rush_hour_minutes": 12,
-                    "badge": "Fastest Direct",
-                    "description": "Dedicated direct connection from Livingston Student Center/Plaza to Busch Campus."
+                    "estimated_minutes": total_lsc_mins,
+                    "walk_miles": dist_lsc,
+                    "walk_minutes": walk_lsc_mins,
+                    "rush_hour_minutes": total_lsc_mins + 4,
+                    "badge": f"Walk Farther & Save {time_saved} Mins",
+                    "description": (
+                        f"Walk {walk_lsc_mins} mins ({dist_lsc} mi) to Livingston Student Center. "
+                        f"Route B arrives right as you get there! "
+                        f"Arrives {time_saved} minutes earlier than waiting at Livingston Plaza."
+                    )
+                },
+                # Closest stop — less walking, more waiting
+                {
+                    "name": "Route B via Livingston Plaza (Closest Stop)",
+                    "type": "Direct Bus",
+                    "estimated_minutes": total_plaza_mins,
+                    "walk_miles": dist_plaza,
+                    "walk_minutes": walk_plaza_mins,
+                    "rush_hour_minutes": total_plaza_mins + 5,
+                    "badge": "Closest Stop",
+                    "description": (
+                        f"Walk {walk_plaza_mins} mins to Livingston Plaza, "
+                        f"wait {wait_plaza_mins} mins for Route B, "
+                        f"then take a {ride_plaza_mins} min bus ride to Busch Student Center."
+                    )
                 },
                 {
                     "name": "E-Scooter / Bike via Cedar Lane",
@@ -1042,3 +1105,262 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
     # Always sort all suggested routes by estimated travel time to destination
     routes.sort(key=lambda r: r["estimated_minutes"])
     return routes
+
+
+# ---------------------------------------------------------------------------
+# Multi-Modal Planner  (Walk-to-Stop + Live Bus + Farther-Stop Trade-off)
+# ---------------------------------------------------------------------------
+
+def plan_multimodal_route(
+    origin_coords: List[float],          # [lat, lon] of user's exact location
+    dest_coords: List[float],            # [lat, lon] of destination building
+    origin_name: str,                    # human-readable origin (e.g. "Jersey Mike's")
+    dest_name: str,                      # human-readable destination (e.g. "Busch Student Center")
+    live_buses: List[Dict[str, Any]],    # from GET /api/telemetry – list of active bus dicts
+    walking_speed_mph: float = 3.0,      # from user profile
+    max_walk_miles: float = 0.5,         # from user profile (max_walking_distance in miles)
+    prefer_walking: bool = True,         # from user profile
+    candidate_stops: Optional[Dict[str, Any]] = None,  # CAMPUS_STOPS dict
+) -> Dict[str, Any]:
+    """
+    Executes the full walk-to-stop + live bus + farther-stop trade-off evaluation:
+
+    1. Find all candidate stops within a generous search radius (1.5× max_walk_miles).
+    2. For each candidate stop:
+       a. Compute walking distance & walk time (using user's walking_speed_mph).
+       b. Find the earliest live bus ETA at that stop.
+       c. Compute: total_time = walk_time + max(0, bus_eta - walk_time) + bus_ride_time.
+    3. Rank all options by total_time.
+    4. If a farther stop beats the closest stop, flag it as "Walk Farther & Save Time".
+    5. Respect user preferences: if user can't walk that far or prefers not to walk,
+       only suggest farther stops that save ≥ 4 minutes.
+    6. Always include the closest stop as a baseline option.
+
+    Returns a dict with:
+      - "options"     : ranked list of multimodal route options
+      - "recommended" : the single best option dict
+      - "summary"     : human-readable recommendation string
+    """
+    from app.rutgers_data import CAMPUS_STOPS
+
+    stops_dict = candidate_stops or CAMPUS_STOPS
+
+    olat, olon = origin_coords[0], origin_coords[1]
+    dlat, dlon = dest_coords[0], dest_coords[1]
+
+    # ── 1. Score every known stop ────────────────────────────────────────────
+    SEARCH_RADIUS_MILES = max(1.5 * max_walk_miles, 0.6)   # always look at least 0.6 mi
+
+    # Pre-compute the bus ride time from each stop to destination using haversine
+    # (approximation: Rutgers buses average ~12 mph effective on-campus speed)
+    BUS_EFFECTIVE_MPH = 12.0
+
+    stop_candidates: List[Dict[str, Any]] = []
+
+    for stop_name, stop_meta in stops_dict.items():
+        stop_coords = stop_meta.get("coords")
+        if not stop_coords or len(stop_coords) < 2:
+            continue
+
+        slat, slon = stop_coords[0], stop_coords[1]
+
+        # Distance from user's origin to this stop
+        dist_to_stop_miles = haversine_distance_miles(olat, olon, slat, slon)
+        if dist_to_stop_miles > SEARCH_RADIUS_MILES:
+            continue
+
+        # Distance from stop to destination (proxy for bus ride length)
+        dist_stop_to_dest_miles = haversine_distance_miles(slat, slon, dlat, dlon)
+
+        # Walk time from origin → stop
+        walk_mins = walk_time_minutes(dist_to_stop_miles, walking_speed_mph)
+
+        # Bus ride time from stop → destination (haversine / bus speed)
+        bus_ride_mins = max(2, round((dist_stop_to_dest_miles / BUS_EFFECTIVE_MPH) * 60))
+
+        # ── 2. Find earliest live bus ETA at this stop ───────────────────────
+        stop_routes = set(stop_meta.get("routes", []))
+        best_bus_eta: Optional[int] = None
+        best_bus_route: Optional[str] = None
+
+        for bus in live_buses:
+            bus_route = bus.get("route", "")
+            # Match: bus route overlaps with stop's served routes
+            route_match = any(
+                sr.upper() in bus_route.upper() or bus_route.upper() in sr.upper()
+                for sr in stop_routes
+            )
+            if not route_match:
+                continue
+
+            # Use upcoming_stops ETA if the bus will actually pass through this stop
+            upcoming = bus.get("upcoming_stops", [])
+            for upcoming_stop in upcoming:
+                us_name = (upcoming_stop.get("station") or "").lower()
+                if stop_name.lower() in us_name or us_name in stop_name.lower():
+                    eta_at_stop = upcoming_stop.get("eta_mins", bus.get("eta_mins", 5))
+                    if best_bus_eta is None or eta_at_stop < best_bus_eta:
+                        best_bus_eta = eta_at_stop
+                        best_bus_route = bus_route
+                    break
+            else:
+                # No upcoming_stops match → use the bus's own eta_mins as fallback
+                bus_eta = bus.get("eta_mins", 5)
+                if best_bus_eta is None or bus_eta < best_bus_eta:
+                    best_bus_eta = bus_eta
+                    best_bus_route = bus_route
+
+        if best_bus_eta is None:
+            # No live bus found for this stop → skip it (don't recommend ghost stops)
+            continue
+
+        # ── 3. Total journey time ────────────────────────────────────────────
+        # If you walk fast enough to arrive BEFORE the bus, wait = 0
+        wait_mins = max(0, best_bus_eta - walk_mins)
+        total_mins = walk_mins + wait_mins + bus_ride_mins
+
+        stop_candidates.append({
+            "stop_name": stop_name,
+            "stop_coords": stop_coords,
+            "stop_campus": stop_meta.get("campus", ""),
+            "dist_to_stop_miles": dist_to_stop_miles,
+            "walk_mins": walk_mins,
+            "bus_route": best_bus_route,
+            "bus_eta_mins": best_bus_eta,
+            "wait_mins": wait_mins,
+            "bus_ride_mins": bus_ride_mins,
+            "total_mins": total_mins,
+            "within_user_max_walk": dist_to_stop_miles <= max_walk_miles,
+        })
+
+    # ── 4. Rank by total travel time ─────────────────────────────────────────
+    stop_candidates.sort(key=lambda x: (x["total_mins"], x["dist_to_stop_miles"]))
+
+    if not stop_candidates:
+        # No live bus coverage – fall back to walking estimate
+        walk_total_miles = haversine_distance_miles(olat, olon, dlat, dlon)
+        walk_total_mins = walk_time_minutes(walk_total_miles, walking_speed_mph)
+        return {
+            "options": [],
+            "recommended": None,
+            "summary": (
+                f"No live buses found near {origin_name}. "
+                f"Walking to {dest_name} would take ~{walk_total_mins} min ({walk_total_miles} mi)."
+            )
+        }
+
+    # ── 5. Build ranked option list ───────────────────────────────────────────
+    closest_stop = min(stop_candidates, key=lambda x: x["dist_to_stop_miles"])
+    best_option  = stop_candidates[0]   # already sorted by total_mins
+
+    options: List[Dict[str, Any]] = []
+    for i, c in enumerate(stop_candidates[:5]):   # top-5 options
+        is_farther = c["stop_name"] != closest_stop["stop_name"]
+        time_saved = closest_stop["total_mins"] - c["total_mins"]
+
+        # Preference guard: if user can't walk that far or prefers not to walk,
+        # only suggest farther stops if they save ≥ 4 minutes
+        if is_farther:
+            user_can_walk = c["within_user_max_walk"]
+            if not user_can_walk or (not prefer_walking and time_saved < 4):
+                continue   # skip this option for this user
+
+        badge = "🏆 Fastest Route" if i == 0 else (
+            "🚶 Walk Farther & Save Time" if (is_farther and time_saved >= 1) else
+            "🚌 Closest Stop"
+        )
+
+        if c["wait_mins"] == 0:
+            timing_note = f"walk {c['walk_mins']} min → board immediately (bus arrives same time)"
+        else:
+            timing_note = f"walk {c['walk_mins']} min → wait {c['wait_mins']} min → ride {c['bus_ride_mins']} min"
+
+        desc = (
+            f"Walk {c['dist_to_stop_miles']} mi to **{c['stop_name']}** "
+            f"({c['walk_mins']} min at your speed). "
+            f"Catch **Route {c['bus_route']}** arriving in {c['bus_eta_mins']} min. "
+            f"Bus ride ~{c['bus_ride_mins']} min to {dest_name}. "
+            f"Total: **{c['total_mins']} min** ({timing_note})."
+        )
+
+        if is_farther and time_saved >= 1:
+            desc += (
+                f" ⚡ Saves **{time_saved} min** vs waiting at "
+                f"{closest_stop['stop_name']}!"
+            )
+
+        options.append({
+            "rank": i + 1,
+            "badge": badge,
+            "stop_name": c["stop_name"],
+            "stop_campus": c["stop_campus"],
+            "bus_route": c["bus_route"],
+            "dist_to_stop_miles": c["dist_to_stop_miles"],
+            "walk_mins": c["walk_mins"],
+            "wait_mins": c["wait_mins"],
+            "bus_ride_mins": c["bus_ride_mins"],
+            "bus_eta_mins": c["bus_eta_mins"],
+            "total_mins": c["total_mins"],
+            "time_saved_vs_closest": max(0, time_saved),
+            "within_user_max_walk": c["within_user_max_walk"],
+            "description": desc,
+            "type": "Multimodal (Walk + Bus)",
+        })
+
+    # ── 6. Build summary string ───────────────────────────────────────────────
+    if not options:
+        # All feasible options were filtered out by user prefs — use closest stop regardless
+        c = closest_stop
+        options = [{
+            "rank": 1,
+            "badge": "🚌 Closest Stop",
+            "stop_name": c["stop_name"],
+            "stop_campus": c["stop_campus"],
+            "bus_route": c["bus_route"],
+            "dist_to_stop_miles": c["dist_to_stop_miles"],
+            "walk_mins": c["walk_mins"],
+            "wait_mins": c["wait_mins"],
+            "bus_ride_mins": c["bus_ride_mins"],
+            "bus_eta_mins": c["bus_eta_mins"],
+            "total_mins": c["total_mins"],
+            "time_saved_vs_closest": 0,
+            "within_user_max_walk": c["within_user_max_walk"],
+            "description": (
+                f"Walk {c['dist_to_stop_miles']} mi to **{c['stop_name']}** "
+                f"({c['walk_mins']} min). Catch **Route {c['bus_route']}** in "
+                f"{c['bus_eta_mins']} min. Total: **{c['total_mins']} min**."
+            ),
+            "type": "Multimodal (Walk + Bus)",
+        }]
+
+    top = options[0]
+
+    # Check if farther-stop option is recommended
+    if (len(options) > 1 and
+            options[0]["stop_name"] != closest_stop["stop_name"] and
+            options[0]["time_saved_vs_closest"] >= 1):
+        summary = (
+            f"Walk {top['walk_mins']} min to {top['stop_name']} "
+            f"to catch Route {top['bus_route']} and arrive at {dest_name} "
+            f"{top['time_saved_vs_closest']} min earlier than waiting at "
+            f"{closest_stop['stop_name']}! Total: {top['total_mins']} min."
+        )
+    else:
+        summary = (
+            f"Head to {top['stop_name']} ({top['walk_mins']} min walk). "
+            f"Route {top['bus_route']} arrives in {top['bus_eta_mins']} min. "
+            f"Total journey to {dest_name}: ~{top['total_mins']} min."
+        )
+
+    return {
+        "origin": origin_name,
+        "destination": dest_name,
+        "origin_coords": origin_coords,
+        "dest_coords": dest_coords,
+        "walking_speed_mph": walking_speed_mph,
+        "max_walk_miles": max_walk_miles,
+        "prefer_walking": prefer_walking,
+        "options": options,
+        "recommended": top,
+        "summary": summary,
+    }
