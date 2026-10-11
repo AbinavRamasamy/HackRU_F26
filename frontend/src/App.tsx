@@ -91,25 +91,22 @@ export function App() {
     }
   }, [classes]);
 
-  // On startup or device change, pull latest classes from backend user profile if logged in
+  // On startup, pull latest synced classes from backend SQLite database
   useEffect(() => {
     const syncProfileClasses = async () => {
       try {
         const savedUser = localStorage.getItem('scarlethop_auth_user');
-        if (savedUser) {
-          const u = JSON.parse(savedUser);
-          if (u?.netId) {
-            const res = await fetch(`${API_BASE_URL}/api/user/${u.netId}`);
-            if (res.ok) {
-              const data = await res.json();
-              if (data?.classes && data.classes.length > 0) {
-                setClasses(sortClassesByDateAndTime(data.classes));
-              }
-            }
+        const u = savedUser ? JSON.parse(savedUser) : null;
+        const url = `${API_BASE_URL}/api/calendar/device-sync${u?.netId ? `?username=${u.netId}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.classes && data.classes.length > 0) {
+            setClasses(sortClassesByDateAndTime(data.classes));
           }
         }
       } catch (err) {
-        console.log("Profile classes sync skipped:", err);
+        console.log("Device calendar sync skipped:", err);
       }
     };
     syncProfileClasses();
@@ -447,16 +444,12 @@ export function App() {
         setClasses(result.classes);
         try {
           const savedUser = localStorage.getItem('scarlethop_auth_user');
-          if (savedUser) {
-            const u = JSON.parse(savedUser);
-            if (u?.netId) {
-              await fetch(`${API_BASE_URL}/api/user/${u.netId}/classes`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ classes: result.classes })
-              });
-            }
-          }
+          const u = savedUser ? JSON.parse(savedUser) : null;
+          await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ classes: result.classes, username: u?.netId || 'ar2783' })
+          });
         } catch (e) {
           console.warn("Could not persist synced classes to profile:", e);
         }
@@ -466,22 +459,18 @@ export function App() {
           handleGetToNextClass(up.nextClass);
         }
       } else if (result.source === 'web') {
-        // If logged in on computer/laptop, refresh synced classes from backend profile
+        // On laptop/desktop, refresh latest synced classes from SQLite backend
         let refreshedFromProfile = false;
         try {
           const savedUser = localStorage.getItem('scarlethop_auth_user');
-          if (savedUser) {
-            const u = JSON.parse(savedUser);
-            if (u?.netId) {
-              const res = await fetch(`${API_BASE_URL}/api/user/${u.netId}`);
-              if (res.ok) {
-                const data = await res.json();
-                if (data?.classes && data.classes.length > 0) {
-                  setClasses(sortClassesByDateAndTime(data.classes));
-                  alert(`Successfully refreshed ${data.classes.length} classes from your Rutgers profile!`);
-                  refreshedFromProfile = true;
-                }
-              }
+          const u = savedUser ? JSON.parse(savedUser) : null;
+          const res = await fetch(`${API_BASE_URL}/api/calendar/device-sync${u?.netId ? `?username=${u.netId}` : ''}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.classes && data.classes.length > 0) {
+              setClasses(sortClassesByDateAndTime(data.classes));
+              alert(`Successfully synced ${data.classes.length} classes from your shared calendar!`);
+              refreshedFromProfile = true;
             }
           }
         } catch (e) {
@@ -513,16 +502,12 @@ export function App() {
           setClasses(res.classes);
           try {
             const savedUser = localStorage.getItem('scarlethop_auth_user');
-            if (savedUser) {
-              const u = JSON.parse(savedUser);
-              if (u?.netId) {
-                fetch(`${API_BASE_URL}/api/user/${u.netId}/classes`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ classes: res.classes })
-                }).catch(() => {});
-              }
-            }
+            const u = savedUser ? JSON.parse(savedUser) : null;
+            fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ classes: res.classes, username: u?.netId || 'ar2783' })
+            }).catch(() => {});
           } catch {}
         }
       }).catch(err => {

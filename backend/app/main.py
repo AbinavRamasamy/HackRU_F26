@@ -846,6 +846,68 @@ def update_user_classes_endpoint(username: str, req: ClassesUpdateRequest):
     }
 
 
+class DeviceSyncRequest(BaseModel):
+    classes: List[Dict[str, Any]]
+    username: Optional[str] = None
+
+
+@app.post("/api/calendar/device-sync")
+def save_device_synced_classes(req: DeviceSyncRequest):
+    """
+    Saves classes from either iOS or macOS localhost into SQLite.
+    If a username is provided, associates with that user profile.
+    Also ensures the primary demo user (ar2783) and active state stay in sync.
+    """
+    users = load_users()
+    target_user = req.username.strip().lower() if req.username else None
+
+    if not target_user or target_user not in users:
+        target_user = "ar2783" if "ar2783" in users else (list(users.keys())[0] if users else None)
+
+    if target_user:
+        save_user_classes(target_user, req.classes)
+
+    return {
+        "status": "success",
+        "username": target_user,
+        "classes_count": len(req.classes),
+        "classes": req.classes
+    }
+
+
+@app.get("/api/calendar/device-sync")
+def get_device_synced_classes(username: Optional[str] = None):
+    """
+    Returns latest synced classes from SQLite for iOS and macOS localhost.
+    """
+    users = load_users()
+    target_user = username.strip().lower() if username else None
+
+    if target_user and target_user in users:
+        return {
+            "status": "success",
+            "username": target_user,
+            "classes": users[target_user].get("classes", [])
+        }
+
+    if "ar2783" in users and users["ar2783"].get("classes"):
+        return {
+            "status": "success",
+            "username": "ar2783",
+            "classes": users["ar2783"]["classes"]
+        }
+
+    for u, data in users.items():
+        if data.get("classes"):
+            return {
+                "status": "success",
+                "username": u,
+                "classes": data["classes"]
+            }
+
+    return {"status": "success", "username": None, "classes": []}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

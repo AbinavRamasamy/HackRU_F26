@@ -28,6 +28,11 @@
 	<string>ScarletHop needs full access to your calendar to automatically sync your class schedule and navigate you to upcoming classes.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>ScarletHop needs access to your default calendar to automatically sync your class schedule and provide live bus routes to your classrooms.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
