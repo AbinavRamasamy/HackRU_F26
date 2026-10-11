@@ -76,7 +76,7 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 "estimated_minutes": 10,
                 "rush_hour_minutes": 12,
                 "badge": "Alternative Bus",
-                "description": f"Secondary loop servicing internal stops across {origin}."
+                "description": f"Secondary shuttle loop servicing stops across {origin}."
             }
         ]
         return routes

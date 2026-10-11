@@ -223,10 +223,18 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     return resolveLocationCoords(targetLocation || destCampus, destCampus);
   }, [targetLocation, destCampus]);
 
-  // Geodesic distance minimization against all candidate stops served by the route
+  // Geodesic distance minimization against all candidate stops served by the route (or explicit stop from selected itinerary)
   const boardingStop: BusStop = React.useMemo(() => {
+    if (selectedRoute?.stop_name) {
+      const explicitStop = RUTGERS_BUS_STOPS.find(s =>
+        s.name.toLowerCase() === selectedRoute.stop_name.toLowerCase() ||
+        s.name.toLowerCase().includes(selectedRoute.stop_name.toLowerCase()) ||
+        selectedRoute.stop_name.toLowerCase().includes(s.name.toLowerCase())
+      );
+      if (explicitStop) return explicitStop;
+    }
     return findNearestBusStop(origTarget, origTarget.campus || originCampus, selectedRoute?.name);
-  }, [origTarget, originCampus, selectedRoute?.name]);
+  }, [origTarget, originCampus, selectedRoute?.name, selectedRoute?.stop_name]);
 
   const dropoffStop: BusStop = React.useMemo(() => {
     return findNearestBusStop(destTarget, destTarget.campus || destCampus, selectedRoute?.name);
@@ -565,170 +573,49 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     } else {
       // 2. Zoomed In (>= 14.75): Show detailed inner locations (Boarding, Dropoff, Intermediate stops, Destination building)
       if (selectedRoute) {
-        // Boarding Stop Marker (Compact Apple Icon Pin)
-        const boardingCode = getStopShortCode(boardingStop.name);
-        const boardingIcon = L.divIcon({
-          className: 'apple-campus-map-marker',
-          html: `
-            <div style="
-              display: inline-flex;
-              align-items: center;
-              gap: 3.5px;
-              padding: 2.5px 7px 2.5px 3.5px;
-              background: ${markerBg};
-              backdrop-filter: blur(20px);
-              -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid #30D158;
-              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(48, 209, 88, 0.4);
-              border-radius: 9999px;
-              cursor: pointer;
-              transform: translate(-50%, -50%);
-              white-space: nowrap;
-            ">
-              <span style="
-                width: 17px;
-                height: 17px;
-                border-radius: 50%;
-                background: #30D158;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 9.5px;
-                color: #000;
-                font-weight: 900;
-              ">▲</span>
-              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-                ${boardingCode}
-              </span>
-            </div>
-          `,
-          iconSize: [60, 24],
-          iconAnchor: [30, 12]
-        });
-        const bMarker = L.marker([boardingStop.lat, boardingStop.lon], { icon: boardingIcon });
-        bMarker.bindPopup(`
-          <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
-            <div style="font-size: 12.5px; font-weight: 700; color: #30D158;">🟢 Boarding Stop</div>
-            <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${boardingStop.name}</div>
-            <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${boardingStop.campus} Campus</div>
-          </div>
-        `);
-        markersGroup.addLayer(bMarker);
+        const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
+          (selectedRoute.name || '').toLowerCase().includes('walk') ||
+          (selectedRoute.name || '').toLowerCase().includes('pedestrian');
 
-        // Drop-Off Stop Marker (Compact Apple Icon Pin)
-        const dropoffCode = getStopShortCode(dropoffStop.name);
-        const dropoffIcon = L.divIcon({
-          className: 'apple-campus-map-marker',
-          html: `
-            <div style="
-              display: inline-flex;
-              align-items: center;
-              gap: 3.5px;
-              padding: 2.5px 7px 2.5px 3.5px;
-              background: ${markerBg};
-              backdrop-filter: blur(20px);
-              -webkit-backdrop-filter: blur(20px);
-              border: 1.5px solid ${destAccent};
-              box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px ${destAccent}66;
-              border-radius: 9999px;
-              cursor: pointer;
-              transform: translate(-50%, -50%);
-              white-space: nowrap;
-            ">
-              <span style="
-                width: 17px;
-                height: 17px;
-                border-radius: 50%;
-                background: ${destAccent};
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 9.5px;
-                color: #fff;
-                font-weight: 900;
-              ">▼</span>
-              <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-                ${dropoffCode}
-              </span>
-            </div>
-          `,
-          iconSize: [60, 24],
-          iconAnchor: [30, 12]
-        });
-        const dMarker = L.marker([dropoffStop.lat, dropoffStop.lon], { icon: dropoffIcon });
-        dMarker.bindPopup(`
-          <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
-            <div style="font-size: 12.5px; font-weight: 700; color: ${destAccent};">📍 Drop-off Stop</div>
-            <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${dropoffStop.name}</div>
-            <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${dropoffStop.campus} Campus</div>
-          </div>
-        `);
-        markersGroup.addLayer(dMarker);
-
-        // Intermediate stops along the selected route (Interactive Apple Stop Glyphs)
-        routeStops.forEach((st) => {
-          if (st.name === boardingStop.name || st.name === dropoffStop.name) return;
-          const code = getStopShortCode(st.name);
-          const isOnSegment = routeSegmentStops.some(s => s.name.toLowerCase() === st.name.toLowerCase());
-
-          const stopGlyphIcon = L.divIcon({
-            className: 'apple-stop-glyph-marker',
+        if (isWalk) {
+          // Walking Route: Direct pedestrian navigation between buildings
+          const startCode = getStopShortCode(origTarget.name) || origTarget.name;
+          const startIcon = L.divIcon({
+            className: 'apple-campus-map-marker',
             html: `
               <div style="
                 display: inline-flex;
                 align-items: center;
-                gap: 3px;
-                padding: 2.5px 6px;
+                gap: 4px;
+                padding: 2.5px 8px 2.5px 4px;
                 background: ${markerBg};
-                backdrop-filter: blur(16px);
-                border: ${isOnSegment ? '1.5px solid #0A84FF' : (isLight ? '1px solid rgba(15, 23, 42, 0.14)' : '1px solid rgba(255, 255, 255, 0.22)')};
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1.5px solid #30D158;
+                box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(48, 209, 88, 0.4);
                 border-radius: 9999px;
-                box-shadow: ${isOnSegment ? `0 2px 10px rgba(10, 132, 255, 0.4), 0 2px 8px ${shadowColor}` : `0 2px 8px ${shadowColor}`};
                 cursor: pointer;
                 transform: translate(-50%, -50%);
                 white-space: nowrap;
               ">
-                <span style="font-size: 9.5px;">🚏</span>
-                <span style="font-size: 9.5px; font-weight: ${isOnSegment ? '700' : '600'}; color: ${isOnSegment ? '#0A84FF' : textSecondary}; font-family: -apple-system, sans-serif;">
-                  ${code}
+                <span style="font-size: 11px;">🟢</span>
+                <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                  ${startCode}
                 </span>
               </div>
             `,
-            iconSize: [52, 22],
-            iconAnchor: [26, 11]
+            iconSize: [60, 24],
+            iconAnchor: [30, 12]
           });
-
-          const sMarker = L.marker([st.lat, st.lon], { icon: stopGlyphIcon });
-          sMarker.on('click', () => {
-            if (onSelectTargetLocation) {
-              onSelectTargetLocation(st.name);
-            }
-          });
-          sMarker.bindPopup(`
+          const startMarker = L.marker([origTarget.lat, origTarget.lon], { icon: startIcon });
+          startMarker.bindPopup(`
             <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
-              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
-              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">Route ${selectedRoute.name} Stop</div>
-              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
-                margin-top: 6px;
-                width: 100%;
-                padding: 4px 8px;
-                background: #0A84FF;
-                color: #fff;
-                border: none;
-                border-radius: 6px;
-                font-size: 11px;
-                font-weight: 700;
-                cursor: pointer;
-              ">
-                Route to this Stop ➔
-              </button>
+              <div style="font-size: 12.5px; font-weight: 700; color: #30D158;">🟢 Walk Start</div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${origTarget.name}</div>
             </div>
           `);
-          markersGroup.addLayer(sMarker);
-        });
+          markersGroup.addLayer(startMarker);
 
-        // Final Target Destination Building Marker (if separate structure from bus stop)
-        if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
           const destCode = getStopShortCode(destTarget.name) || destTarget.name;
           const destBuildingIcon = L.divIcon({
             className: 'google-dest-building-marker',
@@ -737,16 +624,19 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
-                padding: 2.5px 7px;
+                padding: 2.5px 8px;
                 background: ${markerBg};
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
                 border: 1.5px solid #0A84FF;
+                box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(10, 132, 255, 0.4);
                 border-radius: 9999px;
-                box-shadow: 0 4px 14px ${shadowColor};
-                white-space: nowrap;
+                cursor: pointer;
                 transform: translate(-50%, -50%);
+                white-space: nowrap;
               ">
-                <span style="font-size: 10px;">🏁</span>
-                <span style="font-size: 10.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, sans-serif;">
+                <span style="font-size: 11px;">🏁</span>
+                <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
                   ${destCode}
                 </span>
               </div>
@@ -754,15 +644,217 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             iconSize: [60, 24],
             iconAnchor: [30, 12]
           });
-          markersGroup.addLayer(L.marker([destTarget.lat, destTarget.lon], { icon: destBuildingIcon }));
+          const dMarker = L.marker([destTarget.lat, destTarget.lon], { icon: destBuildingIcon });
+          dMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12.5px; font-weight: 700; color: #0A84FF;">🏁 Walk Destination</div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${destTarget.name}</div>
+            </div>
+          `);
+          markersGroup.addLayer(dMarker);
+        } else {
+          // Transit / Bus Route: Boarding, Dropoff, and intermediate stop pins
+          // Boarding Stop Marker (Compact Apple Icon Pin)
+          const boardingCode = getStopShortCode(boardingStop.name);
+          const boardingIcon = L.divIcon({
+            className: 'apple-campus-map-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3.5px;
+                padding: 2.5px 7px 2.5px 3.5px;
+                background: ${markerBg};
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1.5px solid #30D158;
+                box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px rgba(48, 209, 88, 0.4);
+                border-radius: 9999px;
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="
+                  width: 17px;
+                  height: 17px;
+                  border-radius: 50%;
+                  background: #30D158;
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 9.5px;
+                  color: #000;
+                  font-weight: 900;
+                ">▲</span>
+                <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                  ${boardingCode}
+                </span>
+              </div>
+            `,
+            iconSize: [60, 24],
+            iconAnchor: [30, 12]
+          });
+          const bMarker = L.marker([boardingStop.lat, boardingStop.lon], { icon: boardingIcon });
+          bMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12.5px; font-weight: 700; color: #30D158;">🟢 Boarding Stop</div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${boardingStop.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${boardingStop.campus} Campus</div>
+            </div>
+          `);
+          markersGroup.addLayer(bMarker);
+
+          // Drop-Off Stop Marker (Compact Apple Icon Pin)
+          const dropoffCode = getStopShortCode(dropoffStop.name);
+          const dropoffIcon = L.divIcon({
+            className: 'apple-campus-map-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3.5px;
+                padding: 2.5px 7px 2.5px 3.5px;
+                background: ${markerBg};
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                border: 1.5px solid ${destAccent};
+                box-shadow: 0 4px 14px ${shadowColor}, 0 0 10px ${destAccent}66;
+                border-radius: 9999px;
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="
+                  width: 17px;
+                  height: 17px;
+                  border-radius: 50%;
+                  background: ${destAccent};
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 9.5px;
+                  color: #fff;
+                  font-weight: 900;
+                ">▼</span>
+                <span style="font-size: 11px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                  ${dropoffCode}
+                </span>
+              </div>
+            `,
+            iconSize: [60, 24],
+            iconAnchor: [30, 12]
+          });
+          const dMarker = L.marker([dropoffStop.lat, dropoffStop.lon], { icon: dropoffIcon });
+          dMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12.5px; font-weight: 700; color: ${destAccent};">📍 Drop-off Stop</div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${dropoffStop.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${dropoffStop.campus} Campus</div>
+            </div>
+          `);
+          markersGroup.addLayer(dMarker);
+
+          // Intermediate stops along the selected route (Interactive Apple Stop Glyphs)
+          routeStops.forEach((st) => {
+            if (st.name === boardingStop.name || st.name === dropoffStop.name) return;
+            const code = getStopShortCode(st.name);
+            const isOnSegment = routeSegmentStops.some(s => s.name.toLowerCase() === st.name.toLowerCase());
+
+            const stopGlyphIcon = L.divIcon({
+              className: 'apple-stop-glyph-marker',
+              html: `
+                <div style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 3px;
+                  padding: 2.5px 6px;
+                  background: ${markerBg};
+                  backdrop-filter: blur(16px);
+                  border: ${isOnSegment ? '1.5px solid #0A84FF' : (isLight ? '1px solid rgba(15, 23, 42, 0.14)' : '1px solid rgba(255, 255, 255, 0.22)')};
+                  border-radius: 9999px;
+                  box-shadow: ${isOnSegment ? `0 2px 10px rgba(10, 132, 255, 0.4), 0 2px 8px ${shadowColor}` : `0 2px 8px ${shadowColor}`};
+                  cursor: pointer;
+                  transform: translate(-50%, -50%);
+                  white-space: nowrap;
+                ">
+                  <span style="font-size: 9.5px;">🚏</span>
+                  <span style="font-size: 9.5px; font-weight: ${isOnSegment ? '700' : '600'}; color: ${isOnSegment ? '#0A84FF' : textSecondary}; font-family: -apple-system, sans-serif;">
+                    ${code}
+                  </span>
+                </div>
+              `,
+              iconSize: [52, 22],
+              iconAnchor: [26, 11]
+            });
+
+            const sMarker = L.marker([st.lat, st.lon], { icon: stopGlyphIcon });
+            sMarker.on('click', () => {
+              if (onSelectTargetLocation) {
+                onSelectTargetLocation(st.name);
+              }
+            });
+            sMarker.bindPopup(`
+              <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+                <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+                <div style="font-size: 10.5px; color: #666; margin-top: 2px;">Route ${selectedRoute.name} Stop</div>
+                <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                  margin-top: 6px;
+                  width: 100%;
+                  padding: 4px 8px;
+                  background: #0A84FF;
+                  color: #fff;
+                  border: none;
+                  border-radius: 6px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  cursor: pointer;
+                ">
+                  Route to this Stop ➔
+                </button>
+              </div>
+            `);
+            markersGroup.addLayer(sMarker);
+          });
+
+          // Final Target Destination Building Marker (if separate structure from bus stop)
+          if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+            const destCode = getStopShortCode(destTarget.name) || destTarget.name;
+            const destBuildingIcon = L.divIcon({
+              className: 'google-dest-building-marker',
+              html: `
+                <div style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 4px;
+                  padding: 2.5px 7px;
+                  background: ${markerBg};
+                  border: 1.5px solid #0A84FF;
+                  border-radius: 9999px;
+                  box-shadow: 0 4px 14px ${shadowColor};
+                  white-space: nowrap;
+                  transform: translate(-50%, -50%);
+                ">
+                  <span style="font-size: 10px;">🏁</span>
+                  <span style="font-size: 10.5px; font-weight: 700; color: ${textPrimary}; font-family: -apple-system, sans-serif;">
+                    ${destCode}
+                  </span>
+                </div>
+              `,
+              iconSize: [60, 24],
+              iconAnchor: [30, 12]
+            });
+            markersGroup.addLayer(L.marker([destTarget.lat, destTarget.lon], { icon: destBuildingIcon }));
+          }
         }
 
         // Render all other network stops in RUTGERS_BUS_STOPS so stops like Quads, Science Building, etc. are always present
-        const renderedStopNames = new Set([
-          boardingStop.name.toLowerCase(),
-          dropoffStop.name.toLowerCase(),
-          ...routeStops.map(s => s.name.toLowerCase())
-        ]);
+        const renderedStopNames = isWalk
+          ? new Set<string>()
+          : new Set([
+              boardingStop.name.toLowerCase(),
+              dropoffStop.name.toLowerCase(),
+              ...routeStops.map(s => s.name.toLowerCase())
+            ]);
 
         RUTGERS_BUS_STOPS.forEach((st) => {
           if (renderedStopNames.has(st.name.toLowerCase())) return;

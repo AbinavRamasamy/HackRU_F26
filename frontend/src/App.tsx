@@ -63,6 +63,18 @@ const WingedSneakerIcon = ({ size = 21, color = "#fff" }: { size?: number; color
   </svg>
 );
 
+export const getRouteUniqueKey = (route: any, fallbackIndex?: number): string => {
+  if (!route) return '';
+  if (route.id) return String(route.id);
+  const name = route.name || '';
+  const stop = route.stop_name || '';
+  const badge = route.badge || '';
+  const mins = route.estimated_minutes ?? '';
+  const desc = (route.description || '').slice(0, 35);
+  const composite = `${name}__${stop}__${badge}__${mins}__${desc}`;
+  return composite || (fallbackIndex !== undefined ? `route_${fallbackIndex}` : '');
+};
+
 export function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('scarlethop_theme');
@@ -291,9 +303,12 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setPlanResult(data);
-        const stillServes = selectedRoute && data.routes?.some((r: any) => r.name === selectedRoute.name);
+        const stillServes = selectedRoute && data.routes?.some((r: any, i: number) => getRouteUniqueKey(r, i) === getRouteUniqueKey(selectedRoute));
         if (!stillServes && data.routes && data.routes.length > 0) {
           setSelectedRoute(data.routes[0]);
+        } else if (stillServes) {
+          const matched = data.routes.find((r: any, i: number) => getRouteUniqueKey(r, i) === getRouteUniqueKey(selectedRoute));
+          if (matched) setSelectedRoute(matched);
         }
         return;
       }
@@ -311,26 +326,28 @@ export function App() {
       const primaryBus = isWeekend ? "Weekend 2" : (originCampus === "Busch" ? "Route B" : originCampus === "College Ave" ? "Route EE" : "Route B");
       fallbackRoutes = [
         {
-          name: primaryBus,
-          type: "Campus Bus",
+          name: "Campus Pedestrian Walk",
+          type: "Walking Path",
           estimated_minutes: 5,
-          rush_hour_minutes: 7,
+          rush_hour_minutes: 6,
           badge: "Recommended",
-          description: `Direct bus connecting local stops across ${originCampus} (BSC, Hill, Science, ARC).`
+          description: `Direct pedestrian walk between buildings on ${originCampus} (cuts straight across campus walkways without taking the outer bus loop).`
         },
         {
           name: "Rutgers E-Scooter / Bike",
           type: "Bike / E-Scooter",
           estimated_minutes: 3,
           rush_hour_minutes: 4,
+          badge: "Fastest Active",
           description: `Hop on a Veo e-scooter or bike for quick cross-building transit on ${originCampus}.`
         },
         {
-          name: "Campus Pedestrian Walk",
-          type: "Walking Path",
-          estimated_minutes: 6,
-          rush_hour_minutes: 8,
-          description: `Direct pedestrian walk between buildings on ${originCampus}.`
+          name: primaryBus,
+          type: "Campus Bus",
+          estimated_minutes: 8,
+          rush_hour_minutes: 12,
+          badge: "Perimeter Bus Loop",
+          description: `Bus following the outer roadway loop on ${originCampus}. Note: vehicles take the outer road rather than direct pedestrian walkways.`
         }
       ];
     } else {
@@ -379,9 +396,12 @@ export function App() {
     };
 
     setPlanResult(fallbackPlan);
-    const stillServesFallback = selectedRoute && fallbackRoutes.some((r: any) => r.name === selectedRoute.name);
+    const stillServesFallback = selectedRoute && fallbackRoutes.some((r: any, i: number) => getRouteUniqueKey(r, i) === getRouteUniqueKey(selectedRoute));
     if (!stillServesFallback && fallbackRoutes.length > 0) {
       setSelectedRoute(fallbackRoutes[0]);
+    } else if (stillServesFallback) {
+      const matched = fallbackRoutes.find((r: any, i: number) => getRouteUniqueKey(r, i) === getRouteUniqueKey(selectedRoute));
+      if (matched) setSelectedRoute(matched);
     }
   };
 
@@ -711,7 +731,6 @@ export function App() {
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
-  const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
 
   return (
     <div className="apple-app-container">
@@ -1676,7 +1695,7 @@ export function App() {
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         {visibleRoutes.map((route: any, idx: number) => {
-                          const isSelected = selectedRoute?.name === route.name;
+                          const isSelected = selectedRoute ? getRouteUniqueKey(selectedRoute) === getRouteUniqueKey(route, idx) : false;
                           const isTop = idx === 0;
                           const colorInfo = getRouteColorInfo(route.name);
                           const stops = getStopsForRoute(route.name);

@@ -4,6 +4,7 @@ import re
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -557,8 +558,9 @@ async def calculate_commute(plan: CommutePlanRequest):
 
     if mm_result and mm_result.get("options"):
         routes = []
-        for opt in mm_result["options"]:
+        for i, opt in enumerate(mm_result["options"]):
             routes.append({
+                "id": f"mm_{opt.get('bus_route')}_{opt.get('stop_name')}_{opt.get('total_mins')}_{i}",
                 "name": opt.get("bus_route") or "Campus Route",
                 "type": opt.get("type", "Multimodal (Walk + Bus)"),
                 "estimated_minutes": opt.get("total_mins", 10),
