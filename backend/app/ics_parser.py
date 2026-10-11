@@ -1,20 +1,23 @@
-#calander scanner
+# Rutgers Calendar .ics Schedule Parser
 import os
 import re
+import json
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
+
+from google import genai
 
 from app.rutgers_data import CAMPUS_BUILDINGS, find_building
 from app.schedule_parser import DAY_ORDER, normalize_time, normalize_days
 
 ICS_DAY_MAP = {
-    "MO": "M",
-    "TU": "T",
-    "WE": "W",
-    "TH": "TH",
-    "FR": "F",
-    "SA": "S",
-    "SU": "SU"
+    "MO": "M", "M": "M",
+    "TU": "T", "T": "T",
+    "WE": "W", "W": "W",
+    "TH": "TH", "R": "TH", "H": "TH",
+    "FR": "F", "F": "F",
+    "SA": "S", "S": "S",
+    "SU": "SU", "U": "SU"
 }
 
 WEEKDAY_TO_DAY = ["M", "T", "W", "TH", "F", "S", "SU"]
@@ -23,8 +26,24 @@ IGNORE_KEYWORDS = [
     "birthday", "bday", "b-day", "anniversary", "holiday", 
     "observed", "day off", "vacation", "no classes", "reminder", 
     "task", "doctor", "dentist", "payday", "flight", "check-in",
-    "garbage", "trash", "recycle", "election"
+    "garbage", "trash", "recycle", "election",
+    "final exam", "midterm", "quiz", "reading day"
 ]
+
+def extract_zoom_link(ev: Dict[str, str]) -> Optional[str]:
+    """Extracts Zoom or video conferencing URL from event properties."""
+    zoom_pattern = re.compile(
+        r"https://[a-zA-Z0-9.\-_]*(?:zoom\.us|webex\.com|teams\.microsoft\.com|meet\.google\.com)/[^\s\"'<>]+",
+        re.I
+    )
+    for key, val in ev.items():
+        if not val:
+            continue
+        match = zoom_pattern.search(val)
+        if match:
+            url = match.group(0).rstrip(".,;)\\")
+            return url
+    return None
 
 def unfold_ics(content: str) -> List[str]:
     """Unfolds wrapped lines in standard RFC 5545 iCalendar format."""
@@ -64,45 +83,178 @@ def is_all_day(prop_line: str) -> bool:
     val = prop_line.split(":")[-1].strip()
     return "T" not in val
 
-def get_current_semester_bounds(ref_date: date):
+def get_rutgers_semester_bounds(ref_date: date):
     """
-    Returns (semester_start, semester_end, semester_name) based on official Rutgers semester dates.
-    - Fall Semester: Sept 1 to Dec 23
-    - Spring Semester: Jan 15 to May 15
-    - Summer Session: May 25 to Aug 20
+    Returns official Rutgers University academic calendar cutoff dates.
+    - Fall 2026:
+        * Classes Begin: Tuesday, September 1, 2026
+        * Regular Classes End: Thursday, December 10, 2026
+        * Reading Days: Friday, December 11 – Monday, December 14, 2026
+        * Final Exams Period: Tuesday, December 15 – Tuesday, December 22, 2026 (cutoff Dec 23)
+    - Spring: January 16 to May 15
+    - Summer: May 20 to August 20
     """
     year = ref_date.year
     month = ref_date.month
 
-    if month >= 9:
-        # Fall Semester (starts Sept 1, ends Dec 23)
-        return date(year, 9, 1), date(year, 12, 23), "Fall"
-    elif month <= 5 and (month > 1 or ref_date.day >= 15):
-        # Spring Semester (starts mid-Jan, ends mid-May)
-        return date(year, 1, 15), date(year, 5, 15), "Spring"
-    elif 5 < month < 9:
-        # Summer Session (starts late May, ends mid-Aug)
-        return date(year, 5, 25), date(year, 8, 20), "Summer"
+    if month >= 8:
+        # Official Rutgers Fall Semester (starts Sept 1; exams end Dec 23)
+        return date(year, 9, 1), date(year, 12, 23), f"Fall {year}"
+    elif month <= 5:
+        # Spring Semester
+        return date(year, 1, 16), date(year, 5, 15), f"Spring {year}"
     else:
-        # Winter Session (early Jan)
-        return date(year, 1, 2), date(year, 1, 14), "Winter"
+        # Summer Session
+        return date(year, 5, 20), date(year, 8, 20), f"Summer {year}"
+
+
+def resolve_locations_with_gemini(classes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Uses Gemini 3.5 Flash Lite to resolve each class's location:
+    - The optimal Google Maps search location query string if it is a physical location
+      (e.g. 'Hill Center, Rutgers University, Busch Campus, Piscataway, NJ').
+    - Strictly '(Online)' otherwise (for virtual, remote, asynchronous, zoom, canvas, or unspecified classes).
+    """
+    if not classes:
+        return classes
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
+
+    gemini_data = None
+    if api_key and api_key.strip() not in ["", "your_gemini_api_key_here", "YOUR_GEMINI_API_KEY"]:
+        try:
+            client = genai.Client(api_key=api_key.strip())
+            query_items = [
+                {
+                    "index": i,
+                    "course": c.get("course", ""),
+                    "raw_location": c.get("building") or c.get("location") or ""
+                }
+                for i, c in enumerate(classes)
+            ]
+
+            prompt = f"""You are an expert Rutgers University navigation assistant.
+For each of the following courses and raw locations, determine:
+1. Is it a physical in-person classroom location at Rutgers University, or is it online/remote/virtual/asynchronous/unspecified?
+2. If it is a physical location:
+   - Provide the optimal Google Maps search location query (e.g. "Hill Center, Rutgers University, Busch Campus, Piscataway, NJ", "Tillett Hall, Rutgers University, Livingston Campus, Piscataway, NJ", "Academic Building, Rutgers University, College Ave, New Brunswick, NJ") that directly navigates to the building on Google Maps. Strip room numbers like 114 or 254 from the query so Google Maps pins the building accurately.
+   - Provide the Rutgers campus name (one of: "Busch", "College Ave", "Livingston", "Cook/Douglass").
+3. If it is NOT a physical location (online, virtual, canvas, zoom, asynchronous, remote, or blank/unspecified):
+   - "location" MUST be strictly "(Online)"
+   - "campus" MUST be strictly "(Online)"
+   - "is_online" MUST be true
+
+Input items:
+{json.dumps(query_items)}
+
+Return ONLY a strictly valid JSON array of objects with the exact schema:
+[
+  {{
+    "index": 0,
+    "location": "Google Maps search string OR (Online)",
+    "campus": "Busch / College Ave / Livingston / Cook/Douglass / (Online)",
+    "is_online": boolean
+  }}
+]
+"""
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            text = (response.text or "").strip()
+            if "```" in text:
+                text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+                text = re.sub(r"\s*```$", "", text)
+            parsed_json = json.loads(text)
+            if isinstance(parsed_json, list) and len(parsed_json) == len(classes):
+                gemini_data = {item.get("index", idx): item for idx, item in enumerate(parsed_json)}
+        except Exception as e:
+            print(f"[GeminiLocationResolver] Gemini 3.5 Flash Lite error: {e}")
+
+    # Apply Gemini results or intelligent fallback
+    for idx, item in enumerate(classes):
+        if item.get("zoom_link"):
+            item["location"] = "(Online)"
+            item["campus"] = "(Online)"
+            item["is_online"] = True
+            item["has_real_location"] = False
+            item["coords"] = None
+            item["stop"] = None
+            continue
+
+        raw_bldg = (item.get("building") or item.get("location") or "").strip()
+        is_known_online = any(term in raw_bldg.lower() for term in ["online", "virtual", "canvas", "zoom", "asynchronous", "remote", "website", "webex"]) or not bool(raw_bldg)
+
+        if gemini_data and idx in gemini_data:
+            g_item = gemini_data[idx]
+            g_loc = (g_item.get("location") or "").strip()
+            g_campus = (g_item.get("campus") or "").strip()
+            g_is_online = g_item.get("is_online", False) or g_loc == "(Online)"
+
+            if g_is_online or g_loc == "(Online)":
+                item["location"] = "(Online)"
+                item["campus"] = "(Online)"
+                item["is_online"] = True
+                item["has_real_location"] = False
+                item["coords"] = None
+                item["stop"] = None
+            else:
+                item["location"] = g_loc
+                item["campus"] = g_campus or "College Ave"
+                item["is_online"] = False
+                item["has_real_location"] = True
+                matched = find_building(raw_bldg) or find_building(g_loc)
+                if matched:
+                    item["coords"] = matched.get("coords")
+                    item["stop"] = matched.get("stop")
+                    if not item["campus"] or item["campus"] == "(Online)":
+                        item["campus"] = matched.get("campus")
+                else:
+                    item["coords"] = None
+                    item["stop"] = None
+        else:
+            # Fallback when Gemini is unavailable
+            if is_known_online:
+                item["location"] = "(Online)"
+                item["campus"] = "(Online)"
+                item["is_online"] = True
+                item["has_real_location"] = False
+                item["coords"] = None
+                item["stop"] = None
+            else:
+                matched = find_building(raw_bldg)
+                if matched:
+                    clean_bldg = re.sub(r"\s+\b(?:room|rm|\d{1,4}[a-z]?)\b.*$", "", raw_bldg, flags=re.I).strip() or raw_bldg
+                    campus = matched.get("campus", "College Ave")
+                    item["location"] = f"{clean_bldg}, Rutgers University, {campus} Campus, NJ"
+                    item["campus"] = campus
+                    item["coords"] = matched.get("coords")
+                    item["stop"] = matched.get("stop")
+                    item["is_online"] = False
+                    item["has_real_location"] = True
+                else:
+                    item["location"] = f"{raw_bldg}, Rutgers University, New Brunswick, NJ"
+                    item["campus"] = "College Ave"
+                    item["coords"] = None
+                    item["stop"] = None
+                    item["is_online"] = False
+                    item["has_real_location"] = True
+
+    return classes
+
 
 def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
     """
-    Parses an .ics (iCalendar) file and extracts active class meetings for the CURRENT week only.
+    Parses an .ics (iCalendar) file and extracts weekly class meetings.
+    - Strictly enforces official Rutgers Fall 2026 semester cutoff dates (Sept 1 - Dec 23, 2026).
+    - Accurately captures recurring semester classes (RRULE with BYDAY).
+    - Accurately captures individual recurring lecture meetings across the semester.
     - Excludes non-class personal events (birthdays, holidays, all-day events).
-    - Enforces strict Rutgers semester cutoff dates (e.g. ignores August summer/orientation events).
     - Consolidates identical meetings (same course, time, location) with merged day codes.
     - Returns classes ordered strictly by Date (day of week) and Time.
     """
     lines = unfold_ics(ics_content)
-    now = datetime.now()
-    # Monday to Sunday of the current week
-    current_monday = (now - timedelta(days=now.weekday())).date()
-    current_sunday = current_monday + timedelta(days=6)
-    
-    # Strict semester cutoff dates for Rutgers
-    semester_start, semester_end, semester_name = get_current_semester_bounds(current_monday)
 
     raw_events = []
     in_vevent = False
@@ -122,16 +274,38 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
             prop_val = line
             current_props[prop_key] = prop_val
 
+    # Determine active Rutgers semester cutoff bounds
+    now_date = datetime.now().date()
+    valid_dates = []
+    for ev in raw_events:
+        dtstart_line = ev.get("DTSTART", "")
+        if not is_all_day(dtstart_line):
+            dt = parse_ics_datetime(dtstart_line)
+            if dt:
+                valid_dates.append(dt.date())
+
+    has_recent = any(abs((d - now_date).days) <= 100 for d in valid_dates) if valid_dates else False
+    anchor_date = now_date if has_recent else (max(valid_dates) if valid_dates else now_date)
+    term_start, term_end, term_name = get_rutgers_semester_bounds(anchor_date)
+
+    # Active date window: strictly limit single events to current week and next week
+    # (Excludes distant future events like December exams when in October)
+    curr_week_start = anchor_date - timedelta(days=anchor_date.weekday() + 1)
+    next_week_end = curr_week_start + timedelta(days=21)
+
     parsed_meetings = []
 
     for ev in raw_events:
         summary_line = ev.get("SUMMARY", "")
         summary = summary_line.split(":", 1)[-1].strip() if ":" in summary_line else "Class Meeting"
         
-        # 1. Filter out birthdays, holidays, and personal reminders
+        # 1. Filter out birthdays, holidays, personal reminders, exams, tests, and quizzes
         summary_lower = summary.lower()
-        if any(ign in summary_lower for ign in IGNORE_KEYWORDS):
+        if any(ign in summary_lower for ign in IGNORE_KEYWORDS) or re.search(r"\b(exam|final exam|midterm|quiz|reading day)\b", summary_lower):
             continue
+
+        # Extract Zoom / video conference URL if present
+        zoom_link = extract_zoom_link(ev)
 
         # 2. Filter out all-day events (e.g. VALUE=DATE or no time component)
         dtstart_line = ev.get("DTSTART", "")
@@ -142,23 +316,17 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
         if not dtstart:
             continue
 
-        # 3. Enforce semester cutoffs: Skip any event that started before official semester start (e.g. in August)
-        if dtstart.date() < semester_start:
-            continue
-        if dtstart.date() > semester_end:
-            continue
-
         dtend_line = ev.get("DTEND", "")
         dtend = parse_ics_datetime(dtend_line)
 
-        # 4. Verify meeting duration (academic classes are between 25 mins and 5 hours)
+        # 3. Verify meeting duration (academic classes are typically 25 mins to 5 hours)
         if dtend:
             duration_minutes = (dtend - dtstart).total_seconds() / 60
-            if duration_minutes < 25 or duration_minutes > 300:
+            if duration_minutes < 20 or duration_minutes > 360:
                 continue
             end_time = f"{dtend.hour:02d}:{dtend.minute:02d}"
         else:
-            # Default Rutgers period ~80 mins
+            # Default Rutgers class period ~80 mins
             end_dt = dtstart + timedelta(minutes=80)
             end_time = f"{end_dt.hour:02d}:{end_dt.minute:02d}"
 
@@ -174,8 +342,13 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
         rrule_line = ev.get("RRULE", "")
         rrule = rrule_line.split(":", 1)[-1].strip() if ":" in rrule_line else ""
 
+        # 4. Strict semester cutoff: Only events belonging to this semester
+        # (e.g. Rutgers Fall 2026: Sept 1, 2026 - Dec 23, 2026)
+        earliest_start = term_start - timedelta(days=2) # Grace buffer for timezone/orientation
+        if dtstart.date() < earliest_start or dtstart.date() > term_end:
+            continue
+
         event_days = []
-        is_active_current_week = False
 
         if rrule:
             rrule_upper = rrule.upper()
@@ -184,32 +357,22 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
             if "FREQ=YEARLY" in rrule_upper or "FREQ=MONTHLY" in rrule_upper:
                 continue
 
-            # Check UNTIL: if sequence ended before this week, discard
+            # Recurring sequence cannot start beyond next week
+            if dtstart.date() > next_week_end:
+                continue
+
+            # If recurring sequence ended before the active window started, discard
             until_match = re.search(r"UNTIL=(\d{8}(?:T\d{6}Z?)?)", rrule_upper)
             if until_match:
                 until_str = until_match.group(1)
-                match_until_date = re.match(r"^(\d{4})(\d{2})(\d{2})", until_str)
-                if match_until_date:
-                    uy, um, ud = int(match_until_date.group(1)), int(match_until_date.group(2)), int(match_until_date.group(3))
-                    until_date = date(uy, um, ud)
-                    if until_date < current_monday:
-                        # Recurrence ended before the current week
+                m = re.match(r"^(\d{4})(\d{2})(\d{2})", until_str)
+                if m:
+                    until_date = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                    if until_date < curr_week_start:
                         continue
 
-            # Check COUNT: if limited occurrences, check that it didn't end before this week
-            count_match = re.search(r"COUNT=(\d+)", rrule_upper)
-            if count_match:
-                count_val = int(count_match.group(1))
-                last_occurrence = dtstart.date() + timedelta(weeks=count_val)
-                if last_occurrence < current_monday:
-                    continue
-
-            # Ensure event has already started by end of current week
-            if dtstart.date() > current_sunday:
-                continue
-
-            # Extract BYDAY recurrence days
-            byday_match = re.search(r"BYDAY=([A-Z,]+)", rrule)
+            # Extract BYDAY recurrence days (e.g. BYDAY=MO,WE,FR or BYDAY=TU,TH)
+            byday_match = re.search(r"BYDAY=([A-Z0-9,]+)", rrule)
             if byday_match:
                 bydays = byday_match.group(1).split(",")
                 for bd in bydays:
@@ -219,27 +382,28 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
             else:
                 event_days.append(WEEKDAY_TO_DAY[dtstart.weekday()])
 
-            is_active_current_week = True
-
         else:
-            # Single non-repeating event: MUST take place strictly within the current week
-            event_date = dtstart.date()
-            if current_monday <= event_date <= current_sunday:
-                event_day_code = WEEKDAY_TO_DAY[dtstart.weekday()]
-                event_days.append(event_day_code)
-                is_active_current_week = True
+            # Single or non-RRULE exported class event:
+            # STRICTLY exclude events beyond current week and next week!
+            # (Excludes December exams, future reviews, and past one-off meetings)
+            if dtstart.date() < curr_week_start or dtstart.date() > next_week_end:
+                continue
 
-        if is_active_current_week and event_days:
+            event_day_code = WEEKDAY_TO_DAY[dtstart.weekday()]
+            event_days.append(event_day_code)
+
+        if event_days:
             parsed_meetings.append({
                 "course": cleaned_summary,
                 "days": event_days,
                 "startTime": start_time,
                 "endTime": end_time,
                 "building": location,
-                "location": location
+                "location": location,
+                "zoom_link": zoom_link
             })
 
-    # Group identical (course, building, time) across days for current week
+    # Group identical (course, building, time) across days into recurring weekly entries
     grouped_dict = {}
     for item in parsed_meetings:
         course = item.get("course", "").strip()
@@ -258,9 +422,12 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
                 "building": building,
                 "startTime": start,
                 "endTime": end,
-                "days": days
+                "days": days,
+                "zoom_link": item.get("zoom_link")
             }
         else:
+            if not grouped_dict[key].get("zoom_link") and item.get("zoom_link"):
+                grouped_dict[key]["zoom_link"] = item.get("zoom_link")
             for d in days:
                 if d not in grouped_dict[key]["days"]:
                     grouped_dict[key]["days"].append(d)
@@ -271,39 +438,14 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
 
     consolidated = list(grouped_dict.values())
 
-    # Enrich with Rutgers campus and location formatting
+    # Enrich with days_display
     for item in consolidated:
         item["days_display"] = ", ".join(item["days"])
-        raw_bldg = (item.get("building") or "").strip()
 
-        #check if the event is online or virtual
-        is_online = any(term in raw_bldg.lower() for term in ["online","virtual","canvas","zoom", "asynchronous", "remote" , "website", "webex"])
-        has_real_location = bool(raw_bldg) and not is_online
-        item["is_online"] = is_online
-        item["has_real_location"] = has_real_location
-
-        matched_building = find_building(raw_bldg) if has_real_location else None
-        if matched_building:
-            item["campus"] = matched_building["campus"]
-            item["coords"] = matched_building["coords"]
-            item["stop"] = matched_building["stop"]
-            item["location"] = f"{raw_bldg} ({matched_building['campus']})" if matched_building['campus'].lower() not in raw_bldg.lower() else raw_bldg
-        elif is_online:
-            item["campus"] = "Online"
-            item["coords"] = None
-            item["stop"] = None
-            item["location"] = "Online / Virtual Lecture"
-        elif has_real_location:
-            # Has a custom building/location name not yet in the Rutgers dictionary
-            item["campus"] = "College Ave"
-            item["coords"] = None
-            item["stop"] = None
-            item["location"] = raw_bldg
-        else:
-            item["campus"] = None
-            item["coords"] = None
-            item["stop"] = None
-            item["location"] = "No Location Specified"
+    # Resolve class locations using Gemini 3.5 Flash Lite:
+    # Physical locations become the Google Maps search location query;
+    # Non-physical/virtual classes strictly become "(Online)".
+    consolidated = resolve_locations_with_gemini(consolidated)
 
     # Order strictly by Date (earliest day of the week) and Time
     def class_sort_key(cls_item):
@@ -315,7 +457,7 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
     if not consolidated:
         return {
             "status": "success",
-            "message": "No active classes found for the current week in the uploaded calendar file.",
+            "message": "No course meetings could be identified in the uploaded calendar file.",
             "classes": []
         }
 

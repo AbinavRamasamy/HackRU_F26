@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, MapPin, Copy, Check } from 'lucide-react';
 import { getRouteColor } from './CampusRadar';
+import { API_BASE_URL } from './apiConfig';
 
 interface BusItem {
   id: string;
@@ -55,7 +56,7 @@ export const TransitWidget: React.FC<TransitWidgetOverlayProps> = ({
 
     const fetchTelemetry = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/telemetry");
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
         if (res.ok) {
           const data = await res.json();
           setBuses(data.buses || []);

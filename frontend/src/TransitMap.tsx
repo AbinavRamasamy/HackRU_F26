@@ -1077,35 +1077,77 @@ export const TransitMap: React.FC<TransitMapProps> = ({
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
               }}>
-                📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • {upcomingClassInfo.nextClass.campus} Campus • ⏰ {upcomingClassInfo.nextClass.startTime}
+                {upcomingClassInfo.nextClass.location === '(Online)' || upcomingClassInfo.nextClass.campus === '(Online)' ? (
+                  <span>💻 (Online Class) • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
+                ) : (
+                  <span>📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Action Button: Auto-Select Route to Next Class */}
+          {/* Action Button: Auto-Select Route to Next Class OR Join Zoom */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            <button
-              onClick={onAutoRouteToNextClass}
-              className="apple-btn-primary"
-              style={{
-                padding: '7px 14px',
-                fontSize: '11.5px',
-                fontWeight: 700,
+            {upcomingClassInfo.nextClass.zoom_link ? (
+              <a
+                href={upcomingClassInfo.nextClass.zoom_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apple-btn-primary"
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  borderRadius: '9999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(11, 132, 254, 0.35)',
+                  border: 'none',
+                  textDecoration: 'none'
+                }}
+                title="Open Zoom video conference in new tab"
+              >
+                📹 Join Zoom
+              </a>
+            ) : upcomingClassInfo.nextClass.location !== '(Online)' && upcomingClassInfo.nextClass.campus !== '(Online)' ? (
+              <button
+                onClick={onAutoRouteToNextClass}
+                className="apple-btn-primary"
+                style={{
+                  padding: '7px 14px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  borderRadius: '9999px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
+                  color: '#fff',
+                  boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
+                  border: 'none'
+                }}
+                title="Auto-select transit route directly to this class"
+              >
+                <Navigation size={13} />
+                <span>Route to Class</span>
+              </button>
+            ) : (
+              <span style={{
+                padding: '6px 12px',
+                fontSize: '11px',
+                fontWeight: 600,
                 borderRadius: '9999px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                cursor: 'pointer',
-                background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
-                color: '#fff',
-                boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
-                border: 'none'
-              }}
-              title="Auto-select transit route directly to this class"
-            >
-              <Navigation size={13} />
-              <span>Route to Class</span>
-            </button>
+                background: 'var(--apple-card-bg-inset)',
+                color: 'var(--apple-label-secondary)'
+              }}>
+                💻 Online
+              </span>
+            )}
           </div>
         </div>
       )}

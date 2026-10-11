@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -367,7 +368,7 @@ async def copilot_chat(req: ChatQueryRequest):
         try:
             from google import genai
             client = genai.Client(api_key=api_key)
-            model_name = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+            model_name = os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite"
             
             prompt = f"""
 You are ScarletHop, the expert Rutgers University real-time transit AI assistant.
@@ -607,10 +608,6 @@ def signup(req: SignupRequest):
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters.")
     if req.password.strip() == "":
         raise HTTPException(status_code=400, detail="Password can't be empty.")
-    if req.walking_speed not in SPEED_OPTIONS:
-        raise HTTPException(status_code=400, detail="Invalid walking speed.")
-    if req.max_walking_distance not in DISTANCE_OPTIONS:
-        raise HTTPException(status_code=400, detail="Invalid walking distance.")
 
     users = load_users()
 
@@ -621,10 +618,12 @@ def signup(req: SignupRequest):
 
     users[username] = {
         "password": hashed_password,
-        "walking_speed": req.walking_speed,
-        "prefer_walking": req.prefer_walking,
-        "max_walking_distance": req.max_walking_distance,
-        "avoid_bad_weather": req.avoid_bad_weather,
+        "walking_speed": req.walking_speed or "2.5 mph",
+        "prefer_walking": True if req.prefer_walking is None else req.prefer_walking,
+        "max_walking_distance": req.max_walking_distance or "1 Mile",
+        "avoid_bad_weather": True if req.avoid_bad_weather is None else req.avoid_bad_weather,
+        "avoid_rain": True if req.avoid_rain is None else req.avoid_rain,
+        "avoid_snow": True if req.avoid_snow is None else req.avoid_snow,
         "classes": []
     }
     save_users(users)
@@ -651,33 +650,48 @@ def login(req: LoginRequest):
     return {"status": "success", "username": username}
 
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: UploadFile = File(...), username: str = Form(...)):
-    username = username.strip().lower()
-    if username not in load_users():
-        raise HTTPException(status_code= 404, detail = "User not Found.")
+async def upload_schedule(file: UploadFile = File(...), username: Optional[str] = Form(None)):
+    # 1. Clean the username if provided
+    clean_user = username.strip().lower() if username else None
+
+    # 2. Verify user exists if username was specified
+    if clean_user and clean_user not in load_users():
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # 3. Read the uploaded file
     contents = await file.read()
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
-    if filename.endswith(".ics") or "calendar" in content_type:
+
+    # 4. Choose parser: .ics calendar or image OCR
+    if filename.endswith(".ics") or "calendar" in content_type or b"BEGIN:VCALENDAR" in contents[:500]:
         try:
             text = contents.decode("utf-8", errors="ignore")
-            result = parse_ics_schedule(text)
+            result = await asyncio.to_thread(parse_ics_schedule, text)
         except Exception as e:
-            return {
+            result = {
                 "status": "error",
                 "message": f"Failed to parse .ics calendar file: {str(e)}",
                 "classes": []
             }
     else:
-        result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
-    if result.get("status") == "success" :
+        result = await asyncio.to_thread(parse_schedule_with_gemini, contents, file.content_type or "image/png")
+
+    # 5. If parsing succeeded and a username was provided, save classes to the user's SQL profile
+    if result.get("status") == "success" and clean_user:
         users = load_users()
-        users[username]["classes"] = result["classes"]
-        save_users(users)
+        if clean_user in users:
+            users[clean_user]["classes"] = result.get("classes", [])
+            save_users(users)
+
+    # 6. Return the result
     return result
+
+
 class CalendarSyncRequest(BaseModel):
     username: str
     calendar_url: str
+
 
 @app.post("/api/calendar/sync")
 async def sync_calendar_feed(req: CalendarSyncRequest):
@@ -700,7 +714,7 @@ async def sync_calendar_feed(req: CalendarSyncRequest):
                 raise HTTPException(status_code=400, detail=f"Failed to fetch calendar from provider (HTTP {resp.status_code}).")
 
             ics_text = resp.text
-            result = parse_ics_schedule(ics_text)
+            result = await asyncio.to_thread(parse_ics_schedule, ics_text)
             
             if result.get("status") == "success":
                 users = load_users()
@@ -716,3 +730,103 @@ async def sync_calendar_feed(req: CalendarSyncRequest):
                 return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Calendar sync error: {str(e)}")
+
+
+@app.get("/api/database/status")
+def get_database_status():
+    raw_url = os.getenv("DATABASE_URL") or os.getenv("TIGERDATA_DATABASE_URL", "")
+    provider = "TigerData (PostgreSQL Cloud)" if raw_url else "SQLite (Local File Fallback)"
+    users = load_users()
+    return {
+        "status": "connected",
+        "provider": provider,
+        "is_tigerdata": bool(raw_url),
+        "database_url_configured": bool(raw_url),
+        "registered_users_count": len(users),
+        "usernames": list(users.keys())
+    }
+
+
+@app.get("/api/users")
+def list_registered_users():
+    users = load_users()
+    return {
+        "count": len(users),
+        "users": [
+            {
+                "username": u,
+                "walking_speed": data.get("walking_speed"),
+                "classes_count": len(data.get("classes", []))
+            }
+            for u, data in users.items()
+        ]
+    }
+
+
+@app.get("/api/user/{username}")
+def get_user_profile(username: str):
+    clean = username.strip().lower()
+    users = load_users()
+    if clean not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+    u_data = users[clean]
+    return {
+        "username": clean,
+        "walking_speed": u_data.get("walking_speed", "2.5 mph"),
+        "prefer_walking": u_data.get("prefer_walking", True),
+        "max_walking_distance": u_data.get("max_walking_distance", "1 Mile"),
+        "avoid_bad_weather": u_data.get("avoid_bad_weather", True),
+        "avoid_rain": u_data.get("avoid_rain", True),
+        "avoid_snow": u_data.get("avoid_snow", True),
+        "classes": u_data.get("classes", [])
+    }
+
+
+class PreferencesUpdateRequest(BaseModel):
+    walking_speed: Optional[str] = None
+    prefer_walking: Optional[bool] = None
+    max_walking_distance: Optional[str] = None
+    avoid_bad_weather: Optional[bool] = None
+    avoid_rain: Optional[bool] = None
+    avoid_snow: Optional[bool] = None
+
+
+@app.post("/api/user/{username}/preferences")
+def update_user_preferences(username: str, req: PreferencesUpdateRequest):
+    clean = username.strip().lower()
+    users = load_users()
+    if clean not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if req.walking_speed is not None:
+        users[clean]["walking_speed"] = req.walking_speed
+    if req.prefer_walking is not None:
+        users[clean]["prefer_walking"] = req.prefer_walking
+    if req.max_walking_distance is not None:
+        users[clean]["max_walking_distance"] = req.max_walking_distance
+    if req.avoid_bad_weather is not None:
+        users[clean]["avoid_bad_weather"] = req.avoid_bad_weather
+    if req.avoid_rain is not None:
+        users[clean]["avoid_rain"] = req.avoid_rain
+    if req.avoid_snow is not None:
+        users[clean]["avoid_snow"] = req.avoid_snow
+
+    save_users(users)
+    return {
+        "status": "success",
+        "username": clean,
+        "preferences": {
+            "walking_speed": users[clean].get("walking_speed", "2.5 mph"),
+            "prefer_walking": users[clean].get("prefer_walking", True),
+            "max_walking_distance": users[clean].get("max_walking_distance", "1 Mile"),
+            "avoid_bad_weather": users[clean].get("avoid_bad_weather", True),
+            "avoid_rain": users[clean].get("avoid_rain", True),
+            "avoid_snow": users[clean].get("avoid_snow", True)
+        }
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+
