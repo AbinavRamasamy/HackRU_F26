@@ -16,6 +16,7 @@ from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
 from app.commute_planner import get_commute_routes, plan_multimodal_route
+from app.weather import get_commute_weather_guidance, get_forecast, evaluate_weather
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -596,6 +597,11 @@ class SignupRequest(BaseModel):
     prefer_walking: bool
     max_walking_distance: str
     avoid_bad_weather: bool
+    calendar_url: Optional[str] = None
+    willing_to_walk_further: Optional[bool] = None
+    priority: Optional[str] = None
+    avoid_rain: Optional[bool] = None
+    avoid_snow: Optional[bool] = None
 
 
 @app.post("/api/signup")
@@ -618,12 +624,15 @@ def signup(req: SignupRequest):
 
     users[username] = {
         "password": hashed_password,
-        "walking_speed": req.walking_speed or "2.5 mph",
+        "walking_speed": req.walking_speed if req.walking_speed in SPEED_OPTIONS else "Stride",
         "prefer_walking": True if req.prefer_walking is None else req.prefer_walking,
-        "max_walking_distance": req.max_walking_distance or "1 Mile",
+        "max_walking_distance": req.max_walking_distance if req.max_walking_distance in DISTANCE_OPTIONS else "1/2 A Mile",
         "avoid_bad_weather": True if req.avoid_bad_weather is None else req.avoid_bad_weather,
         "avoid_rain": True if req.avoid_rain is None else req.avoid_rain,
         "avoid_snow": True if req.avoid_snow is None else req.avoid_snow,
+        "calendar_url": req.calendar_url,
+        "willing_to_walk_further": True if req.willing_to_walk_further is None else req.willing_to_walk_further,
+        "priority": req.priority if req.priority in ("fastest_arrival", "least_walking") else "fastest_arrival",
         "classes": []
     }
     save_users(users)
@@ -720,6 +729,7 @@ async def sync_calendar_feed(req: CalendarSyncRequest):
                 users = load_users()
                 users[username]["classes"] = result.get("classes", [])
                 users[username]["calendar_url"] = url
+                users[username]["calendar_synced_at"] = datetime.utcnow()
                 save_users(users)
                 return {
                     "status": "success",
@@ -772,9 +782,9 @@ def get_user_profile(username: str):
     u_data = users[clean]
     return {
         "username": clean,
-        "walking_speed": u_data.get("walking_speed", "2.5 mph"),
+        "walking_speed": u_data.get("walking_speed", "Stride"),
         "prefer_walking": u_data.get("prefer_walking", True),
-        "max_walking_distance": u_data.get("max_walking_distance", "1 Mile"),
+        "max_walking_distance": u_data.get("max_walking_distance", "1/2 A Mile"),
         "avoid_bad_weather": u_data.get("avoid_bad_weather", True),
         "avoid_rain": u_data.get("avoid_rain", True),
         "avoid_snow": u_data.get("avoid_snow", True),
@@ -789,6 +799,8 @@ class PreferencesUpdateRequest(BaseModel):
     avoid_bad_weather: Optional[bool] = None
     avoid_rain: Optional[bool] = None
     avoid_snow: Optional[bool] = None
+    willing_to_walk_further: Optional[bool] = None
+    priority: Optional[str] = None
 
 
 @app.post("/api/user/{username}/preferences")
@@ -810,21 +822,53 @@ def update_user_preferences(username: str, req: PreferencesUpdateRequest):
         users[clean]["avoid_rain"] = req.avoid_rain
     if req.avoid_snow is not None:
         users[clean]["avoid_snow"] = req.avoid_snow
-
+    if req.willing_to_walk_further is not None:
+        users[clean]["willing_to_walk_further"] = req.willing_to_walk_further
+    if req.priority in ("fastest_arrival", "least_walking"):
+        users[clean]["priority"] = req.priority
     save_users(users)
     return {
         "status": "success",
         "username": clean,
         "preferences": {
-            "walking_speed": users[clean].get("walking_speed", "2.5 mph"),
+            "walking_speed": users[clean].get("walking_speed", "Stride"),
             "prefer_walking": users[clean].get("prefer_walking", True),
-            "max_walking_distance": users[clean].get("max_walking_distance", "1 Mile"),
+            "max_walking_distance": users[clean].get("max_walking_distance", "1/2 A Mile"),
             "avoid_bad_weather": users[clean].get("avoid_bad_weather", True),
             "avoid_rain": users[clean].get("avoid_rain", True),
             "avoid_snow": users[clean].get("avoid_snow", True)
         }
     }
 
+@app.get("/api/weather")
+async def weather_endpoint(lat: float = 40.501986, lon: float = -74.4474, username: Optional[str] = None):
+    """Current conditions, short forecast, and (if username given) whether it's bad weather for that user."""
+    try:
+        guidance = await get_commute_weather_guidance(lat, lon)
+        forecast = await get_forecast(lat, lon)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Weather unavailable: {e}")
+
+    data = guidance["data"]
+    result = {"current": data, "forecast": forecast}
+
+    if username:
+        user = load_users().get(username.strip().lower())
+        if user:
+            if user.get("avoid_bad_weather", True):
+                bad, reason = evaluate_weather(
+                    {"feels_like": data["feels_like"],
+                     "is_raining": data["is_raining"],
+                     "is_snowing": data["is_snowing"]},
+                    user.get("avoid_rain", True),
+                    user.get("avoid_snow", True),
+                )
+            else:
+                bad, reason = False, ""
+            result["bad_weather_for_user"] = bad
+            result["reason"] = reason
+
+    return result
 
 class ClassesUpdateRequest(BaseModel):
     classes: List[Dict[str, Any]]

@@ -10,7 +10,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 init_db()
-
+USER_FIELDS = ["calendar_url", "calendar_synced_at", "willing_to_walk_further", "priority", "avoid_rain", "avoid_snow"]
 def get_db_session() -> Session:
     return SessionLocal()
 
@@ -31,6 +31,7 @@ def load_users() -> Dict[str, Any]:
                 "prefer_walking": u.prefer_walking,
                 "max_walking_distance": u.max_walking_distance,
                 "avoid_bad_weather": u.avoid_bad_weather,
+                **{f: getattr(u, f) for f in USER_FIELDS},
                 "classes": [c.to_dict() for c in u.classes]
             }
         return result
@@ -50,7 +51,7 @@ def save_users(users_dict: Dict[str, Any]) -> None:
                 user = User(
                     username=username_clean,
                     password_hash=data.get("password", ""),
-                    walking_speed=data.get("walking_speed", "Stroll"),
+                    walking_speed=data.get("walking_speed", "Stride"),                    
                     prefer_walking=bool(data.get("prefer_walking", True)),
                     max_walking_distance=data.get("max_walking_distance", "1/2 A Mile"),
                     avoid_bad_weather=bool(data.get("avoid_bad_weather", True))
@@ -69,6 +70,9 @@ def save_users(users_dict: Dict[str, Any]) -> None:
                 if "avoid_bad_weather" in data:
                     user.avoid_bad_weather = bool(data["avoid_bad_weather"])
 
+            for f in USER_FIELDS:
+                if f in data:
+                    setattr(user, f, data[f])
             # Update classes if present
             if "classes" in data:
                 # Remove existing classes
@@ -119,7 +123,7 @@ def get_user_by_username(username: str, db: Optional[Session] = None) -> Optiona
 def create_user_record(
     username: str,
     password_hash: str,
-    walking_speed: str = "Stroll",
+    walking_speed: str = "Stride",
     prefer_walking: bool = True,
     max_walking_distance: str = "1/2 A Mile",
     avoid_bad_weather: bool = True,
