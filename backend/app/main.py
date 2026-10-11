@@ -15,13 +15,8 @@ from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
-<<<<<<< HEAD
-from app.commute_planner import get_commute_routes
-from app.weather import get_commute_weather_guidance
-=======
 from app.commute_planner import get_commute_routes, plan_multimodal_route
 from app.weather import get_commute_weather_guidance, get_forecast, evaluate_weather
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 
 # Find and load .env in root or backend directory
 load_dotenv(find_dotenv())
@@ -52,6 +47,12 @@ class CommutePlanRequest(BaseModel):
     target_arrival_time: str                    # e.g. "10:20"
     username: Optional[str] = None              # load walking prefs from users.json
     walking_speed_mph: Optional[float] = None   # override walking speed directly
+    origin_name: Optional[str] = None
+    destination_name: Optional[str] = None
+    origin_coords: Optional[List[float]] = None
+    dest_coords: Optional[List[float]] = None
+    prefer_walking: Optional[bool] = None
+    max_walk_miles: Optional[float] = None
 
 @app.get("/")
 def health_check():
@@ -499,16 +500,100 @@ Real-Time Vehicles & Upcoming Arrivals:
     }
 
 @app.post("/api/plan")
-def calculate_commute(plan: CommutePlanRequest):
-    # Load walking speed from user profile if username is provided
+async def calculate_commute(plan: CommutePlanRequest):
+    # Load walking speed and preferences from user profile if username is provided
     walking_speed_mph = plan.walking_speed_mph or 3.0
+    max_walk_miles = plan.max_walk_miles or 0.5
+    prefer_walking = plan.prefer_walking if plan.prefer_walking is not None else True
+
     if plan.username:
         users = load_users()
         user_data = users.get(plan.username.strip().lower(), {})
-        stored_speed = user_data.get("walking_speed")
-        if stored_speed and stored_speed in SPEED_OPTIONS:
-            walking_speed_mph = SPEED_OPTIONS[stored_speed]
+        if user_data:
+            stored_speed = user_data.get("walking_speed")
+            if stored_speed and stored_speed in SPEED_OPTIONS:
+                walking_speed_mph = SPEED_OPTIONS[stored_speed]
+            stored_dist = user_data.get("max_walking_distance")
+            if stored_dist and stored_dist in DISTANCE_OPTIONS:
+                max_walk_miles = DISTANCE_OPTIONS[stored_dist]
+            if plan.prefer_walking is None:
+                prefer_walking = user_data.get("prefer_walking", True)
 
+    # Attempt multi-modal routing if specific building or coordinates are available
+    mm_result = None
+    origin_label = plan.origin_name or plan.origin_campus
+    dest_label = plan.destination_name or plan.destination_campus
+
+    from app.rutgers_data import find_building
+    origin_coords = plan.origin_coords
+    dest_coords = plan.dest_coords
+
+    if not origin_coords and origin_label:
+        bldg = find_building(origin_label)
+        if bldg and bldg.get("coords"):
+            origin_coords = bldg["coords"]
+
+    if not dest_coords and dest_label:
+        bldg = find_building(dest_label)
+        if bldg and bldg.get("coords"):
+            dest_coords = bldg["coords"]
+
+    if origin_coords and dest_coords:
+        try:
+            telemetry = await get_live_telemetry()
+            live_buses = telemetry.get("buses", []) if isinstance(telemetry, dict) else []
+            mm_result = plan_multimodal_route(
+                origin_coords=origin_coords,
+                dest_coords=dest_coords,
+                origin_name=origin_label,
+                dest_name=dest_label,
+                live_buses=live_buses,
+                walking_speed_mph=walking_speed_mph,
+                max_walk_miles=max_walk_miles,
+                prefer_walking=prefer_walking,
+            )
+        except Exception as e:
+            print(f"[calculate_commute] Multi-modal planner exception: {e}")
+
+    if mm_result and mm_result.get("options"):
+        routes = []
+        for opt in mm_result["options"]:
+            routes.append({
+                "name": opt.get("bus_route") or "Campus Route",
+                "type": opt.get("type", "Multimodal (Walk + Bus)"),
+                "estimated_minutes": opt.get("total_mins", 10),
+                "rush_hour_minutes": opt.get("total_mins", 10) + 3,
+                "badge": opt.get("badge"),
+                "description": opt.get("description"),
+                "stop_name": opt.get("stop_name"),
+                "walk_mins": opt.get("walk_mins"),
+                "wait_mins": opt.get("wait_mins"),
+                "bus_ride_mins": opt.get("bus_ride_mins"),
+                "dist_to_stop_miles": opt.get("dist_to_stop_miles"),
+                "time_saved_vs_closest": opt.get("time_saved_vs_closest", 0)
+            })
+        primary = routes[0]["name"]
+        alts = [r["name"] for r in routes[1:]]
+        base_mins = routes[0]["estimated_minutes"]
+        rush_mins = routes[0]["rush_hour_minutes"]
+        advice = mm_result.get("summary") or f"Recommended: {primary} (~{base_mins} mins)."
+
+        return {
+            "origin": plan.origin_campus,
+            "destination": plan.destination_campus,
+            "origin_name": origin_label,
+            "destination_name": dest_label,
+            "routes": routes,
+            "primary_route": primary,
+            "alternative_routes": alts,
+            "base_minutes": base_mins,
+            "rush_hour_minutes": rush_mins,
+            "walking_speed_mph": walking_speed_mph,
+            "advice": advice,
+            "multimodal": mm_result
+        }
+
+    # Standard fallback route matrix
     routes = get_commute_routes(
         plan.origin_campus,
         plan.destination_campus,
@@ -532,8 +617,7 @@ def calculate_commute(plan: CommutePlanRequest):
         "walking_speed_mph": walking_speed_mph,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
-<<<<<<< HEAD
-=======
+
 
 # ─── Multi-Modal Plan v2 ─────────────────────────────────────────────────────
 
@@ -1008,5 +1092,3 @@ def delete_class_endpoint(req: DeleteClassRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
-
->>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8

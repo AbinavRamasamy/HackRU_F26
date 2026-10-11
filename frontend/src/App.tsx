@@ -192,6 +192,26 @@ export function App() {
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
   const [locationZoomTrigger, setLocationZoomTrigger] = useState<number>(0);
+  const [weatherData, setWeatherData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const username = currentUser?.netId;
+        const url = `${API_BASE_URL}/api/weather${username ? `?username=${username}` : ''}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setWeatherData(data);
+        }
+      } catch (err) {
+        console.warn("Weather fetch error:", err);
+      }
+    };
+    fetchWeather();
+    const interval = setInterval(fetchWeather, 120000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   const requestLocationPermission = (isManual = false) => {
     setGeoStatus("requesting");
@@ -261,7 +281,11 @@ export function App() {
         body: JSON.stringify({
           origin_campus: originCampus,
           destination_campus: destCampus,
-          target_arrival_time: "12:00"
+          target_arrival_time: "12:00",
+          origin_name: currentLocation,
+          destination_name: targetLocation,
+          username: currentUser?.netId,
+          prefer_walking: currentUser?.preferences?.prefer_walking
         })
       });
       if (res.ok) {
@@ -430,7 +454,11 @@ export function App() {
         body: JSON.stringify({
           origin_campus: currentOrigin,
           destination_campus: targetCampus,
-          target_arrival_time: targetClass.startTime || "12:00"
+          target_arrival_time: targetClass.startTime || "12:00",
+          origin_name: currentLocation,
+          destination_name: targetBuilding,
+          username: currentUser?.netId,
+          prefer_walking: currentUser?.preferences?.prefer_walking
         })
       });
       if (res.ok) {
@@ -683,6 +711,7 @@ export function App() {
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
+  const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
 
   return (
     <div className="apple-app-container">
@@ -859,6 +888,95 @@ export function App() {
             overflowY: 'auto',
             boxSizing: 'border-box'
           }}>
+            {/* ========================================================
+                HERO: WHAT'S NEXT & WEATHER ADVISORY
+                ======================================================== */}
+            {upcomingClassInfo.nextClass ? (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.08) 0%, rgba(204, 0, 51, 0.02) 100%)',
+                border: '1px solid rgba(204, 0, 51, 0.22)',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} color="var(--apple-accent)" />
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--apple-accent)' }}>
+                      What's Next
+                    </span>
+                  </div>
+                  {upcomingClassInfo.minutesUntil !== null && (
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      background: 'var(--apple-accent)',
+                      color: '#FFFFFF'
+                    }}>
+                      Leave in ~{Math.max(1, (upcomingClassInfo.minutesUntil || 20) - (planResult?.base_minutes || 10))} min
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--apple-label-primary)' }}>
+                      {upcomingClassInfo.nextClass.course}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', marginTop: '2px' }}>
+                      📍 {getFriendlyBuildingDisplay(upcomingClassInfo.nextClass)} • {upcomingClassInfo.nextClass.startTime} ({upcomingClassInfo.dayLabel})
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleGetToNextClass(upcomingClassInfo.nextClass || undefined)}
+                    className="apple-btn-primary"
+                    style={{ fontSize: '11px', padding: '6px 12px', flexShrink: 0 }}
+                  >
+                    Go Now ➔
+                  </button>
+                </div>
+
+                {weatherData?.current && (
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'var(--apple-label-secondary)',
+                    paddingTop: '6px',
+                    borderTop: '1px solid var(--apple-border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>{weatherData.current.summary}</span>
+                    <span>•</span>
+                    <span style={{ color: weatherData.bad_weather_for_user ? '#FF9F0A' : 'var(--apple-label-primary)' }}>
+                      {weatherData.bad_weather_for_user ? `⚠️ ${weatherData.reason || 'Bad weather'} (Bus advised)` : weatherData.current.commute_advice || 'Great weather for walking'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : weatherData?.current ? (
+              <div style={{
+                background: 'var(--apple-surface-card)',
+                border: '1px solid var(--apple-border-subtle)',
+                borderRadius: '12px',
+                padding: '9px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '11px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🌤️</span>
+                  <span style={{ fontWeight: 650, color: 'var(--apple-label-primary)' }}>{weatherData.current.summary}</span>
+                  <span style={{ color: 'var(--apple-label-secondary)' }}>• {weatherData.current.commute_advice}</span>
+                </div>
+              </div>
+            ) : null}
+
             {/* ========================================================
                 SECTION 1: COURSE SCHEDULE (TOP)
                 ======================================================== */}
@@ -1586,7 +1704,7 @@ export function App() {
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                   <span style={{
                                     padding: '3px 8px',
                                     borderRadius: '6px',
@@ -1597,7 +1715,18 @@ export function App() {
                                   }}>
                                     {route.name}
                                   </span>
-                                  {isSelected ? (
+                                  {route.badge ? (
+                                    <span style={{
+                                      fontSize: '10.5px',
+                                      fontWeight: 700,
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      background: route.badge.includes('Walk Farther') ? 'rgba(255, 159, 10, 0.18)' : 'rgba(48, 209, 88, 0.18)',
+                                      color: route.badge.includes('Walk Farther') ? '#FF9F0A' : '#30D158'
+                                    }}>
+                                      {route.badge}
+                                    </span>
+                                  ) : isSelected ? (
                                     <span style={{ fontSize: '11px', color: '#30D158', fontWeight: 700 }}>
                                       ● Navigating
                                     </span>
@@ -1608,36 +1737,59 @@ export function App() {
                                   ) : null}
                                 </div>
 
-                                {isSelected && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedRoute(null);
-                                    }}
-                                    title="Deselect route / End navigation"
-                                    className="apple-btn-dark-glass"
-                                    style={{
-                                      width: '22px',
-                                      height: '22px',
-                                      padding: 0,
-                                      borderRadius: '50%',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      background: 'var(--apple-surface-subtle)',
-                                      border: '1px solid var(--apple-border)',
-                                      color: 'var(--apple-label-primary)',
-                                      cursor: 'pointer',
-                                      flexShrink: 0
-                                    }}
-                                  >
-                                    <X size={12} strokeWidth={2.8} />
-                                  </button>
-                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--apple-label-primary)' }}>
+                                    {route.estimated_minutes} min
+                                  </span>
+                                  {isSelected && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedRoute(null);
+                                      }}
+                                      title="Deselect route / End navigation"
+                                      className="apple-btn-dark-glass"
+                                      style={{
+                                        width: '22px',
+                                        height: '22px',
+                                        padding: 0,
+                                        borderRadius: '50%',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: 'var(--apple-surface-subtle)',
+                                        border: '1px solid var(--apple-border)',
+                                        color: 'var(--apple-label-primary)',
+                                        cursor: 'pointer',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <X size={12} strokeWidth={2.8} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <p style={{ fontSize: '11px', color: 'var(--apple-label-secondary)', margin: '3px 0 0', lineHeight: 1.35 }}>
                                 {route.description}
                               </p>
+
+                              {route.walk_mins !== undefined && (
+                                <div style={{
+                                  display: 'flex',
+                                  gap: '10px',
+                                  marginTop: '6px',
+                                  fontSize: '10.5px',
+                                  color: 'var(--apple-label-secondary)',
+                                  flexWrap: 'wrap'
+                                }}>
+                                  <span>🚶 {route.walk_mins}m walk ({route.dist_to_stop_miles} mi)</span>
+                                  {route.wait_mins > 0 && <span>⏳ {route.wait_mins}m wait</span>}
+                                  <span>🚌 ~{route.bus_ride_mins}m ride</span>
+                                  {route.time_saved_vs_closest > 0 && (
+                                    <span style={{ color: '#FF9F0A', fontWeight: 700 }}>⚡ Saves {route.time_saved_vs_closest}m</span>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Stop Selector Buttons for Selected Route */}
                               {isSelected && stops.length > 0 && (
