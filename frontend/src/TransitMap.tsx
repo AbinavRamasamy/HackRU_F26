@@ -1088,32 +1088,41 @@ export const TransitMap: React.FC<TransitMapProps> = ({
 
           {/* Action Button: Auto-Select Route to Next Class OR Join Zoom */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {upcomingClassInfo.nextClass.zoom_link ? (
-              <a
-                href={upcomingClassInfo.nextClass.zoom_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="apple-btn-primary"
-                style={{
-                  padding: '7px 14px',
-                  fontSize: '11.5px',
-                  fontWeight: 700,
-                  borderRadius: '9999px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 14px rgba(11, 132, 254, 0.35)',
-                  border: 'none',
-                  textDecoration: 'none'
-                }}
-                title="Open Zoom video conference in new tab"
-              >
-                📹 Join Zoom
-              </a>
-            ) : upcomingClassInfo.nextClass.location !== '(Online)' && upcomingClassInfo.nextClass.campus !== '(Online)' ? (
+            {upcomingClassInfo.nextClass.zoom_link ? (() => {
+              const safeZoomUrl = upcomingClassInfo.nextClass.zoom_link.startsWith('http://') || upcomingClassInfo.nextClass.zoom_link.startsWith('https://')
+                ? upcomingClassInfo.nextClass.zoom_link
+                : `https://${upcomingClassInfo.nextClass.zoom_link}`;
+              return (
+                <a
+                  href={safeZoomUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="apple-btn-primary"
+                  style={{
+                    padding: '7px 14px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                    color: '#fff',
+                    boxShadow: '0 4px 14px rgba(11, 132, 254, 0.35)',
+                    border: 'none',
+                    textDecoration: 'none'
+                  }}
+                  title="Open Zoom video conference in new tab"
+                >
+                  📹 Join Zoom
+                </a>
+              );
+            })() : upcomingClassInfo.nextClass.location !== '(Online)' && upcomingClassInfo.nextClass.campus !== '(Online)' ? (
               <button
                 onClick={onAutoRouteToNextClass}
                 className="apple-btn-primary"

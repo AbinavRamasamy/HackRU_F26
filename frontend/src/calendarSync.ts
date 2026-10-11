@@ -179,6 +179,17 @@ export async function syncDefaultDeviceCalendar(): Promise<{
         // Filter out very short or excessively long events (allow 10m to 8h)
         if (durationMins < 10 || durationMins > 480) continue;
 
+        // Strictly filter out exams, finals, midterms, quizzes, holidays, and reminders
+        const titleLower = title.toLowerCase();
+        const isExamOrExcluded =
+          /\b(exam|final exam|finals|midterm|quiz|test|reading day)\b/i.test(titleLower) ||
+          [
+            'final exam', 'finals', 'midterm', 'quiz', 'reading day',
+            'holiday', 'recess', 'break', 'canceled', 'cancelled', 'labor day', 'thanksgiving', 'birthday'
+          ].some(ign => titleLower.includes(ign));
+
+        if (isExamOrExcluded) continue;
+
         const dayCode = daysArr[start.getDay()];
         const startTimeStr = formatTime(ev.startDate);
         const endTimeStr = formatTime(ev.endDate);

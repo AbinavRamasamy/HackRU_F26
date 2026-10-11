@@ -91,6 +91,30 @@ export function App() {
     }
   }, [classes]);
 
+  // On startup or device change, pull latest classes from backend user profile if logged in
+  useEffect(() => {
+    const syncProfileClasses = async () => {
+      try {
+        const savedUser = localStorage.getItem('scarlethop_auth_user');
+        if (savedUser) {
+          const u = JSON.parse(savedUser);
+          if (u?.netId) {
+            const res = await fetch(`${API_BASE_URL}/api/user/${u.netId}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.classes && data.classes.length > 0) {
+                setClasses(sortClassesByDateAndTime(data.classes));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.log("Profile classes sync skipped:", err);
+      }
+    };
+    syncProfileClasses();
+  }, []);
+
   const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
   const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
@@ -442,8 +466,32 @@ export function App() {
           handleGetToNextClass(up.nextClass);
         }
       } else if (result.source === 'web') {
-        alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
-        scheduleFileInputRef.current?.click();
+        // If logged in on computer/laptop, refresh synced classes from backend profile
+        let refreshedFromProfile = false;
+        try {
+          const savedUser = localStorage.getItem('scarlethop_auth_user');
+          if (savedUser) {
+            const u = JSON.parse(savedUser);
+            if (u?.netId) {
+              const res = await fetch(`${API_BASE_URL}/api/user/${u.netId}`);
+              if (res.ok) {
+                const data = await res.json();
+                if (data?.classes && data.classes.length > 0) {
+                  setClasses(sortClassesByDateAndTime(data.classes));
+                  alert(`Successfully refreshed ${data.classes.length} classes from your Rutgers profile!`);
+                  refreshedFromProfile = true;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Could not reload classes from profile:", e);
+        }
+
+        if (!refreshedFromProfile) {
+          alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
+          scheduleFileInputRef.current?.click();
+        }
       } else if (result.success && result.classes && result.classes.length === 0) {
         alert("Connected to calendar, but no classes with Rutgers locations were found. Please verify your calendar events or upload your schedule.");
       } else if (result.error) {
@@ -813,19 +861,28 @@ export function App() {
                           </div>
                           <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <MapPin size={10} color="var(--apple-accent)" />
-                            {cls.zoom_link ? (
-                              <a
-                                href={cls.zoom_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
-                                title="Open Zoom meeting in new tab"
-                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                              >
-                                📹 Join Zoom Call
-                              </a>
-                            ) : cls.location === '(Online)' || cls.campus === '(Online)' ? (
+                            {cls.zoom_link ? (() => {
+                              const safeZoomUrl = cls.zoom_link.startsWith('http://') || cls.zoom_link.startsWith('https://')
+                                ? cls.zoom_link
+                                : `https://${cls.zoom_link}`;
+                              return (
+                                <a
+                                  href={safeZoomUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+                                  }}
+                                  style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500, cursor: 'pointer' }}
+                                  title="Open Zoom meeting in new tab"
+                                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                >
+                                  📹 Join Zoom Call
+                                </a>
+                              );
+                            })() : cls.location === '(Online)' || cls.campus === '(Online)' ? (
                               <span style={{ color: 'var(--apple-label-tertiary)', fontStyle: 'italic' }}>(Online)</span>
                             ) : (
                               <a
@@ -848,28 +905,38 @@ export function App() {
                             {cls.startTime} - {cls.endTime}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
-                            {cls.zoom_link ? (
-                              <a
-                                href={cls.zoom_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="apple-btn-primary"
-                                style={{
-                                  padding: '3px 8px',
-                                  fontSize: '10.5px',
-                                  textDecoration: 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
-                                  color: '#fff',
-                                  borderRadius: '6px'
-                                }}
-                                title="Open Zoom meeting in new tab"
-                              >
-                                📹 Zoom
-                              </a>
-                            ) : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
+                            {cls.zoom_link ? (() => {
+                              const safeZoomUrl = cls.zoom_link.startsWith('http://') || cls.zoom_link.startsWith('https://')
+                                ? cls.zoom_link
+                                : `https://${cls.zoom_link}`;
+                              return (
+                                <a
+                                  href={safeZoomUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+                                  }}
+                                  className="apple-btn-primary"
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '10.5px',
+                                    textDecoration: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                                    color: '#fff',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Open Zoom meeting in new tab"
+                                >
+                                  📹 Zoom
+                                </a>
+                              );
+                            })() : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
                               <button
                                 onClick={() => handleGetToNextClass(cls)}
                                 className="apple-btn-secondary"

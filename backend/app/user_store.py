@@ -86,7 +86,8 @@ def save_users(users_dict: Dict[str, Any]) -> None:
                         days=days_json,
                         days_display=c.get("days_display", ""),
                         campus=c.get("campus", ""),
-                        location=c.get("location", "")
+                        location=c.get("location", ""),
+                        zoom_link=c.get("zoom_link", "")
                     )
                     session.add(cls_item)
 
