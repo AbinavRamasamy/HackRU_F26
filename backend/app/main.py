@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -507,7 +508,7 @@ async def upload_schedule(file: UploadFile = File(...), username: Optional[str] 
     if filename.endswith(".ics") or "calendar" in content_type or b"BEGIN:VCALENDAR" in contents[:500]:
         try:
             text = contents.decode("utf-8", errors="ignore")
-            result = parse_ics_schedule(text)
+            result = await asyncio.to_thread(parse_ics_schedule, text)
         except Exception as e:
             result = {
                 "status": "error",
@@ -515,7 +516,7 @@ async def upload_schedule(file: UploadFile = File(...), username: Optional[str] 
                 "classes": []
             }
     else:
-        result = parse_schedule_with_gemini(contents, mime_type=file.content_type or "image/png")
+        result = await asyncio.to_thread(parse_schedule_with_gemini, contents, file.content_type or "image/png")
 
     # 5. If parsing succeeded and a username was provided, save classes to the user's SQL profile
     if result.get("status") == "success" and clean_user:

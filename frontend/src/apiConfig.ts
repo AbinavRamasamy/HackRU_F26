@@ -1,11 +1,26 @@
 /**
  * ScarletHop API Configuration
  *
- * Centralized API base URL that falls back to http://localhost:8000 for local desktop web development,
- * but allows overriding via VITE_API_BASE_URL for:
- *  - Native iOS / Android testing on physical devices or emulators (e.g. http://192.168.1.50:8000)
- *  - Cloud production deployments (e.g. https://your-backend.onrender.com)
+ * Centralized API base URL:
+ * 1. Uses VITE_API_BASE_URL if explicitly provided in .env
+ * 2. If running in a web browser on a LAN IP or network hostname (e.g. 192.168.x.x or computer-name.local),
+ *    automatically points to that same host on port 8000
+ * 3. Otherwise defaults directly to http://127.0.0.1:8000 (avoiding IPv6 localhost resolution delays)
  */
-export const API_BASE_URL: string = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-).replace(/\/$/, '');
+const resolveBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const { hostname } = window.location;
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('capacitor')) {
+      return `http://${hostname}:8000`;
+    }
+  }
+
+  return 'http://127.0.0.1:8000';
+};
+
+export const API_BASE_URL: string = resolveBaseUrl();

@@ -445,11 +445,19 @@ export function App() {
       // ignore
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 35000);
+
     try {
+      console.log(`[Upload] Uploading ${file.name} (${file.type || 'file'}) to ${API_BASE_URL}/api/schedule/upload...`);
       const res = await fetch(`${API_BASE_URL}/api/schedule/upload`, {
         method: "POST",
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         if (data.status === "missing_api_key") {
@@ -464,12 +472,18 @@ export function App() {
           alert(data.message || "No classes were detected. Please make sure the uploaded image or .ics file contains class schedule details.");
         }
       } else {
-        alert(`Server returned an error during schedule upload (${res.status}). Please verify backend is running.`);
+        alert(`Server returned an error during schedule upload (${res.status}). Please verify backend is running on ${API_BASE_URL}.`);
       }
     } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error("Upload error:", err);
-      alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload: ${err?.message || err}`);
+      if (err.name === 'AbortError') {
+        alert(`Schedule upload timed out after 35 seconds. Please check that the backend server is reachable at ${API_BASE_URL}.`);
+      } else {
+        alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload: ${err?.message || err}`);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setUploading(false);
       e.target.value = "";
     }
