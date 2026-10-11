@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, ArrowUp, Bot } from 'lucide-react';
+import { API_BASE_URL } from './apiConfig';
 
 interface Message {
   role: 'assistant' | 'user';
@@ -55,7 +56,7 @@ export const AICopilotChat: React.FC<AICopilotChatProps> = ({
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8000/api/copilot/chat", {
+      const res = await fetch(`${API_BASE_URL}/api/copilot/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

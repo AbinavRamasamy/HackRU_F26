@@ -22,6 +22,7 @@ import {
   syncDefaultDeviceCalendar,
   sortClassesByDateAndTime
 } from './calendarSync';
+import { API_BASE_URL } from './apiConfig';
 
 const WingedSneakerIcon = ({ size = 21, color = "#fff" }: { size?: number; color?: string }) => (
   <svg
@@ -141,7 +142,7 @@ export function App() {
   useEffect(() => {
     const fetchBuses = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/telemetry");
+        const res = await fetch(`${API_BASE_URL}/api/telemetry`);
         if (res.ok) {
           const data = await res.json();
           if (data.buses && data.buses.length > 0) {
@@ -168,7 +169,7 @@ export function App() {
 
   const handleCalculateRoute = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -307,7 +308,7 @@ export function App() {
     setMobileTab('map');
 
     try {
-      const res = await fetch("http://localhost:8000/api/plan", {
+      const res = await fetch(`${API_BASE_URL}/api/plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -432,7 +433,7 @@ export function App() {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/schedule/upload", {
+      const res = await fetch(`${API_BASE_URL}/api/schedule/upload`, {
         method: "POST",
         body: formData
       });
@@ -448,11 +449,11 @@ export function App() {
           setClasses(sortClassesByDateAndTime(data.classes));
         }
       } else {
-        alert("Server returned error during schedule upload. Please verify backend is running on port 8000.");
+        alert(`Server returned error during schedule upload. Please verify backend is running on ${API_BASE_URL}.`);
       }
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Could not connect to backend server at http://localhost:8000/api/schedule/upload.");
+      alert(`Could not connect to backend server at ${API_BASE_URL}/api/schedule/upload.`);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -576,6 +577,7 @@ export function App() {
               onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               onSelectTheme={(t) => setTheme(t)}
               onSyncCalendar={handleSyncCalendar}
+              onClassesLoaded={(loadedClasses) => setClasses(sortClassesByDateAndTime(loadedClasses))}
             />
           </div>
         </div>
