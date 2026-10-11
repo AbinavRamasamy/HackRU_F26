@@ -8,7 +8,8 @@ import {
   X,
   MapPin,
   Clock,
-  GraduationCap
+  ArrowRight,
+  LocateFixed
 } from 'lucide-react';
 import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
 import { fetchLiveRoute, type LiveRouteResult } from './routingService';
@@ -43,6 +44,8 @@ export interface TransitMapProps {
   classes?: ClassItem[];
   upcomingClassInfo?: UpcomingClassResult;
   onAutoRouteToNextClass?: () => void;
+  userLocation?: { lat: number; lon: number } | null;
+  zoomToLocationTrigger?: number;
 }
 
 export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
@@ -181,9 +184,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
   googleMapsApiKey,
   appTheme = 'dark',
   onSwitchToRoutes,
-  classes: _classes = [],
+  classes = [],
   upcomingClassInfo,
-  onAutoRouteToNextClass
+  onAutoRouteToNextClass,
+  userLocation,
+  zoomToLocationTrigger
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -388,6 +393,38 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     tileLayerRef.current = newTiles;
   }, [mapTheme, googleMapsApiKey]);
 
+  // Zoom to Current User Location when triggered by location pill click
+  useEffect(() => {
+    if (!zoomToLocationTrigger) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    let targetLat: number | null = null;
+    let targetLon: number | null = null;
+
+    if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+      targetLat = userLocation.lat;
+      targetLon = userLocation.lon;
+    } else if (origTarget && typeof origTarget.lat === 'number' && typeof origTarget.lon === 'number') {
+      targetLat = origTarget.lat;
+      targetLon = origTarget.lon;
+    } else {
+      const campKey = getCampusKey(originCampus);
+      if (CAMPUS_COORDINATES[campKey]) {
+        targetLat = CAMPUS_COORDINATES[campKey].lat;
+        targetLon = CAMPUS_COORDINATES[campKey].lon;
+      }
+    }
+
+    if (targetLat !== null && targetLon !== null) {
+      map.flyTo([targetLat, targetLon], 16.5, {
+        animate: true,
+        duration: 1.1
+      });
+      setCurrentZoom(16.5);
+    }
+  }, [zoomToLocationTrigger, userLocation, origTarget, originCampus]);
+
   // Update Campus Markers, Bus Stop Navigation Pins & Real-time Bus Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -402,6 +439,33 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     const textSecondary = isLight ? '#475569' : 'rgba(255, 255, 255, 0.85)';
     const shadowColor = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.65)';
     const destAccent = isLight ? '#0A84FF' : '#FF375F';
+
+    // 0. Current User GPS Location Marker (Apple-style Pulsing Blue Dot)
+    if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+      const userDotIcon = L.divIcon({
+        className: 'apple-user-location-marker',
+        html: `
+          <div style="position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); pointer-events: auto;">
+            <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background: rgba(10, 132, 255, 0.35); animation: pulseUserHalo 2s infinite ease-out;"></div>
+            <div style="position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #0A84FF; border: 2.5px solid #FFFFFF; box-shadow: 0 2px 10px rgba(10, 132, 255, 0.75);"></div>
+          </div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const userMarker = L.marker([userLocation.lat, userLocation.lon], {
+        icon: userDotIcon,
+        zIndexOffset: 10000
+      });
+      userMarker.bindPopup(`
+        <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+          <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">📍 Current Location</div>
+          <div style="font-size: 11px; color: #444; margin-top: 2px;">${currentLocation || originCampus}</div>
+        </div>
+      `);
+      markersGroup.addLayer(userMarker);
+    }
 
     // 1. When Zoomed Out (< 14.5) AND no specific route is active: show overall campus names overview
     const showCampusOverview = !selectedRoute && isZoomedOut;
@@ -832,7 +896,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       `);
       markersGroup.addLayer(marker);
     });
-  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
+  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, origTarget, walkDistMeters, routeStops, routeSegmentStops, isZoomedOut, onSelectTargetLocation, onSelectCampus, userLocation, currentLocation]);
 
   // Handle Route Navigation Layer with Real Road Geometry & Walking Connectors
   useEffect(() => {
@@ -1000,157 +1064,130 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       {/* Map Canvas */}
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
 
-      {/* Top HUD: Auto-Select Route to Next Class (Only shown once a calendar/schedule is connected) */}
-      {!selectedRoute && upcomingClassInfo?.nextClass && (
-        <div style={{
-          position: 'absolute',
-          top: '12px',
-          left: '12px',
-          right: '12px',
-          zIndex: 1000,
-          background: 'var(--apple-glass-overlay)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid var(--apple-border)',
-          borderRadius: '16px',
-          boxShadow: 'var(--apple-shadow-md)',
-          padding: '9px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '10px',
-          pointerEvents: 'auto'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: '1 1 230px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '11px',
-              background: 'linear-gradient(135deg, rgba(204, 0, 51, 0.22), rgba(10, 132, 255, 0.22))',
-              border: '1px solid var(--apple-border)',
+      {/* Top Left (Localhost) / Top (Mobile) Map Button: Next Class Route */}
+      {!selectedRoute && (upcomingClassInfo?.nextClass || (classes && classes.length > 0)) && (() => {
+        const targetClass = upcomingClassInfo?.nextClass || classes[0];
+        if (!targetClass) return null;
+
+        const isOnline = targetClass.location === '(Online)' || targetClass.campus === '(Online)';
+
+        return (
+          <div
+            className="next-class-map-btn"
+            onClick={() => {
+              if (targetClass.zoom_link) {
+                const safeZoomUrl = targetClass.zoom_link.startsWith('http://') || targetClass.zoom_link.startsWith('https://')
+                  ? targetClass.zoom_link
+                  : `https://${targetClass.zoom_link}`;
+                window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+              } else if (!isOnline) {
+                onAutoRouteToNextClass?.();
+              }
+            }}
+            style={{
+              padding: '9px 14px',
+              borderRadius: '16px',
+              background: 'var(--apple-accent-subtle)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid var(--apple-border-focus)',
+              boxShadow: '0 8px 28px rgba(0, 0, 0, 0.45), 0 0 16px var(--apple-accent-glow)',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <GraduationCap size={18} color={appTheme === 'light' ? '#CC0033' : '#FF375F'} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '1px' }}>
-                <span style={{
-                  fontSize: '9.5px',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  color: appTheme === 'light' ? '#CC0033' : '#FF375F'
-                }}>
-                  {upcomingClassInfo.dayLabel} Next Class
-                </span>
-                {upcomingClassInfo.minutesUntil !== null && (
-                  <span style={{
-                    fontSize: '9px',
-                    fontWeight: 700,
-                    padding: '1px 5px',
-                    borderRadius: '4px',
-                    background: upcomingClassInfo.minutesUntil <= 30 ? 'rgba(255, 59, 48, 0.18)' : 'rgba(48, 209, 88, 0.18)',
-                    color: upcomingClassInfo.minutesUntil <= 30 ? '#FF3B30' : '#30D158'
-                  }}>
-                    {upcomingClassInfo.minutesUntil <= 0 ? 'Starting now' : `in ${upcomingClassInfo.minutesUntil}m`}
-                  </span>
-                )}
-              </div>
-              <div style={{
-                fontSize: '13px',
-                fontWeight: 700,
-                color: 'var(--apple-glass-text)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
-                {upcomingClassInfo.nextClass.course}
-              </div>
+              justifyContent: 'space-between',
+              gap: '12px',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
                 fontSize: '10.5px',
-                color: 'var(--apple-label-secondary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
+                color: 'var(--apple-accent)',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '2px'
               }}>
-                {upcomingClassInfo.nextClass.location === '(Online)' || upcomingClassInfo.nextClass.campus === '(Online)' ? (
-                  <span>💻 (Online Class) • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
-                ) : (
-                  <span>📍 {upcomingClassInfo.nextClass.location || upcomingClassInfo.nextClass.building} • ⏰ {upcomingClassInfo.nextClass.startTime}</span>
-                )}
+                Next Class
+              </div>
+              <div style={{
+                fontSize: '12.5px',
+                fontWeight: 600,
+                color: 'var(--apple-label-primary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {targetClass.course} • {targetClass.startTime} ({targetClass.campus || targetClass.location || 'Rutgers'})
               </div>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {targetClass.zoom_link && (() => {
+                const zoomUrl = targetClass.zoom_link as string;
+                const safeUrl = zoomUrl.startsWith('http://') || zoomUrl.startsWith('https://')
+                  ? zoomUrl
+                  : `https://${zoomUrl}`;
+                return (
+                  <a
+                    href={safeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(safeUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="apple-btn-primary"
+                    style={{
+                      padding: '5px 12px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: '9999px',
+                      background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      textDecoration: 'none',
+                      boxShadow: '0 2px 10px rgba(11, 132, 254, 0.4)'
+                    }}
+                    title="Open Zoom Call"
+                  >
+                    📹 Zoom
+                  </a>
+                );
+              })()}
+              {!isOnline && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAutoRouteToNextClass?.();
+                  }}
+                  className="apple-btn-primary"
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'linear-gradient(135deg, var(--apple-accent) 0%, var(--apple-accent-dark) 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 10px var(--apple-accent-glow)'
+                  }}
+                  title="Route to next class"
+                >
+                  <span>Route</span>
+                  <ArrowRight size={11} strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
           </div>
-
-          {/* Action Button: Auto-Select Route to Next Class OR Join Zoom */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-            {upcomingClassInfo.nextClass.zoom_link ? (
-              <a
-                href={upcomingClassInfo.nextClass.zoom_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="apple-btn-primary"
-                style={{
-                  padding: '7px 14px',
-                  fontSize: '11.5px',
-                  fontWeight: 700,
-                  borderRadius: '9999px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 14px rgba(11, 132, 254, 0.35)',
-                  border: 'none',
-                  textDecoration: 'none'
-                }}
-                title="Open Zoom video conference in new tab"
-              >
-                📹 Join Zoom
-              </a>
-            ) : upcomingClassInfo.nextClass.location !== '(Online)' && upcomingClassInfo.nextClass.campus !== '(Online)' ? (
-              <button
-                onClick={onAutoRouteToNextClass}
-                className="apple-btn-primary"
-                style={{
-                  padding: '7px 14px',
-                  fontSize: '11.5px',
-                  fontWeight: 700,
-                  borderRadius: '9999px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #CC0033 0%, #E6224B 100%)',
-                  color: '#fff',
-                  boxShadow: '0 4px 14px rgba(204, 0, 51, 0.35)',
-                  border: 'none'
-                }}
-                title="Auto-select transit route directly to this class"
-              >
-                <Navigation size={13} />
-                <span>Route to Class</span>
-              </button>
-            ) : (
-              <span style={{
-                padding: '6px 12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                borderRadius: '9999px',
-                background: 'var(--apple-card-bg-inset)',
-                color: 'var(--apple-label-secondary)'
-              }}>
-                💻 Online
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================
           BOTTOM NAVIGATION BAR (GOOGLE NAVIGATION DOCK)
@@ -1230,6 +1267,45 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             boxShadow: 'var(--apple-shadow-md)',
             pointerEvents: 'auto'
           }}>
+            <button
+              onClick={() => {
+                const map = mapInstanceRef.current;
+                if (!map) return;
+                let targetLat: number | null = null;
+                let targetLon: number | null = null;
+                if (userLocation && typeof userLocation.lat === 'number' && typeof userLocation.lon === 'number') {
+                  targetLat = userLocation.lat;
+                  targetLon = userLocation.lon;
+                } else if (origTarget && typeof origTarget.lat === 'number') {
+                  targetLat = origTarget.lat;
+                  targetLon = origTarget.lon;
+                } else {
+                  const campKey = getCampusKey(originCampus);
+                  if (CAMPUS_COORDINATES[campKey]) {
+                    targetLat = CAMPUS_COORDINATES[campKey].lat;
+                    targetLon = CAMPUS_COORDINATES[campKey].lon;
+                  }
+                }
+                if (targetLat !== null && targetLon !== null) {
+                  map.flyTo([targetLat, targetLon], 16.5, { animate: true, duration: 1.1 });
+                  setCurrentZoom(16.5);
+                }
+              }}
+              className="apple-segment-btn"
+              style={{
+                padding: '3px 8px',
+                fontSize: '11px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                color: userLocation ? '#0A84FF' : 'var(--apple-glass-text)'
+              }}
+              title="Zoom to My Location"
+            >
+              <LocateFixed size={11} color="#0A84FF" />
+              <span>Me</span>
+            </button>
             {["Busch", "Livingston", "College Ave", "Cook"].map((camp) => (
               <button
                 key={camp}

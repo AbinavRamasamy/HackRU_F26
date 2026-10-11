@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Upload, Calendar, ArrowRight, MapPin, Code, Navigation, LocateFixed, ArrowDownUp, Sparkles, X, ChevronDown, Trash2, RefreshCw, User } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { TransitWidget } from './TransitWidget';
@@ -74,8 +74,23 @@ export function App() {
     localStorage.setItem('scarlethop_theme', theme);
   }, [theme]);
 
+  const [isSessionUploaded, setIsSessionUploaded] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [classes, setClasses] = useState<ClassItem[]>(() => {
     try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      // On desktop, only restore persisted classes if authenticated
+      if (!Capacitor.isNativePlatform() && !savedUser) {
+        return [];
+      }
       const saved = localStorage.getItem('scarlethop_classes');
       return saved ? JSON.parse(saved) : [];
     } catch {
@@ -85,11 +100,72 @@ export function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+      // Only persist to localStorage if authenticated or native or user uploaded in session
+      if (Capacitor.isNativePlatform() || currentUser || isSessionUploaded) {
+        localStorage.setItem('scarlethop_classes', JSON.stringify(classes));
+      } else {
+        localStorage.removeItem('scarlethop_classes');
+      }
     } catch (err) {
       console.warn("Failed to persist classes to localStorage:", err);
     }
-  }, [classes]);
+  }, [classes, currentUser, isSessionUploaded]);
+
+  const [isDbRefreshing, setIsDbRefreshing] = useState(false);
+
+  // Pull latest synced classes from backend database based on user_id / username
+  const fetchScheduleFromDb = useCallback(async (userToFetch = currentUser, notify = false) => {
+    // If not signed in and on desktop, schedule should be empty unless user uploaded .ics this session
+    if (!Capacitor.isNativePlatform() && !userToFetch?.netId) {
+      if (!isSessionUploaded) {
+        setClasses([]);
+      }
+      if (notify) {
+        alert("Please sign in with your Rutgers NetID to fetch your saved schedule from the database.");
+      }
+      return;
+    }
+
+    setIsDbRefreshing(true);
+    try {
+      const username = userToFetch?.netId;
+      const url = `${API_BASE_URL}/api/calendar/device-sync${username ? `?username=${username}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.classes && Array.isArray(data.classes)) {
+          const sorted = sortClassesByDateAndTime(data.classes);
+          setClasses(sorted);
+          if (notify) {
+            alert(sorted.length > 0
+              ? `Loaded ${sorted.length} classes from database for ${username}!`
+              : `Connected to database for ${username}, but no classes are saved yet.`
+            );
+          }
+        } else if (notify) {
+          alert(`No saved schedule found in database for ${username}.`);
+        }
+      } else if (notify) {
+        alert(`Failed to retrieve schedule from database (HTTP ${res.status}).`);
+      }
+    } catch (err: any) {
+      console.warn("Database schedule refresh error:", err);
+      if (notify) {
+        alert(`Could not connect to database: ${err?.message || err}`);
+      }
+    } finally {
+      setIsDbRefreshing(false);
+    }
+  }, [currentUser, isSessionUploaded]);
+
+  // On startup or whenever currentUser changes (sign in / sign out), refresh schedule from database
+  useEffect(() => {
+    if (currentUser?.netId) {
+      fetchScheduleFromDb(currentUser, false);
+    } else if (!Capacitor.isNativePlatform() && !isSessionUploaded) {
+      setClasses([]);
+    }
+  }, [currentUser, fetchScheduleFromDb, isSessionUploaded]);
 
   const [isCalendarSyncing, setIsCalendarSyncing] = useState(false);
   const scheduleFileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +191,7 @@ export function App() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
   const [buses, setBuses] = useState<any[]>([]);
+  const [locationZoomTrigger, setLocationZoomTrigger] = useState<number>(0);
 
   const requestLocationPermission = (isManual = false) => {
     setGeoStatus("requesting");
@@ -124,15 +201,24 @@ export function App() {
         setResolvedGeo(loc);
         setCurrentLocation(loc.locationName);
         setOriginCampus(loc.campus);
+        if (isManual) {
+          setLocationZoomTrigger(Date.now());
+        }
       },
       (err) => {
         console.warn("Geolocation request failed or denied:", err);
         setGeoStatus("denied");
         if (isManual) {
-          alert("Location permission was not granted or is unavailable in your browser. You can select your campus location manually.");
+          setLocationZoomTrigger(Date.now());
         }
       }
     );
+  };
+
+  const handleLocationPillClick = () => {
+    setMobileTab('map');
+    setLocationZoomTrigger(Date.now());
+    requestLocationPermission(true);
   };
 
   useEffect(() => {
@@ -280,6 +366,27 @@ export function App() {
     handleCalculateRoute();
   }, [originCampus, destCampus]);
 
+  const getFriendlyBuildingDisplay = (cls: ClassItem): string => {
+    if (cls.location === '(Online)' || cls.campus === '(Online)') return '(Online)';
+    const bldg = (cls.building || '').trim();
+    const loc = (cls.location || '').trim();
+
+    // If building is concise like "SEC (Room: 202)" or "SERC 202" or "Hill Center 114"
+    if (bldg && bldg.length < 32 && !bldg.toLowerCase().includes('rutgers university')) {
+      if (bldg.toUpperCase().includes('SEC') && !bldg.toUpperCase().includes('SERC')) {
+        return bldg.replace(/SEC/gi, 'SERC');
+      }
+      return bldg;
+    }
+
+    // If location has full address "Science and Engineering Resource Center, Rutgers University, ..."
+    if (loc.includes(',')) {
+      const firstPart = loc.split(',')[0].trim();
+      if (firstPart.length > 0) return firstPart;
+    }
+    return bldg || loc || 'Rutgers Campus';
+  };
+
   const handleGetToNextClass = async (specificClass?: ClassItem) => {
     let targetClass = specificClass;
     if (!targetClass) {
@@ -292,7 +399,10 @@ export function App() {
     }
 
     const targetCampus = targetClass.campus || "College Ave";
-    const targetBuilding = targetClass.location || targetClass.building || targetCampus;
+    const cleanBuilding = getFriendlyBuildingDisplay(targetClass);
+    const targetBuilding = (cleanBuilding && cleanBuilding !== '(Online)')
+      ? cleanBuilding
+      : (targetClass.building || targetClass.location || targetCampus);
 
     if (targetClass.location === "(Online)" || targetClass.campus === "(Online)") {
       alert(`${targetClass.course} is an Online class - no transit navigation needed!`);
@@ -397,14 +507,45 @@ export function App() {
       const result = await syncDefaultDeviceCalendar();
       if (result.success && result.classes && result.classes.length > 0) {
         setClasses(result.classes);
+        try {
+          const savedUser = localStorage.getItem('scarlethop_auth_user');
+          const u = savedUser ? JSON.parse(savedUser) : null;
+          await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ classes: result.classes, username: u?.netId || 'ar2783' })
+          });
+        } catch (e) {
+          console.warn("Could not persist synced classes to profile:", e);
+        }
         alert(`Successfully synced ${result.classes.length} classes from your device calendar!`);
         const up = getNextUpcomingClass(result.classes);
         if (up.nextClass) {
           handleGetToNextClass(up.nextClass);
         }
       } else if (result.source === 'web') {
-        alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
-        scheduleFileInputRef.current?.click();
+        // On laptop/desktop, refresh latest synced classes from SQLite backend
+        let refreshedFromProfile = false;
+        try {
+          const savedUser = localStorage.getItem('scarlethop_auth_user');
+          const u = savedUser ? JSON.parse(savedUser) : null;
+          const res = await fetch(`${API_BASE_URL}/api/calendar/device-sync${u?.netId ? `?username=${u.netId}` : ''}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.classes && data.classes.length > 0) {
+              setClasses(sortClassesByDateAndTime(data.classes));
+              alert(`Successfully synced ${data.classes.length} classes from your shared calendar!`);
+              refreshedFromProfile = true;
+            }
+          }
+        } catch (e) {
+          console.warn("Could not reload classes from profile:", e);
+        }
+
+        if (!refreshedFromProfile) {
+          alert("On computer/laptop, please select your .ics schedule file or WebReg screenshot to sync your classes.");
+          scheduleFileInputRef.current?.click();
+        }
       } else if (result.success && result.classes && result.classes.length === 0) {
         alert("Connected to calendar, but no classes with Rutgers locations were found. Please verify your calendar events or upload your schedule.");
       } else if (result.error) {
@@ -424,6 +565,15 @@ export function App() {
       syncDefaultDeviceCalendar().then(res => {
         if (res.success && res.classes && res.classes.length > 0) {
           setClasses(res.classes);
+          try {
+            const savedUser = localStorage.getItem('scarlethop_auth_user');
+            const u = savedUser ? JSON.parse(savedUser) : null;
+            fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ classes: res.classes, username: u?.netId || 'ar2783' })
+            }).catch(() => {});
+          } catch {}
         }
       }).catch(err => {
         console.log("Background calendar auto-sync skipped:", err);
@@ -472,6 +622,7 @@ export function App() {
           alert("OCR Parsing Notice: " + (data.message || "Failed to parse image. Please ensure the image is clear."));
         } else if (data.classes && data.classes.length > 0) {
           const sorted = sortClassesByDateAndTime(data.classes);
+          setIsSessionUploaded(true);
           setClasses(sorted);
           alert(`Successfully imported ${sorted.length} class meetings!`);
         } else {
@@ -495,8 +646,40 @@ export function App() {
     }
   };
 
-  const handleDeleteClass = (targetClass: ClassItem) => {
-    setClasses(prev => prev.filter(c => c !== targetClass));
+  const handleDeleteClass = async (targetClass: ClassItem) => {
+    const updated = classes.filter(c => c !== targetClass);
+    setClasses(updated);
+
+    // Persist deletion immediately to SQLite database
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      const u = savedUser ? JSON.parse(savedUser) : null;
+      await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classes: updated, username: u?.netId || 'ar2783' })
+      });
+    } catch (err) {
+      console.warn("Failed to delete class from SQL:", err);
+    }
+  };
+
+  const handleClearAllClasses = async () => {
+    if (!window.confirm("Clear all classes from your schedule?")) return;
+    setClasses([]);
+
+    // Clear from SQLite database
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      const u = savedUser ? JSON.parse(savedUser) : null;
+      await fetch(`${API_BASE_URL}/api/calendar/device-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classes: [], username: u?.netId || 'ar2783' })
+      });
+    } catch (err) {
+      console.warn("Failed to clear classes from SQL:", err);
+    }
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
@@ -554,10 +737,10 @@ export function App() {
 
           {/* Location button */}
           <button
-            onClick={() => requestLocationPermission(true)}
+            onClick={handleLocationPillClick}
             className="apple-btn-secondary"
             style={{ fontSize: '12px', padding: '5px 10px', gap: '5px' }}
-            title="Update your current campus location"
+            title="Zoom to your current location"
           >
             <LocateFixed size={12} color={geoStatus === "granted" ? "#30D158" : "var(--apple-label-secondary)"} />
             <span className="btn-label-desktop">{geoStatus === "granted" ? originCampus : "Location"}</span>
@@ -606,13 +789,35 @@ export function App() {
 
             <ProfileMenu
               isOpen={showProfileMenu}
-              onClose={() => setShowProfileMenu(false)}
+              onClose={() => {
+                setShowProfileMenu(false);
+                try {
+                  const saved = localStorage.getItem('scarlethop_auth_user');
+                  setCurrentUser(saved ? JSON.parse(saved) : null);
+                } catch {}
+              }}
               triggerRef={profileTriggerRef}
               theme={theme}
               onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               onSelectTheme={(t) => setTheme(t)}
               onSyncCalendar={handleSyncCalendar}
-              onClassesLoaded={(loadedClasses) => setClasses(sortClassesByDateAndTime(loadedClasses))}
+              onClassesLoaded={(loadedClasses) => {
+                try {
+                  const saved = localStorage.getItem('scarlethop_auth_user');
+                  setCurrentUser(saved ? JSON.parse(saved) : null);
+                } catch {}
+                setClasses(sortClassesByDateAndTime(loadedClasses));
+              }}
+              onLogin={(loggedInUser) => {
+                setCurrentUser(loggedInUser);
+                setIsSessionUploaded(false);
+                fetchScheduleFromDb(loggedInUser, false);
+              }}
+              onLogout={() => {
+                setCurrentUser(null);
+                setIsSessionUploaded(false);
+                setClasses([]);
+              }}
             />
           </div>
         </div>
@@ -671,15 +876,29 @@ export function App() {
                   </h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => fetchScheduleFromDb(currentUser, true)}
+                    disabled={isDbRefreshing}
+                    className="apple-btn-secondary"
+                    style={{
+                      fontSize: '11px',
+                      padding: '4px 7px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: isDbRefreshing ? 'wait' : 'pointer',
+                      borderRadius: '8px'
+                    }}
+                    title="Refresh schedule from database"
+                  >
+                    <RefreshCw size={11} className={isDbRefreshing ? "spin" : ""} color="var(--apple-accent)" />
+                    <span style={{ fontSize: '10.5px' }}>Refresh</span>
+                  </button>
                   {classes.length > 0 && (
                     <button
-                      onClick={() => {
-                        if (window.confirm("Clear all classes from your schedule?")) {
-                          setClasses([]);
-                        }
-                      }}
+                      onClick={handleClearAllClasses}
                       className="apple-btn-secondary"
-                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A' }}
+                      style={{ fontSize: '11px', padding: '4px 8px', color: '#FF453A', borderRadius: '8px' }}
                       title="Clear all imported classes"
                     >
                       Clear
@@ -707,28 +926,56 @@ export function App() {
               {/* Class List */}
               {classes.length === 0 ? (
                 <div style={{
-                  padding: '16px',
+                  padding: '18px 16px',
                   borderRadius: '14px',
                   background: 'var(--apple-surface-card)',
                   border: '1px dashed var(--apple-border)',
                   textAlign: 'center'
                 }}>
-                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.4, margin: '0 auto 12px', maxWidth: '240px' }}>
-                    Connect your default calendar or upload an .ics / WebReg screenshot to view classes and auto-navigate.
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'var(--apple-accent-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 10px'
+                  }}>
+                    <Calendar size={18} color="var(--apple-accent)" />
+                  </div>
+                  <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--apple-label-primary)', margin: '0 0 4px' }}>
+                    {!currentUser && !Capacitor.isNativePlatform() ? "Sign in to view schedule" : "No classes loaded yet"}
+                  </h3>
+                  <p style={{ fontSize: '11.5px', color: 'var(--apple-label-secondary)', lineHeight: 1.45, margin: '0 auto 14px', maxWidth: '270px' }}>
+                    {!currentUser && !Capacitor.isNativePlatform()
+                      ? "Sign in with your Rutgers NetID to sync your saved classes from the database, or upload your .ics calendar file."
+                      : "Sync your device calendar or upload an .ics file / WebReg screenshot to view your schedule and bus routes."}
                   </p>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={handleSyncCalendar}
-                      disabled={isCalendarSyncing}
-                      className="apple-btn-primary"
-                      style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
-                    >
-                      {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
-                      <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
-                    </button>
+                    {!currentUser && !Capacitor.isNativePlatform() ? (
+                      <button
+                        onClick={() => setShowProfileMenu(true)}
+                        className="apple-btn-primary"
+                        style={{ fontSize: '11.5px', padding: '6px 14px' }}
+                      >
+                        <User size={12} />
+                        <span>Sign In</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSyncCalendar}
+                        disabled={isCalendarSyncing}
+                        className="apple-btn-primary"
+                        style={{ fontSize: '11.5px', padding: '6px 12px', cursor: isCalendarSyncing ? 'wait' : 'pointer' }}
+                      >
+                        {isCalendarSyncing ? <RefreshCw size={11} className="spin" /> : <Calendar size={11} />}
+                        <span>{isCalendarSyncing ? "Syncing..." : "Sync Calendar"}</span>
+                      </button>
+                    )}
                     <label className="apple-btn-secondary" style={{ fontSize: '11.5px', padding: '6px 12px', cursor: 'pointer' }}>
                       <Upload size={11} />
-                      <span>{uploading ? "Importing..." : "Choose File"}</span>
+                      <span>{uploading ? "Importing..." : "Upload .ics / Image"}</span>
                       <input type="file" accept="image/*,.ics,text/calendar" onChange={handleFileUpload} style={{ display: 'none' }} />
                     </label>
                   </div>
@@ -761,19 +1008,28 @@ export function App() {
                           </div>
                           <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <MapPin size={10} color="var(--apple-accent)" />
-                            {cls.zoom_link ? (
-                              <a
-                                href={cls.zoom_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
-                                title="Open Zoom meeting in new tab"
-                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                              >
-                                📹 Join Zoom Call
-                              </a>
-                            ) : cls.location === '(Online)' || cls.campus === '(Online)' ? (
+                            {cls.zoom_link ? (() => {
+                              const safeZoomUrl = cls.zoom_link.startsWith('http://') || cls.zoom_link.startsWith('https://')
+                                ? cls.zoom_link
+                                : `https://${cls.zoom_link}`;
+                              return (
+                                <a
+                                  href={safeZoomUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+                                  }}
+                                  style={{ color: '#0b84fe', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500, cursor: 'pointer' }}
+                                  title="Open Zoom meeting in new tab"
+                                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                                >
+                                  📹 Join Zoom Call
+                                </a>
+                              );
+                            })() : cls.location === '(Online)' || cls.campus === '(Online)' ? (
                               <span style={{ color: 'var(--apple-label-tertiary)', fontStyle: 'italic' }}>(Online)</span>
                             ) : (
                               <a
@@ -785,7 +1041,7 @@ export function App() {
                                 onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
                                 onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                               >
-                                {cls.location || cls.building}
+                                {getFriendlyBuildingDisplay(cls)}
                               </a>
                             )}
                           </div>
@@ -796,28 +1052,38 @@ export function App() {
                             {cls.startTime} - {cls.endTime}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', justifyContent: 'flex-end' }}>
-                            {cls.zoom_link ? (
-                              <a
-                                href={cls.zoom_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="apple-btn-primary"
-                                style={{
-                                  padding: '3px 8px',
-                                  fontSize: '10.5px',
-                                  textDecoration: 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px',
-                                  background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
-                                  color: '#fff',
-                                  borderRadius: '6px'
-                                }}
-                                title="Open Zoom meeting in new tab"
-                              >
-                                📹 Zoom
-                              </a>
-                            ) : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
+                            {cls.zoom_link ? (() => {
+                              const safeZoomUrl = cls.zoom_link.startsWith('http://') || cls.zoom_link.startsWith('https://')
+                                ? cls.zoom_link
+                                : `https://${cls.zoom_link}`;
+                              return (
+                                <a
+                                  href={safeZoomUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(safeZoomUrl, '_blank', 'noopener,noreferrer');
+                                  }}
+                                  className="apple-btn-primary"
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '10.5px',
+                                    textDecoration: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: 'linear-gradient(135deg, #0b84fe 0%, #0056b3 100%)',
+                                    color: '#fff',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Open Zoom meeting in new tab"
+                                >
+                                  📹 Zoom
+                                </a>
+                              );
+                            })() : cls.location !== '(Online)' && cls.campus !== '(Online)' ? (
                               <button
                                 onClick={() => handleGetToNextClass(cls)}
                                 className="apple-btn-secondary"
@@ -876,40 +1142,6 @@ export function App() {
                     </h2>
                   </div>
                 </div>
-
-                {/* Next Class Smart Suggestion Chip (If schedule is loaded) */}
-                {upcomingClass && (
-                  <div
-                    onClick={() => {
-                      handleGetToNextClass();
-                      setMobileTab('map');
-                    }}
-                    style={{
-                      padding: '9px 12px',
-                      borderRadius: '12px',
-                      background: 'var(--apple-accent-subtle)',
-                      border: '1px solid var(--apple-border-focus)',
-                      marginBottom: '10px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: '10.5px', color: 'var(--apple-accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                        Next Class
-                      </div>
-                      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--apple-label-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {upcomingClass.course} • {upcomingClass.startTime} ({upcomingClass.campus})
-                      </div>
-                    </div>
-                    <div className="apple-btn-primary" style={{ padding: '4px 10px', fontSize: '11px', flexShrink: 0 }}>
-                      Route <ArrowRight size={11} />
-                    </div>
-                  </div>
-                )}
 
                 {/* Apple Maps Origin / Destination Form Card (Minimized by Default) */}
                 <div style={{
@@ -1545,6 +1777,8 @@ export function App() {
             destCampus={destCampus}
             currentLocation={currentLocation}
             targetLocation={targetLocation}
+            userLocation={resolvedGeo ? resolvedGeo.coords : null}
+            zoomToLocationTrigger={locationZoomTrigger}
             onSelectTargetLocation={(loc) => {
               setTargetLocation(loc);
               const resolved = resolveLocationCoords(loc, destCampus);

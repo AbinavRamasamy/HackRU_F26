@@ -50,6 +50,8 @@ interface ProfileMenuProps {
   onSelectTheme: (t: 'dark' | 'light') => void;
   onSyncCalendar?: () => void;
   onClassesLoaded?: (classes: any[]) => void;
+  onLogout?: () => void;
+  onLogin?: (user: UserProfile) => void;
 }
 
 const DEFAULT_GUEST: UserProfile | null = null;
@@ -71,7 +73,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   onToggleTheme: _onToggleTheme,
   onSelectTheme,
   onSyncCalendar,
-  onClassesLoaded
+  onClassesLoaded,
+  onLogout,
+  onLogin
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -213,6 +217,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       };
 
       setCurrentUser(user);
+      if (onLogin) {
+        onLogin(user);
+      }
       setAuthModalView('none');
       setAuthPassword('');
       setAuthError('');
@@ -275,6 +282,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       };
 
       setCurrentUser(user);
+      if (onLogin) {
+        onLogin(user);
+      }
       setAuthModalView('none');
       setAuthPassword('');
       setAuthError('');
@@ -321,12 +331,24 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       preferences
     };
     setCurrentUser(demoUser);
+    if (onLogin) {
+      onLogin(demoUser);
+    }
     setAuthModalView('none');
     setAuthError('');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    try {
+      localStorage.removeItem('scarlethop_classes');
+      localStorage.removeItem('scarlethop_auth_user');
+    } catch {
+      // ignore
+    }
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   // Save Preferences to LocalStorage & Backend SQL if Logged In

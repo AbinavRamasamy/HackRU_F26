@@ -176,23 +176,57 @@ export async function syncDefaultDeviceCalendar(): Promise<{
         const end = new Date(ev.endDate);
         const durationMins = (end.getTime() - start.getTime()) / (1000 * 60);
 
-        // Class sessions typically run 50 min to 3.5 hrs
-        if (durationMins < 20 || durationMins > 300) continue;
+        // Filter out very short or excessively long events (allow 10m to 8h)
+        if (durationMins < 10 || durationMins > 480) continue;
+
+        // Strictly filter out exams, finals, midterms, quizzes, holidays, and reminders
+        const titleLower = title.toLowerCase();
+        const isExamOrExcluded =
+          /\b(exam|final exam|finals|midterm|quiz|test|reading day)\b/i.test(titleLower) ||
+          [
+            'final exam', 'finals', 'midterm', 'quiz', 'reading day',
+            'holiday', 'recess', 'break', 'canceled', 'cancelled', 'labor day', 'thanksgiving', 'birthday'
+          ].some(ign => titleLower.includes(ign));
+
+        if (isExamOrExcluded) continue;
 
         const dayCode = daysArr[start.getDay()];
         const startTimeStr = formatTime(ev.startDate);
         const endTimeStr = formatTime(ev.endDate);
 
-        // Resolve location to Rutgers buildings/campuses
-        const locString = (ev.location || title).trim();
-        const resolved = resolveLocationCoords(locString, 'College Ave');
+        // Check for Zoom or video conference link across fields
+        const allText = [
+          (ev as any).url || '',
+          ev.location || '',
+          (ev as any).description || '',
+          (ev as any).notes || ''
+        ].join(' ');
 
-        // Look for room codes in location (e.g. "ARC 103" or "SEC 202")
-        const roomMatch = locString.match(/(?:room|rm|#)?\s*([A-Za-z0-9\-]+)/i);
-        const roomName = roomMatch ? locString : resolved.name;
+        const zoomMatch = allText.match(/https?:\/\/[a-zA-Z0-9.\-_]*(?:zoom\.us|webex\.com|teams\.microsoft\.com|meet\.google\.com)\/[^\s"'<>,;)]+/i);
+        const zoomLink = zoomMatch ? zoomMatch[0] : undefined;
+
+        // Resolve location to Rutgers buildings/campuses
+        const locString = (ev.location || '').trim();
+        const hasRealLocation = locString && !locString.toLowerCase().includes('zoom') && !locString.toLowerCase().includes('online');
+
+        let finalLoc = locString || '(Online)';
+        let finalCampus = 'College Ave';
+        let bldgName = locString;
+
+        if (zoomLink || !hasRealLocation) {
+          finalLoc = '(Online)';
+          finalCampus = '(Online)';
+          bldgName = '(Online)';
+        } else {
+          const resolved = resolveLocationCoords(locString || title, 'College Ave');
+          const roomMatch = locString.match(/(?:room|rm|#)?\s*([A-Za-z0-9\-]+)/i);
+          bldgName = resolved.name;
+          finalLoc = roomMatch ? locString : resolved.name;
+          finalCampus = resolved.campus;
+        }
 
         // Group key by title + start time + building
-        const groupKey = `${title.toLowerCase()}_${startTimeStr}_${resolved.name.toLowerCase()}`;
+        const groupKey = `${title.toLowerCase()}_${startTimeStr}_${bldgName.toLowerCase()}`;
 
         if (rawClasses.has(groupKey)) {
           const existing = rawClasses.get(groupKey)!;
@@ -200,15 +234,19 @@ export async function syncDefaultDeviceCalendar(): Promise<{
           if (!currentDays.includes(dayCode)) {
             existing.days = [...currentDays, dayCode];
           }
+          if (!existing.zoom_link && zoomLink) {
+            existing.zoom_link = zoomLink;
+          }
         } else {
           rawClasses.set(groupKey, {
             course: title,
             days: [dayCode],
             startTime: startTimeStr,
             endTime: endTimeStr,
-            building: resolved.name,
-            location: roomName,
-            campus: resolved.campus
+            building: bldgName,
+            location: finalLoc,
+            campus: finalCampus,
+            zoom_link: zoomLink
           });
         }
       }

@@ -7,7 +7,7 @@ By combining multimodal class schedule parsing, live campus bus telemetry, and A
 
 ## Screen Shot Of Transit Portal & Widget
 
-![Patient Portal](./Patient_Portal.png)
+![ScarletHop Transit Portal & Route Navigation](./Patient_Portal.png)
 
 ---
 

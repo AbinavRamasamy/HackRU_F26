@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+#import asynchat
+>>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 import os
 import httpx
 from fastapi import HTTPException
@@ -8,12 +12,22 @@ load_dotenv(find_dotenv())
 
 api_key = os.getenv("WEATHER_API")
 
+<<<<<<< HEAD
 
 # =====================================================================
 # STEP 1: FETCH RAW WEATHER FROM THE API
 # =====================================================================
+=======
+COLD_F = 35  # feels-like temp at or below this counts as "cold"; tune as you like
+SNOW_WORDS = ["snow", "sleet", "blizzard", "ice pellets"]
+
+>>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> dict:
+    if not api_key:
+        raise RuntimeError("WEATHER_API is not set in .env")
+
     url = "https://api.weatherapi.com/v1/current.json"
+<<<<<<< HEAD
     params = {
         "key": api_key,
         "q": f"{lat},{lon}"
@@ -48,12 +62,72 @@ async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> 
 # =====================================================================
 # STEP 2: TURN WEATHER DATA INTO ACTIONABLE ADVICE
 # =====================================================================
+=======
+    params = {"key": api_key, "q": f"{lat},{lon}"}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get(url, params=params)
+        response.raise_for_status()
+        current = response.json()["current"]
+
+    condition = current["condition"]["text"]
+    is_snowing = any(w in condition.lower() for w in SNOW_WORDS)
+    return {
+        "temp": current["temp_f"],
+        "feels_like": current["feelslike_f"],
+        "condition": condition,
+        "is_snowing": is_snowing,
+        "is_raining": current["precip_in"] > 0 and not is_snowing,
+    }
+
+def evaluate_weather(weather: dict, avoid_rain: bool = True, avoid_snow: bool = True) -> tuple[bool, str]:
+    """Returns (is_bad_for_this_user, reason). Step 8 uses this to override walking preference."""
+    if weather.get("is_snowing") and avoid_snow:
+        return True, "It's snowing."
+    if weather.get("is_raining") and avoid_rain:
+        return True, "It's raining."
+    if weather.get("feels_like", 99) <= COLD_F:
+        return True, f"It's cold ({round(weather['feels_like'])}°F feels-like)."
+    return False, ""
+
+async def get_forecast(lat: float = 40.501986, lon: float = -74.4474, hours: int = 3) -> list:
+    """Short-term forecast: the next few hours."""
+    if not api_key:
+        raise RuntimeError("WEATHER_API is not set in .env")
+
+    url = "https://api.weatherapi.com/v1/forecast.json"
+    params = {"key": api_key, "q": f"{lat},{lon}", "days": 2}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        response = await client.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+    now_epoch = data["location"]["localtime_epoch"]
+    all_hours = [h for day in data["forecast"]["forecastday"] for h in day["hour"]]
+    upcoming = [h for h in all_hours if h["time_epoch"] >= now_epoch][:hours]
+
+    return [
+        {
+            "time": h["time"],
+            "temp": h["temp_f"],
+            "condition": h["condition"]["text"],
+            "rain_chance": h["chance_of_rain"],
+            "snow_chance": h["chance_of_snow"],
+        }
+        for h in upcoming
+    ]
+
+>>>>>>> a411f3a3b5577ca32e1d16d09e306fd780b961c8
 def make_advice(weather: dict) -> dict:
     temp = weather["temp"]
     is_raining = weather["is_raining"]
+    is_snowing = weather.get("is_snowing", False)
 
     # 1. Clothing advice based on temperature and rain
-    if is_raining:
+    if is_snowing:
+        clothing = "Snowing. Wear a warm coat, boots, and gloves."
+    elif is_raining:
         clothing = "Bring an umbrella and wear a rain jacket."
     elif temp < 45:
         clothing = "It's cold outside. Wear a warm coat and layers."
@@ -63,7 +137,11 @@ def make_advice(weather: dict) -> dict:
         clothing = "Pleasant weather. Normal campus clothes are fine."
 
     # 2. Transit advice and delay buffer for Rutgers buses
-    if is_raining:
+        # 2. Transit advice and delay buffer for Rutgers buses
+    if is_snowing:
+        commute = "Snow slows buses and sidewalks may be slick. Take the closest stop and leave 10 minutes early."
+        delay_buffer = 10
+    elif is_raining:
         commute = "Buses get crowded and roads slow down when it rains. Head to the stop 5 minutes earlier."
         delay_buffer = 5
     elif temp < 32:
@@ -99,5 +177,7 @@ async def get_commute_weather_guidance(lat: float = 40.501986, lon: float = -74.
             "clothing_advice": advice["clothing_advice"],
             "commute_advice": advice["commute_advice"],
             "delay_buffer_mins": advice["delay_buffer_mins"],
+            "is_raining": weather["is_raining"],
+            "is_snowing": weather["is_snowing"],
         }
     }

@@ -10,10 +10,16 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    walking_speed = Column(String(50), default="Stroll")
+    walking_speed = Column(String(50), default="Stride") 
     prefer_walking = Column(Boolean, default=True)
     max_walking_distance = Column(String(50), default="1/2 A Mile")
     avoid_bad_weather = Column(Boolean, default=True)
+    avoid_rain = Column(Boolean, default=True)
+    avoid_snow = Column(Boolean, default=True)
+    calendar_url = Column(Text, nullable=True)
+    calendar_synced_at = Column(DateTime, nullable=True)
+    willing_to_walk_further = Column(Boolean, default=True)
+    priority = Column(String(30), default="fastest_arrival")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     classes = relationship("UserClass", back_populates="user", cascade="all, delete-orphan")
@@ -43,6 +49,7 @@ class UserClass(Base):
     days_display = Column(String(100), nullable=True)
     campus = Column(String(100), nullable=True)
     location = Column(String(255), nullable=True)
+    zoom_link = Column(String(500), nullable=True)
 
     user = relationship("User", back_populates="classes")
 
@@ -62,5 +69,6 @@ class UserClass(Base):
             "days": days_parsed,
             "days_display": self.days_display or "",
             "campus": self.campus or "",
-            "location": self.location or ""
+            "location": self.location or "",
+            "zoom_link": self.zoom_link or ""
         }
