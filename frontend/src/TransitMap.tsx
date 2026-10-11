@@ -66,6 +66,25 @@ export const getCampusKey = (campusName: string): string => {
   return "Busch";
 };
 
+// Helper to unambiguously distinguish purely pedestrian walks from bus / vehicle / shuttle routes
+export const isWalkOnlyRoute = (route: any): boolean => {
+  if (!route) return false;
+  const type = (route.type || '').toLowerCase();
+  const name = (route.name || '').toLowerCase();
+  if (
+    type.includes('bus') ||
+    name.includes('bus') ||
+    name.includes('weekend') ||
+    name.includes('route') ||
+    name.includes('knight') ||
+    name.includes('escort') ||
+    name.includes('shuttle')
+  ) {
+    return false;
+  }
+  return type.includes('walk') || name.includes('walk') || name.includes('pedestrian');
+};
+
 // Fallback path coordinates connecting campuses along Rutgers transit highways
 export const getFallbackRouteGeometry = (
   origin: string,
@@ -282,11 +301,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
-    const isPureWalk = (selectedRoute.type || '').toLowerCase() === 'walking path' ||
-      (selectedRoute.name || '').toLowerCase() === 'campus pedestrian walk' ||
-      (selectedRoute.name || '').toLowerCase() === 'direct walk' ||
-      (selectedRoute.name || '').toLowerCase() === 'campus walk' ||
-      ((selectedRoute.type || '').toLowerCase().includes('walk') && !(selectedRoute.type || '').toLowerCase().includes('bus'));
+    const isPureWalk = isWalkOnlyRoute(selectedRoute);
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('scooter');
@@ -320,9 +335,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     destTarget.lon
   ]);
 
-  const isSelectedWalk = (selectedRoute?.type || '').toLowerCase().includes('walk') ||
-    (selectedRoute?.name || '').toLowerCase().includes('walk') ||
-    (selectedRoute?.name || '').toLowerCase().includes('pedestrian');
+  const isSelectedWalk = isWalkOnlyRoute(selectedRoute);
 
   const walkingDistMeters = getHaversineDistanceMeters(
     userLocation?.lat ?? origTarget.lat,
@@ -573,13 +586,11 @@ export const TransitMap: React.FC<TransitMapProps> = ({
     } else {
       // 2. Zoomed In (>= 14.75): Show detailed inner locations (Boarding, Dropoff, Intermediate stops, Destination building)
       if (selectedRoute) {
-        const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
-          (selectedRoute.name || '').toLowerCase().includes('walk') ||
-          (selectedRoute.name || '').toLowerCase().includes('pedestrian');
+        const isWalk = isWalkOnlyRoute(selectedRoute);
 
         if (isWalk) {
           // Walking Route: Direct pedestrian navigation between buildings
-          const startCode = getStopShortCode(origTarget.name) || origTarget.name;
+          const startCode = userLocation ? 'Your Location' : (getStopShortCode(origTarget.name) || origTarget.name);
           const startIcon = L.divIcon({
             className: 'apple-campus-map-marker',
             html: `
@@ -607,11 +618,13 @@ export const TransitMap: React.FC<TransitMapProps> = ({
             iconSize: [60, 24],
             iconAnchor: [30, 12]
           });
-          const startMarker = L.marker([origTarget.lat, origTarget.lon], { icon: startIcon });
+          const startLat = userLocation?.lat ?? origTarget.lat;
+          const startLon = userLocation?.lon ?? origTarget.lon;
+          const startMarker = L.marker([startLat, startLon], { icon: startIcon });
           startMarker.bindPopup(`
             <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
               <div style="font-size: 12.5px; font-weight: 700; color: #30D158;">🟢 Walk Start</div>
-              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${origTarget.name}</div>
+              <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${userLocation ? 'Your Location' : origTarget.name}</div>
             </div>
           `);
           markersGroup.addLayer(startMarker);
@@ -1037,11 +1050,7 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
-    const isPureWalk = (selectedRoute.type || '').toLowerCase() === 'walking path' ||
-      (selectedRoute.name || '').toLowerCase() === 'campus pedestrian walk' ||
-      (selectedRoute.name || '').toLowerCase() === 'direct walk' ||
-      (selectedRoute.name || '').toLowerCase() === 'campus walk' ||
-      ((selectedRoute.type || '').toLowerCase().includes('walk') && !(selectedRoute.type || '').toLowerCase().includes('bus'));
+    const isPureWalk = isWalkOnlyRoute(selectedRoute);
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || (selectedRoute.name || '').toLowerCase().includes('bike');
 
     // Use actual road/pathway coordinates from live routing engine if loaded, else fallback
