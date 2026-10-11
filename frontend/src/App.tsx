@@ -5,6 +5,7 @@ import { TransitWidget } from './TransitWidget';
 import { TransitMap } from './TransitMap';
 import { AICopilotChat } from './AICopilotChat';
 import { ProfileMenu } from './ProfileMenu';
+import { AuthModal } from './AuthModal';
 import { requestBrowserLocation, type ResolvedLocation } from './geolocation';
 import {
   RUTGERS_BUILDINGS,
@@ -202,6 +203,16 @@ export function App() {
   const widgetTriggerRef = useRef<HTMLButtonElement>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileTriggerRef = useRef<HTMLButtonElement>(null);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(() => {
+    try {
+      const savedUser = localStorage.getItem('scarlethop_auth_user');
+      // If user has not signed in, show modal the second the app opens
+      return !savedUser;
+    } catch {
+      return true;
+    }
+  });
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [buses, setBuses] = useState<any[]>([]);
   const [locationZoomTrigger, setLocationZoomTrigger] = useState<number>(0);
   const [weatherData, setWeatherData] = useState<any>(null);
@@ -820,19 +831,28 @@ export function App() {
           <div style={{ position: 'relative' }}>
             <button
               ref={profileTriggerRef}
-              onClick={() => setShowProfileMenu(prev => !prev)}
+              onClick={() => {
+                if (!currentUser) {
+                  setAuthModalMode('login');
+                  setShowAuthModal(true);
+                } else {
+                  setShowProfileMenu(prev => !prev);
+                }
+              }}
               className="apple-btn-secondary"
               style={{
                 fontSize: '12px',
                 padding: '5px 10px',
                 gap: '5px',
-                background: showProfileMenu ? 'var(--apple-accent-subtle)' : undefined,
-                borderColor: showProfileMenu ? 'var(--apple-accent)' : undefined
+                background: (showProfileMenu || (!currentUser && showAuthModal)) ? 'var(--apple-accent-subtle)' : undefined,
+                borderColor: (showProfileMenu || (!currentUser && showAuthModal)) ? 'var(--apple-accent)' : undefined
               }}
-              title="Profile & Settings (Sign Up / Login, Light / Dark Mode)"
+              title={currentUser ? "Profile & Settings" : "Sign In or Register"}
             >
               <User size={13} color="var(--apple-accent)" />
-              <span className="btn-label-desktop">Profile</span>
+              <span className="btn-label-desktop">
+                {currentUser ? (currentUser.netId || currentUser.username || "Profile") : "Sign In"}
+              </span>
             </button>
 
             <ProfileMenu
@@ -865,6 +885,27 @@ export function App() {
                 setCurrentUser(null);
                 setIsSessionUploaded(false);
                 setClasses([]);
+                setAuthModalMode('login');
+                setShowAuthModal(true);
+              }}
+              onOpenAuthModal={(mode) => {
+                setAuthModalMode(mode);
+                setShowAuthModal(true);
+              }}
+            />
+
+            <AuthModal
+              isOpen={showAuthModal}
+              onClose={() => setShowAuthModal(false)}
+              initialMode={authModalMode}
+              onLogin={(loggedInUser) => {
+                setCurrentUser(loggedInUser);
+                setIsSessionUploaded(false);
+                fetchScheduleFromDb(loggedInUser, false);
+                setShowAuthModal(false);
+              }}
+              onClassesLoaded={(loadedClasses) => {
+                setClasses(sortClassesByDateAndTime(loadedClasses));
               }}
             />
           </div>
@@ -1092,7 +1133,10 @@ export function App() {
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     {!currentUser && !Capacitor.isNativePlatform() ? (
                       <button
-                        onClick={() => setShowProfileMenu(true)}
+                        onClick={() => {
+                          setAuthModalMode('login');
+                          setShowAuthModal(true);
+                        }}
                         className="apple-btn-primary"
                         style={{ fontSize: '11.5px', padding: '6px 14px' }}
                       >

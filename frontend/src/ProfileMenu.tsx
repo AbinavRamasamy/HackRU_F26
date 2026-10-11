@@ -52,6 +52,7 @@ interface ProfileMenuProps {
   onClassesLoaded?: (classes: any[]) => void;
   onLogout?: () => void;
   onLogin?: (user: UserProfile) => void;
+  onOpenAuthModal?: (mode: 'login' | 'signup') => void;
 }
 
 const DEFAULT_GUEST: UserProfile | null = null;
@@ -75,7 +76,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   onSyncCalendar,
   onClassesLoaded,
   onLogout,
-  onLogin
+  onLogin,
+  onOpenAuthModal
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +90,20 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       return DEFAULT_GUEST;
     }
   });
+
+  // Re-sync with localStorage whenever menu opens
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = localStorage.getItem('scarlethop_auth_user');
+        setCurrentUser(saved ? JSON.parse(saved) : DEFAULT_GUEST);
+        const savedPrefs = localStorage.getItem('scarlethop_user_preferences');
+        if (savedPrefs) {
+          setPreferences(prev => ({ ...prev, ...JSON.parse(savedPrefs) }));
+        }
+      } catch {}
+    }
+  }, [isOpen]);
 
   // User preferences (default: walking speed 2.5 mph, 1 mile, no rain/snow)
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
@@ -502,8 +518,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
             <div style={{ display: 'flex', gap: '7px' }}>
               <button
                 onClick={() => {
-                  setAuthModalView('login');
-                  setAuthError('');
+                  if (onOpenAuthModal) {
+                    onClose();
+                    onOpenAuthModal('login');
+                  } else {
+                    setAuthModalView('login');
+                    setAuthError('');
+                  }
                 }}
                 className="apple-btn-primary"
                 style={{
@@ -520,8 +541,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
               </button>
               <button
                 onClick={() => {
-                  setAuthModalView('signup');
-                  setAuthError('');
+                  if (onOpenAuthModal) {
+                    onClose();
+                    onOpenAuthModal('signup');
+                  } else {
+                    setAuthModalView('signup');
+                    setAuthError('');
+                  }
                 }}
                 className="apple-btn-secondary"
                 style={{
