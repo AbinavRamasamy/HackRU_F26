@@ -381,18 +381,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 gap: '7px',
                 padding: '7px 12px',
                 borderRadius: '10px',
-                background: 'rgba(10, 132, 255, 0.12)',
-                border: '1px solid rgba(10, 132, 255, 0.25)',
-                color: '#0A84FF',
+                background: theme === 'dark' ? 'rgba(255, 55, 95, 0.14)' : 'rgba(10, 132, 255, 0.12)',
+                border: `1px solid ${theme === 'dark' ? 'rgba(255, 55, 95, 0.32)' : 'rgba(10, 132, 255, 0.28)'}`,
+                color: theme === 'dark' ? '#FF375F' : '#0A84FF',
                 fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 width: '100%',
                 textAlign: 'center',
-                boxShadow: 'var(--apple-shadow-sm)'
+                boxShadow: 'var(--apple-shadow-sm)',
+                transition: 'all 0.18s ease'
               }}
             >
-              <Calendar size={13} color="#0A84FF" />
+              <Calendar size={13} color={theme === 'dark' ? '#FF375F' : '#0A84FF'} />
               <span>Sync Device Calendar</span>
             </button>
           )}
