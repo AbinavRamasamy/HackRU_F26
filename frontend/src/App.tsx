@@ -713,7 +713,6 @@ export function App() {
   };
 
   const upcomingClass = classes.length > 0 ? classes[0] : null;
-  const upcomingClassInfo = useMemo(() => getNextUpcomingClass(classes), [classes]);
 
   return (
     <div className="apple-app-container">

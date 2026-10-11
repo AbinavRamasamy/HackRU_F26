@@ -11,10 +11,6 @@ api_key = os.getenv("WEATHER_API")
 COLD_F = 35  # feels-like temp at or below this counts as "cold"; tune as you like
 SNOW_WORDS = ["snow", "sleet", "blizzard", "ice pellets"]
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 709dff6e6028bfc6e90a8fc2e0fa725c3abebdcb
 async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> dict:
     if not api_key:
         raise RuntimeError("WEATHER_API is not set in .env")
@@ -22,7 +18,6 @@ async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> 
     url = "https://api.weatherapi.com/v1/current.json"
     params = {"key": api_key, "q": f"{lat},{lon}"}
 
-<<<<<<< HEAD
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url, params=params)
@@ -48,23 +43,6 @@ async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> 
             status_code=503,
             detail=f"Unable to reach Weather API service: {str(exc)}"
         )
-
-=======
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.get(url, params=params)
-        response.raise_for_status()
-        current = response.json()["current"]
-
-    condition = current["condition"]["text"]
-    is_snowing = any(w in condition.lower() for w in SNOW_WORDS)
-    return {
-        "temp": current["temp_f"],
-        "feels_like": current["feelslike_f"],
-        "condition": condition,
-        "is_snowing": is_snowing,
-        "is_raining": current["precip_in"] > 0 and not is_snowing,
-    }
->>>>>>> 709dff6e6028bfc6e90a8fc2e0fa725c3abebdcb
 
 def evaluate_weather(weather: dict, avoid_rain: bool = True, avoid_snow: bool = True) -> tuple[bool, str]:
     """Returns (is_bad_for_this_user, reason). Step 8 uses this to override walking preference."""
