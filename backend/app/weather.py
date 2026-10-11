@@ -43,6 +43,11 @@ async def get_current_weather(lat: float = 40.501986, lon: float = -74.4474) -> 
             status_code=503,
             detail=f"Unable to reach Weather API service: {str(exc)}"
         )
+
+
+# =====================================================================
+# STEP 2: TURN WEATHER DATA INTO ACTIONABLE ADVICE
+# =====================================================================
 def make_advice(weather: dict) -> dict:
     temp = weather["temp"]
     is_raining = weather["is_raining"]
@@ -70,11 +75,17 @@ def make_advice(weather: dict) -> dict:
     else:
         commute = "Good commute conditions today."
         delay_buffer = 0
+
     return {
         "clothing_advice": clothing,
         "commute_advice": commute,
         "delay_buffer_mins": delay_buffer,
     }
+
+
+# =====================================================================
+# STEP 3: COMBINED COMMUTE WEATHER GUIDANCE (ENDPOINT HANDLER)
+# =====================================================================
 async def get_commute_weather_guidance(lat: float = 40.501986, lon: float = -74.4474) -> dict:
     weather = await get_current_weather(lat, lon)
     advice = make_advice(weather)
@@ -90,4 +101,3 @@ async def get_commute_weather_guidance(lat: float = 40.501986, lon: float = -74.
             "delay_buffer_mins": advice["delay_buffer_mins"],
         }
     }
-

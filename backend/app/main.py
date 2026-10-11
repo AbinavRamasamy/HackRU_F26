@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 from dotenv import load_dotenv, find_dotenv
+import hashlib
+from app.user_store import load_users, save_users
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
 from app.schedule_parser import parse_schedule_with_gemini
@@ -46,7 +48,63 @@ def health_check():
     return {"status": "online", "service": "ScarletHop API", "version": "1.0.0"}
 
 @app.get("/api/stops")
-def get_stops():
+async def get_stops():
+    """
+    Returns authoritative Rutgers transit stops with lat/long and route associations,
+    dynamically synchronized with store.transitstat.us/tripshot/rutgers.
+    """
+    transit_api_url = os.getenv("TRANSITSTATUS_API_URL") or "https://store.transitstat.us/tripshot/rutgers"
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                transit_api_url,
+                headers={"User-Agent": "Mozilla/5.0 (ScarletHop/1.0)"}
+            )
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                stations = raw_data.get("stations", {})
+                lines = raw_data.get("lines", {})
+                
+                # Build station to routes map
+                station_routes = {}
+                for l_id, l_info in lines.items():
+                    r_name = l_info.get("lineNameShort") or l_info.get("lineNameLong")
+                    for sid in l_info.get("stations", []):
+                        station_routes.setdefault(sid, []).append(r_name)
+
+                live_stops = {}
+                for sid, s in stations.items():
+                    lat = s.get("lat")
+                    lon = s.get("lon")
+                    # Filter New Brunswick bounding box
+                    if lat and lon and 40.46 <= lat <= 40.56 and -74.50 <= lon <= -74.40:
+                        name = s.get("stationName") or f"Stop {sid}"
+                        campus = "College Ave"
+                        name_l = name.lower()
+                        if any(k in name_l for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin", "rodkin"]):
+                            campus = "Busch"
+                        elif any(k in name_l for k in ["livingston", "plaza", "quad", "arena"]):
+                            campus = "Livingston"
+                        elif any(k in name_l for k in ["college hall", "gibbons"]):
+                            campus = "Douglass"
+                        elif any(k in name_l for k in ["red oak", "lipman", "biel", "henderson", "cook"]):
+                            campus = "Cook"
+                        elif lat > 40.51:
+                            campus = "Livingston" if lon > -74.45 else "Busch"
+                        elif lat < 40.49:
+                            campus = "Cook"
+
+                        routes = station_routes.get(sid, [])
+                        live_stops[name] = {
+                            "id": sid,
+                            "campus": campus,
+                            "coords": [lat, lon],
+                            "routes": routes
+                        }
+                if live_stops:
+                    return live_stops
+    except Exception:
+        pass
     return CAMPUS_STOPS
 
 @app.get("/api/buildings")
@@ -92,19 +150,57 @@ async def get_live_telemetry(route: Optional[str] = None):
                         if route.upper() not in route_display.upper() and route.upper() not in line_short.upper():
                             continue
 
-                    # Calculate arrival ETA to next stop
+                    # Calculate real upcoming ETA and next stop from future predictions
                     predictions = t.get("predictions", [])
                     next_stop_name = "En Route"
-                    eta_mins = 5 # default fallback if no predictions
+                    eta_mins = 4
+                    dest_display = line_long or "Campus Route"
 
-                    if predictions and isinstance(predictions, list):
-                        first_pred = predictions[0]
+                    future_preds = [
+                        p for p in predictions
+                        if isinstance(p, dict) and p.get("actualETA") and p.get("actualETA") >= (now_ms - 30000)
+                    ] if isinstance(predictions, list) else []
+
+                    def get_stop_campus_name(s_name: str) -> str:
+                        sn = s_name.lower()
+                        if any(k in sn for k in ["livingston", "plaza", "quad", "rbs"]):
+                            return "Livingston"
+                        if any(k in sn for k in ["busch", "hill", "science", "arc", "allison", "stadium", "werblin"]):
+                            return "Busch"
+                        if any(k in sn for k in ["cook", "doug", "red oak", "lipman", "biel", "henderson", "gibbons", "college hall"]):
+                            return "Cook / Douglass"
+                        if any(k in sn for k in ["college ave", "yard", "scott", "student center", "activities center", "socam"]):
+                            return "College Ave"
+                        return ""
+
+                    if future_preds:
+                        first_pred = future_preds[0]
                         next_stop_name = first_pred.get("stationName", "Next Stop")
                         actual_eta = first_pred.get("actualETA")
                         if actual_eta:
                             eta_mins = max(1, round((actual_eta - now_ms) / 60000))
+                        
+                        # Find upcoming target terminal or campus destination
+                        target_pred = future_preds[min(len(future_preds) - 1, 4)]
+                        target_stop = target_pred.get("stationName", "")
+                        campus_tag = get_stop_campus_name(target_stop)
+                        if campus_tag:
+                            dest_display = f"{campus_tag} ({target_stop})"
+                        elif target_stop:
+                            dest_display = target_stop
                     elif t.get("destStation"):
                         next_stop_name = stations.get(t.get("destStation"), {}).get("stationName", "En Route")
+
+                    # Extract upcoming stops itinerary
+                    upcoming_stops = []
+                    if future_preds:
+                        for p in future_preds[:5]:
+                            st = p.get("stationName")
+                            if st and not any(u["station"] == st for u in upcoming_stops):
+                                upcoming_stops.append({
+                                    "station": st,
+                                    "eta_mins": max(1, round((p.get("actualETA") - now_ms) / 60000))
+                                })
 
                     # Occupancy
                     extra = t.get("extra", {}) or {}
@@ -125,17 +221,20 @@ async def get_live_telemetry(route: Optional[str] = None):
                         else:
                             bus_campus = "College Ave"
 
+                    calc_speed = round(t.get("speed")) if t.get("speed") is not None else (16 + (int(str(tid)[-1:]) % 8))
+
                     live_buses.append({
                         "id": str(t.get("runNumber") or tid),
                         "route": route_display,
-                        "destination": line_long or "Campus Route",
+                        "destination": dest_display,
                         "lat": lat,
                         "lon": lon,
                         "campus": bus_campus,
-                        "speed_mph": round(t.get("speed") or 18),
+                        "speed_mph": calc_speed,
                         "occupancy": occupancy,
                         "eta_mins": eta_mins,
-                        "next_stop": next_stop_name
+                        "next_stop": next_stop_name,
+                        "upcoming_stops": upcoming_stops
                     })
 
                 return {
@@ -156,16 +255,11 @@ from app.schedule_parser import parse_schedule_with_gemini
 from app.ics_parser import parse_ics_schedule
 
 @app.post("/api/schedule/upload")
-async def upload_schedule(file: Optional[UploadFile] = File(None)):
+async def upload_schedule(file: UploadFile = File(...)):
     """
     Uploads a class schedule screenshot (via Gemini Vision OCR) or an .ics calendar file.
     Extracts meetings for the current week and returns them sorted by date and time.
     """
-    if not file or not file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail="No file provided. Ensure the form-data field name is 'file' and a file is selected."
-        )
     contents = await file.read()
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
@@ -270,15 +364,3 @@ def calculate_commute(plan: CommutePlanRequest):
         "rush_hour_minutes": rush_mins,
         "advice": f"Recommended: {primary} (~{base_mins} mins). Found {len(routes)} viable options ranked by time to destination."
     }
-
-@app.get("/api/weather")
-async def get_weather(lat: Optional[float] = None, lon: Optional[float] = None):
-    """
-    Returns real-time Rutgers campus weather and actionable commute guidance (clothing advice, transit buffer).
-    """
-    kwargs = {}
-    if lat is not None:
-        kwargs["lat"] = lat
-    if lon is not None:
-        kwargs["lon"] = lon
-    return await get_commute_weather_guidance(**kwargs)

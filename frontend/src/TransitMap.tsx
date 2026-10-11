@@ -1,0 +1,1497 @@
+import React, { useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import {
+  Navigation,
+  Layers,
+  ExternalLink,
+  X,
+  MapPin,
+  ChevronRight,
+  ChevronLeft,
+  List,
+  Clock,
+  Footprints,
+  Bike,
+  Car,
+  Bus as BusIcon,
+  Loader2
+} from 'lucide-react';
+import { GOOGLE_MAPS_TILES, getGoogleMapsTileUrl } from './config';
+import { fetchLiveRoute, type LiveRouteResult, type RouteStep } from './routingService';
+import {
+  findNearestBusStop,
+  resolveLocationCoords,
+  getHaversineDistanceMeters,
+  getRouteColorInfo,
+  getStopShortCode,
+  getStopsForRoute,
+  RUTGERS_BUS_STOPS,
+  type BusStop
+} from './transitDirectory';
+
+export interface TransitMapProps {
+  buses: any[];
+  originCampus: string;
+  destCampus: string;
+  currentLocation?: string;
+  targetLocation?: string;
+  onSelectTargetLocation?: (loc: string) => void;
+  selectedRoute: any | null;
+  onSelectCampus?: (campus: string) => void;
+  onClearSelectedRoute?: () => void;
+  onSelectRoute?: (route: any) => void;
+  planResult?: any;
+  googleMapsApiKey?: string;
+}
+
+export const CAMPUS_COORDINATES: Record<string, { lat: number; lon: number; name: string; desc: string }> = {
+  "Busch": { lat: 40.5238, lon: -74.45826, name: "Busch Campus", desc: "Busch Student Center, Hill Center, Science Bldg, ARC" },
+  "Livingston": { lat: 40.524, lon: -74.43663, name: "Livingston Campus", desc: "Livingston Plaza, Student Center, Quads" },
+  "College Ave": { lat: 40.50366, lon: -74.4524, name: "College Avenue Campus", desc: "College Ave Student Center, The Yard, SAC, SoCam" },
+  "Cook": { lat: 40.48551, lon: -74.4372, name: "Cook / Douglass Campus", desc: "College Hall, Red Oak Lane, Biel, Gibbons" }
+};
+
+// Normalized key getter
+export const getCampusKey = (campusName: string): string => {
+  if (!campusName) return "Busch";
+  const c = campusName.toLowerCase();
+  if (c.includes("col")) return "College Ave";
+  if (c.includes("liv")) return "Livingston";
+  if (c.includes("bus")) return "Busch";
+  if (c.includes("cook") || c.includes("doug")) return "Cook";
+  return "Busch";
+};
+
+// Fallback path coordinates connecting campuses along Rutgers transit highways
+export const getFallbackRouteGeometry = (origin: string, dest: string, isBike: boolean = false): [number, number][] => {
+  const o = getCampusKey(origin);
+  const d = getCampusKey(dest);
+
+  if (o === d) {
+    const pt = CAMPUS_COORDINATES[o];
+    return [[pt.lat, pt.lon], [pt.lat + 0.002, pt.lon + 0.002]];
+  }
+
+  if (isBike) {
+    if ((o === "Busch" && d === "College Ave") || (o === "College Ave" && d === "Busch")) {
+      const pts: [number, number][] = [
+        [40.5233, -74.4586],
+        [40.5160, -74.4640],
+        [40.5090, -74.4610],
+        [40.5055, -74.4540],
+        [40.5028, -74.4518]
+      ];
+      return o === "Busch" ? pts : [...pts].reverse();
+    }
+  }
+
+  const pairs: Record<string, [number, number][]> = {
+    "Busch-Livingston": [
+      [40.5233, -74.4586],
+      [40.5245, -74.4480],
+      [40.5238, -74.4420],
+      [40.5241, -74.4357]
+    ],
+    "Busch-College Ave": [
+      [40.5233, -74.4586],
+      [40.5185, -74.4530],
+      [40.5110, -74.4510],
+      [40.5050, -74.4490],
+      [40.5028, -74.4518]
+    ],
+    "Livingston-College Ave": [
+      [40.5241, -74.4357],
+      [40.5195, -74.4400],
+      [40.5125, -74.4450],
+      [40.5060, -74.4500],
+      [40.5028, -74.4518]
+    ],
+    "College Ave-Cook": [
+      [40.5028, -74.4518],
+      [40.4955, -74.4445],
+      [40.4900, -74.4410],
+      [40.4851, -74.4376]
+    ],
+    "Busch-Cook": [
+      [40.5233, -74.4586],
+      [40.5140, -74.4470],
+      [40.4980, -74.4430],
+      [40.4851, -74.4376]
+    ],
+    "Livingston-Cook": [
+      [40.5241, -74.4357],
+      [40.5150, -74.4410],
+      [40.4980, -74.4430],
+      [40.4851, -74.4376]
+    ]
+  };
+
+  const key1 = `${o}-${d}`;
+  const key2 = `${d}-${o}`;
+
+  if (pairs[key1]) return pairs[key1];
+  if (pairs[key2]) return [...pairs[key2]].reverse();
+
+  return [
+    [CAMPUS_COORDINATES[o].lat, CAMPUS_COORDINATES[o].lon],
+    [CAMPUS_COORDINATES[d].lat, CAMPUS_COORDINATES[d].lon]
+  ];
+};
+
+// Calculate dynamic arrival clock (e.g. 5:18 PM)
+const getArrivalClock = (minutes: number) => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + (minutes || 15));
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+export const TransitMap: React.FC<TransitMapProps> = ({
+  buses,
+  originCampus,
+  destCampus,
+  currentLocation,
+  targetLocation,
+  onSelectTargetLocation,
+  selectedRoute,
+  onSelectCampus,
+  onClearSelectedRoute,
+  onSelectRoute,
+  planResult,
+  googleMapsApiKey
+}) => {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // Map Provider Themes: Google Maps Dark (default), Google Maps Standard, Google Satellite
+  const [mapTheme, setMapTheme] = useState<'google-dark' | 'google-standard' | 'google-satellite'>('google-dark');
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const [showStepsDrawer, setShowStepsDrawer] = useState<boolean>(false);
+  const prevRouteNameRef = useRef<string | null>(null);
+  const prevRouteFitKeyRef = useRef<string | null>(null);
+
+  // Live real-time road route fetched via Google Maps API or free OSRM engine
+  const [liveRoute, setLiveRoute] = useState<LiveRouteResult | null>(null);
+  const [isRoutingLoading, setIsRoutingLoading] = useState<boolean>(false);
+  const [currentZoom, setCurrentZoom] = useState<number>(13);
+  const currentZoomThreshold = 14.5;
+  const isZoomedOut = currentZoom < currentZoomThreshold;
+
+  // 1. DYNAMIC NEAREST-STOP CALCULATION (ZERO HARDCODING):
+  // Dynamically resolve exact coordinates for current location and target location/building
+  const origTarget = React.useMemo(() => {
+    return resolveLocationCoords(currentLocation || originCampus, originCampus);
+  }, [currentLocation, originCampus]);
+
+  const destTarget = React.useMemo(() => {
+    return resolveLocationCoords(targetLocation || destCampus, destCampus);
+  }, [targetLocation, destCampus]);
+
+  // Geodesic distance minimization against all candidate stops served by the route
+  const boardingStop: BusStop = React.useMemo(() => {
+    return findNearestBusStop(origTarget, originCampus, selectedRoute?.name);
+  }, [origTarget, originCampus, selectedRoute?.name]);
+
+  const dropoffStop: BusStop = React.useMemo(() => {
+    return findNearestBusStop(destTarget, destTarget.campus || destCampus, selectedRoute?.name);
+  }, [destTarget, destCampus, selectedRoute?.name]);
+
+  // All stops along the selected route sequence for the interactive stop buttons
+  const routeStops = React.useMemo(() => {
+    if (!selectedRoute?.name) return [];
+    return getStopsForRoute(selectedRoute.name);
+  }, [selectedRoute?.name]);
+
+  const walkDistMeters = React.useMemo(() => {
+    return getHaversineDistanceMeters(dropoffStop.lat, dropoffStop.lon, destTarget.lat, destTarget.lon);
+  }, [dropoffStop, destTarget]);
+
+  const walkMins = Math.max(1, Math.round(walkDistMeters / 80));
+
+  if (selectedRoute?.name !== prevRouteNameRef.current) {
+    prevRouteNameRef.current = selectedRoute?.name || null;
+    if (currentStepIndex !== 0) setCurrentStepIndex(0);
+    if (showStepsDrawer) setShowStepsDrawer(false);
+  }
+
+  // Global click delegate for Leaflet HTML popups
+  useEffect(() => {
+    (window as any).__selectTransitStop = (name: string) => {
+      if (onSelectTargetLocation) {
+        onSelectTargetLocation(name);
+      }
+    };
+    return () => {
+      delete (window as any).__selectTransitStop;
+    };
+  }, [onSelectTargetLocation]);
+
+  // Fetch actual live road routing from the dynamic boarding stop to dynamic drop-off stop
+  useEffect(() => {
+    if (!selectedRoute) {
+      setLiveRoute(null);
+      return;
+    }
+
+    const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') ||
+      (selectedRoute.name || '').toLowerCase().includes('bike') ||
+      (selectedRoute.name || '').toLowerCase().includes('scooter');
+    const isCar = (selectedRoute.name || '').toLowerCase().includes('knight') ||
+      (selectedRoute.name || '').toLowerCase().includes('escort');
+    const mode = isBike ? 'bike' : isCar ? 'car' : 'bus';
+
+    setIsRoutingLoading(true);
+    // Route directly between the dynamically calculated bus stops (e.g. into College Ave Student Center Stop)
+    fetchLiveRoute(boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon, mode, selectedRoute.name)
+      .then((res) => {
+        setLiveRoute(res);
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch live route:", err);
+      })
+      .finally(() => {
+        setIsRoutingLoading(false);
+      });
+  }, [selectedRoute, boardingStop.lat, boardingStop.lon, dropoffStop.lat, dropoffStop.lon]);
+
+  const effectiveDurationMinutes = liveRoute?.durationMinutes || selectedRoute?.estimated_minutes || 16;
+  const effectiveDistanceMiles = liveRoute?.distanceMiles || 2.4;
+
+  // Ultra-intuitive Apple transit steps showing board, ride, dropoff, and walk
+  const steps: RouteStep[] = React.useMemo(() => {
+    if (!selectedRoute) return [];
+
+    const list: RouteStep[] = [
+      {
+        instruction: `Board ${selectedRoute.name} at ${boardingStop.name}`,
+        subText: `Departing from ${originCampus} • Near ${origTarget.name}`,
+        distance: '0.1 mi',
+        duration: '2 min',
+        iconType: 'bus',
+        distanceMeters: 160,
+        durationSeconds: 120
+      },
+      {
+        instruction: `Ride to ${dropoffStop.name}`,
+        subText: `Direct express transit along Route 18 into College Ave`,
+        distance: `${effectiveDistanceMiles} mi`,
+        duration: `${effectiveDurationMinutes} min`,
+        iconType: 'bus',
+        distanceMeters: Math.round(effectiveDistanceMiles * 1609),
+        durationSeconds: effectiveDurationMinutes * 60
+      },
+      {
+        instruction: `Alight at ${dropoffStop.name}`,
+        subText: walkDistMeters > 35 && destTarget.name !== dropoffStop.name
+          ? `Alight bus and proceed on foot to ${destTarget.name}`
+          : `Arrive at destination (${destTarget.name})`,
+        distance: 'Arrival',
+        duration: '1 min',
+        iconType: 'destination',
+        distanceMeters: 0,
+        durationSeconds: 60
+      }
+    ];
+
+    if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+      list.push({
+        instruction: `Walk to ${destTarget.name}`,
+        subText: `${Math.round(walkDistMeters * 3.28084)} ft • Approx ${walkMins} min walk from stop`,
+        distance: `${(walkDistMeters / 1609.34).toFixed(1)} mi`,
+        duration: `${walkMins} min`,
+        iconType: 'walk',
+        distanceMeters: walkDistMeters,
+        durationSeconds: walkMins * 60
+      });
+    }
+
+    return list;
+  }, [selectedRoute, boardingStop, dropoffStop, origTarget, destTarget, walkDistMeters, walkMins, effectiveDistanceMiles, effectiveDurationMinutes, originCampus]);
+
+  const currentStep = steps[currentStepIndex] || steps[0];
+
+  // Helper to create Google Maps tile layer
+  const createGoogleTileLayer = (theme: typeof mapTheme) => {
+    if (theme === 'google-satellite') {
+      return L.tileLayer(getGoogleMapsTileUrl('hybrid', googleMapsApiKey), {
+        maxZoom: 20,
+        subdomains: GOOGLE_MAPS_TILES.subdomains
+      });
+    }
+
+    if (theme === 'google-standard') {
+      return L.tileLayer(getGoogleMapsTileUrl('roadmap', googleMapsApiKey), {
+        maxZoom: 20,
+        subdomains: GOOGLE_MAPS_TILES.subdomains,
+        className: 'google-maps-standard-tiles'
+      });
+    }
+
+    // Default: Google Maps in Dark Mode
+    return L.tileLayer(getGoogleMapsTileUrl('roadmap', googleMapsApiKey), {
+      maxZoom: 20,
+      subdomains: GOOGLE_MAPS_TILES.subdomains,
+      className: 'google-maps-dark-tiles'
+    });
+  };
+
+  // Initialize Leaflet map with Google Maps provider
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
+
+    // Centered around Rutgers University New Brunswick
+    const map = L.map(mapContainerRef.current, {
+      center: [40.5100, -74.4480],
+      zoom: 13,
+      zoomControl: false,
+      attributionControl: false
+    });
+
+    const googleTiles = createGoogleTileLayer('google-dark');
+    googleTiles.addTo(map);
+    tileLayerRef.current = googleTiles;
+
+    // Zoom control at bottom right
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Track zoom events to smoothly toggle between overall campus view and inner stop view
+    const onZoom = () => {
+      setCurrentZoom(map.getZoom());
+    };
+    map.on('zoomend', onZoom);
+    map.on('zoom', onZoom);
+    setCurrentZoom(map.getZoom());
+
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    routeLayerRef.current = L.layerGroup().addTo(map);
+    mapInstanceRef.current = map;
+
+    return () => {
+      map.off('zoomend', onZoom);
+      map.off('zoom', onZoom);
+      map.remove();
+      mapInstanceRef.current = null;
+      tileLayerRef.current = null;
+    };
+  }, []);
+
+  // Update Google Maps Tiles when theme toggles
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+
+    const newTiles = createGoogleTileLayer(mapTheme);
+    newTiles.addTo(map);
+    tileLayerRef.current = newTiles;
+  }, [mapTheme, googleMapsApiKey]);
+
+  // Update Campus Markers, Bus Stop Navigation Pins & Real-time Bus Markers
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const markersGroup = markersLayerRef.current;
+    if (!map || !markersGroup) return;
+
+    markersGroup.clearLayers();
+
+    // 1. When Zoomed Out (< 14.75): HIDE inner locations and ONLY show overall campus names
+    if (isZoomedOut) {
+      Object.entries(CAMPUS_COORDINATES).forEach(([key, info]) => {
+        const isOrigin = getCampusKey(originCampus) === key;
+        const isDest = getCampusKey(destCampus) === key;
+
+        const badgeColor = isOrigin ? '#30D158' : isDest ? '#FF375F' : '#0A84FF';
+        const label = isOrigin ? 'START' : isDest ? 'DEST' : 'CAMPUS';
+
+        const campusIcon = L.divIcon({
+          className: 'apple-campus-overview-marker',
+          html: `
+            <div style="
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              padding: 5px 12px;
+              background: rgba(28, 28, 30, 0.94);
+              backdrop-filter: blur(20px);
+              -webkit-backdrop-filter: blur(20px);
+              border: 1.5px solid ${isOrigin || isDest ? badgeColor : 'rgba(255,255,255,0.2)'};
+              box-shadow: 0 4px 18px rgba(0,0,0,0.65), 0 0 14px ${isOrigin || isDest ? badgeColor + '77' : 'transparent'};
+              border-radius: 9999px;
+              cursor: pointer;
+              white-space: nowrap;
+              transform: translate(-50%, -50%);
+            ">
+              <span style="
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                background: ${badgeColor};
+                box-shadow: 0 0 10px ${badgeColor};
+              "></span>
+              <span style="font-size: 12.5px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                ${key}
+              </span>
+              ${(isOrigin || isDest) && selectedRoute ? `
+                <span style="
+                  font-size: 9.5px;
+                  font-weight: 800;
+                  color: ${isOrigin ? '#000' : '#fff'};
+                  background: ${badgeColor};
+                  padding: 1.5px 6px;
+                  border-radius: 4px;
+                ">${label}</span>
+              ` : ''}
+            </div>
+          `,
+          iconSize: [120, 30],
+          iconAnchor: [60, 15]
+        });
+
+        const marker = L.marker([info.lat, info.lon], { icon: campusIcon });
+        marker.on('click', () => {
+          if (onSelectCampus) onSelectCampus(key);
+        });
+        markersGroup.addLayer(marker);
+      });
+    } else {
+      // 2. Zoomed In (>= 14.75): Show detailed inner locations (Boarding, Dropoff, Intermediate stops, Destination building)
+      if (selectedRoute) {
+        // Boarding Stop Marker (Compact Apple Icon Pin)
+        const boardingCode = getStopShortCode(boardingStop.name);
+        const boardingIcon = L.divIcon({
+          className: 'apple-campus-map-marker',
+          html: `
+            <div style="
+              display: inline-flex;
+              align-items: center;
+              gap: 3.5px;
+              padding: 2.5px 7px 2.5px 3.5px;
+              background: rgba(20, 20, 22, 0.94);
+              backdrop-filter: blur(20px);
+              -webkit-backdrop-filter: blur(20px);
+              border: 1.5px solid #30D158;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(48, 209, 88, 0.4);
+              border-radius: 9999px;
+              cursor: pointer;
+              transform: translate(-50%, -50%);
+              white-space: nowrap;
+            ">
+              <span style="
+                width: 17px;
+                height: 17px;
+                border-radius: 50%;
+                background: #30D158;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 9.5px;
+                color: #000;
+                font-weight: 900;
+              ">▲</span>
+              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                ${boardingCode}
+              </span>
+            </div>
+          `,
+          iconSize: [60, 24],
+          iconAnchor: [30, 12]
+        });
+        const bMarker = L.marker([boardingStop.lat, boardingStop.lon], { icon: boardingIcon });
+        bMarker.bindPopup(`
+          <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+            <div style="font-size: 12.5px; font-weight: 700; color: #30D158;">🟢 Boarding Stop</div>
+            <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${boardingStop.name}</div>
+            <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${boardingStop.campus} Campus</div>
+          </div>
+        `);
+        markersGroup.addLayer(bMarker);
+
+        // Drop-Off Stop Marker (Compact Apple Icon Pin)
+        const dropoffCode = getStopShortCode(dropoffStop.name);
+        const dropoffIcon = L.divIcon({
+          className: 'apple-campus-map-marker',
+          html: `
+            <div style="
+              display: inline-flex;
+              align-items: center;
+              gap: 3.5px;
+              padding: 2.5px 7px 2.5px 3.5px;
+              background: rgba(20, 20, 22, 0.94);
+              backdrop-filter: blur(20px);
+              -webkit-backdrop-filter: blur(20px);
+              border: 1.5px solid #FF375F;
+              box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(255, 55, 95, 0.4);
+              border-radius: 9999px;
+              cursor: pointer;
+              transform: translate(-50%, -50%);
+              white-space: nowrap;
+            ">
+              <span style="
+                width: 17px;
+                height: 17px;
+                border-radius: 50%;
+                background: #FF375F;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 9.5px;
+                color: #fff;
+                font-weight: 900;
+              ">▼</span>
+              <span style="font-size: 11px; font-weight: 700; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+                ${dropoffCode}
+              </span>
+            </div>
+          `,
+          iconSize: [60, 24],
+          iconAnchor: [30, 12]
+        });
+        const dMarker = L.marker([dropoffStop.lat, dropoffStop.lon], { icon: dropoffIcon });
+        dMarker.bindPopup(`
+          <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+            <div style="font-size: 12.5px; font-weight: 700; color: #FF375F;">🔴 Drop-off Stop</div>
+            <div style="font-size: 12px; font-weight: 600; margin-top: 2px;">${dropoffStop.name}</div>
+            <div style="font-size: 10.5px; color: #666; margin-top: 1px;">${dropoffStop.campus} Campus</div>
+          </div>
+        `);
+        markersGroup.addLayer(dMarker);
+
+        // Intermediate stops along the selected route (Interactive Apple Stop Glyphs)
+        routeStops.forEach((st) => {
+          if (st.name === boardingStop.name || st.name === dropoffStop.name) return;
+          const code = getStopShortCode(st.name);
+
+          const stopGlyphIcon = L.divIcon({
+            className: 'apple-stop-glyph-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                padding: 2.5px 6px;
+                background: rgba(28, 28, 30, 0.92);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.22);
+                border-radius: 9999px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="font-size: 9.5px;">🚏</span>
+                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.85); font-family: -apple-system, sans-serif;">
+                  ${code}
+                </span>
+              </div>
+            `,
+            iconSize: [52, 22],
+            iconAnchor: [26, 11]
+          });
+
+          const sMarker = L.marker([st.lat, st.lon], { icon: stopGlyphIcon });
+          sMarker.on('click', () => {
+            if (onSelectTargetLocation) {
+              onSelectTargetLocation(st.name);
+            }
+          });
+          sMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">Route ${selectedRoute.name} Stop</div>
+              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                margin-top: 6px;
+                width: 100%;
+                padding: 4px 8px;
+                background: #0A84FF;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              ">
+                Route to this Stop ➔
+              </button>
+            </div>
+          `);
+          markersGroup.addLayer(sMarker);
+        });
+
+        // Final Target Destination Building Marker (if separate structure from bus stop)
+        if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+          const destCode = getStopShortCode(destTarget.name) || destTarget.name;
+          const destBuildingIcon = L.divIcon({
+            className: 'google-dest-building-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 2.5px 7px;
+                background: rgba(28, 28, 30, 0.94);
+                border: 1.5px solid #0A84FF;
+                border-radius: 9999px;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+                white-space: nowrap;
+                transform: translate(-50%, -50%);
+              ">
+                <span style="font-size: 10px;">🏁</span>
+                <span style="font-size: 10.5px; font-weight: 700; color: #fff; font-family: -apple-system, sans-serif;">
+                  ${destCode}
+                </span>
+              </div>
+            `,
+            iconSize: [60, 24],
+            iconAnchor: [30, 12]
+          });
+          markersGroup.addLayer(L.marker([destTarget.lat, destTarget.lon], { icon: destBuildingIcon }));
+        }
+
+        // Render all other network stops in RUTGERS_BUS_STOPS so stops like Quads, Science Building, etc. are always present
+        const renderedStopNames = new Set([
+          boardingStop.name.toLowerCase(),
+          dropoffStop.name.toLowerCase(),
+          ...routeStops.map(s => s.name.toLowerCase())
+        ]);
+
+        RUTGERS_BUS_STOPS.forEach((st) => {
+          if (renderedStopNames.has(st.name.toLowerCase())) return;
+          if (st.name.includes('(SB)') || st.name.includes('(NB)')) return;
+
+          const code = getStopShortCode(st.name);
+          const otherStopIcon = L.divIcon({
+            className: 'apple-stop-network-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 2.5px;
+                padding: 2px 5.5px;
+                background: rgba(28, 28, 30, 0.88);
+                backdrop-filter: blur(14px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 9999px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="font-size: 8.5px;">🚏</span>
+                <span style="font-size: 9px; font-weight: 600; color: rgba(235, 235, 245, 0.85); font-family: -apple-system, sans-serif;">
+                  ${code}
+                </span>
+              </div>
+            `,
+            iconSize: [50, 20],
+            iconAnchor: [25, 10]
+          });
+
+          const oMarker = L.marker([st.lat, st.lon], { icon: otherStopIcon });
+          oMarker.on('click', () => {
+            if (onSelectTargetLocation) onSelectTargetLocation(st.name);
+          });
+          oMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">${st.campus} Campus</div>
+              <div style="font-size: 9.5px; color: #888; margin-top: 1px;">Routes: ${st.routes.join(', ')}</div>
+              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                margin-top: 6px;
+                width: 100%;
+                padding: 4px 8px;
+                background: #0A84FF;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              ">
+                Route to this Stop ➔
+              </button>
+            </div>
+          `);
+          markersGroup.addLayer(oMarker);
+        });
+      } else {
+        // No active route selected: render all Rutgers bus stops (Quads, Science Building, BSC, LSC, The Yard, etc.)
+        RUTGERS_BUS_STOPS.forEach((st) => {
+          if (st.name.includes('(SB)') || st.name.includes('(NB)')) return;
+
+          const code = getStopShortCode(st.name);
+          const stopGlyphIcon = L.divIcon({
+            className: 'apple-stop-glyph-marker',
+            html: `
+              <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                padding: 2.5px 6px;
+                background: rgba(28, 28, 30, 0.92);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.22);
+                border-radius: 9999px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                cursor: pointer;
+                transform: translate(-50%, -50%);
+                white-space: nowrap;
+              ">
+                <span style="font-size: 9.5px;">🚏</span>
+                <span style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.9); font-family: -apple-system, sans-serif;">
+                  ${code}
+                </span>
+              </div>
+            `,
+            iconSize: [52, 22],
+            iconAnchor: [26, 11]
+          });
+
+          const sMarker = L.marker([st.lat, st.lon], { icon: stopGlyphIcon });
+          sMarker.on('click', () => {
+            if (onSelectTargetLocation) onSelectTargetLocation(st.name);
+          });
+          sMarker.bindPopup(`
+            <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+              <div style="font-size: 12px; font-weight: 700; color: #0A84FF;">🚏 ${st.name}</div>
+              <div style="font-size: 10.5px; color: #666; margin-top: 2px;">${st.campus} Campus</div>
+              <div style="font-size: 9.5px; color: #888; margin-top: 1px;">Routes: ${st.routes.join(', ')}</div>
+              <button onclick="window.__selectTransitStop && window.__selectTransitStop('${st.name}')" style="
+                margin-top: 6px;
+                width: 100%;
+                padding: 4px 8px;
+                background: #0A84FF;
+                color: #fff;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 700;
+                cursor: pointer;
+              ">
+                Route to this Stop ➔
+              </button>
+            </div>
+          `);
+          markersGroup.addLayer(sMarker);
+        });
+      }
+    }
+
+    // 2. Real-time Live Buses Markers (Color-coded using official Transitstat.us palette)
+    buses.forEach((b) => {
+      if (!b.lat || !b.lon) return;
+
+      const colorInfo = getRouteColorInfo(b.route);
+
+      const busIcon = L.divIcon({
+        className: 'apple-bus-map-marker',
+        html: `
+          <div style="
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2.5px 7px;
+            background: ${colorInfo.bg};
+            color: ${colorInfo.text};
+            font-size: 10px;
+            font-weight: 800;
+            font-family: -apple-system, sans-serif;
+            border-radius: 6px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.55), 0 0 12px ${colorInfo.bg}77;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+          ">
+            <span>🚌</span>
+            <span>${colorInfo.shortName}</span>
+            <span style="opacity: 0.92; font-weight: 600; font-size: 9px; margin-left: 2px;">${b.eta_mins}m</span>
+          </div>
+        `,
+        iconSize: [56, 22],
+        iconAnchor: [28, 11]
+      });
+
+      const marker = L.marker([b.lat, b.lon], { icon: busIcon });
+      marker.bindPopup(`
+        <div style="font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 2px;">
+          <div style="font-size: 13px; font-weight: 700; color: ${colorInfo.bg};">Route ${b.route}</div>
+          <div style="font-size: 11px; font-weight: 600; margin-top: 2px;">To ${b.destination}</div>
+          <div style="font-size: 10px; color: #666; margin-top: 2px;">Next: ${b.next_stop} • ETA: ${b.eta_mins} min</div>
+          <div style="font-size: 10px; color: #10b981; font-weight: 600; margin-top: 3px;">● ${b.occupancy}</div>
+        </div>
+      `);
+      markersGroup.addLayer(marker);
+    });
+  }, [buses, originCampus, destCampus, selectedRoute, boardingStop, dropoffStop, destTarget, walkDistMeters, routeStops, isZoomedOut, onSelectTargetLocation, onSelectCampus]);
+
+  // Handle Route Navigation Layer with Real Road Geometry & Walking Connectors
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const routeGroup = routeLayerRef.current;
+    if (!map || !routeGroup) return;
+
+    routeGroup.clearLayers();
+
+    if (!selectedRoute) {
+      return;
+    }
+
+    const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || (selectedRoute.name || '').toLowerCase().includes('bike');
+
+    // Use actual road coordinates from live routing engine if loaded, else fallback
+    const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
+      ? liveRoute.coordinates
+      : getFallbackRouteGeometry(originCampus, destCampus, isBike);
+
+    // Glowing navigation route line (transitstat.us route color or bike green)
+    const routeColor = isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
+
+    // Outer glow casing
+    const glowPolyline = L.polyline(pathCoords, {
+      color: routeColor,
+      weight: 10,
+      opacity: 0.45,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    // Core sharp road line
+    const corePolyline = L.polyline(pathCoords, {
+      color: '#FFFFFF',
+      weight: 4.5,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+      dashArray: isBike ? '6, 8' : undefined
+    });
+
+    routeGroup.addLayer(glowPolyline);
+    routeGroup.addLayer(corePolyline);
+
+    // If destination building is a separate walk from the drop-off bus stop, render dotted walking line
+    // HIDE inner walking line when zoomed out!
+    if (!isZoomedOut && walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+      const walkPolyline = L.polyline([
+        [dropoffStop.lat, dropoffStop.lon],
+        [destTarget.lat, destTarget.lon]
+      ], {
+        color: '#FF9500',
+        weight: 3.5,
+        opacity: 0.9,
+        dashArray: '5, 7',
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+      routeGroup.addLayer(walkPolyline);
+    }
+
+    // Animated Traveler / Active Nav Pin along the real road path
+    const midIdx = Math.floor(pathCoords.length / 2);
+    const midCoord = pathCoords[midIdx] || pathCoords[0];
+
+    const travelerIcon = L.divIcon({
+      className: 'google-traveler-pin',
+      html: `
+        <div style="
+          position: relative;
+          width: 26px;
+          height: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transform: translate(-50%, -50%);
+        ">
+          <div style="
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: ${routeColor};
+            opacity: 0.4;
+            animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+          "></div>
+          <div style="
+            position: relative;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 3.5px solid ${routeColor};
+            box-shadow: 0 0 12px ${routeColor};
+          "></div>
+        </div>
+      `,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    const travelerMarker = L.marker([midCoord[0], midCoord[1]], { icon: travelerIcon });
+    routeGroup.addLayer(travelerMarker);
+
+    // Animate bounds to smoothly fit the real road coordinates when route or destination changes
+    const routeFitKey = `${selectedRoute?.name}_${originCampus}_${destCampus}_${destTarget.name}`;
+    if (prevRouteFitKeyRef.current !== routeFitKey) {
+      prevRouteFitKeyRef.current = routeFitKey;
+      const bounds = L.latLngBounds(pathCoords);
+      if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+        bounds.extend([destTarget.lat, destTarget.lon]);
+      }
+      map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16, animate: true, duration: 0.8 });
+    }
+  }, [selectedRoute, liveRoute, originCampus, destCampus, dropoffStop, destTarget, walkDistMeters, isZoomedOut]);
+
+  // Deep links to Google Maps directly between the dynamic transit stops
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${boardingStop.lat},${boardingStop.lon}&destination=${dropoffStop.lat},${dropoffStop.lon}&travelmode=transit`;
+
+  // Render Maneuver Icon
+  const renderManeuverIcon = (type: RouteStep['iconType']) => {
+    switch (type) {
+      case 'walk':
+        return <Footprints size={19} />;
+      case 'bike':
+        return <Bike size={19} />;
+      case 'car':
+        return <Car size={19} />;
+      case 'destination':
+        return <MapPin size={19} />;
+      case 'turn-left':
+        return <Navigation size={19} style={{ transform: 'rotate(-45deg)' }} />;
+      case 'turn-right':
+        return <Navigation size={19} style={{ transform: 'rotate(45deg)' }} />;
+      case 'bus':
+      default:
+        return <BusIcon size={19} />;
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      minHeight: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      borderRadius: '20px',
+      border: '1px solid var(--apple-border)',
+      boxShadow: 'var(--apple-shadow-lg)'
+    }}>
+      {/* Map Canvas */}
+      <div ref={mapContainerRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
+
+      {/* ========================================================
+          TOP FLOATING GOOGLE MAPS NAVIGATION HEADER
+          (Triggered when routing option is selected)
+          ======================================================== */}
+      {selectedRoute ? (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          left: '12px',
+          right: '12px',
+          zIndex: 1000,
+          background: 'rgba(20, 20, 22, 0.94)',
+          backdropFilter: 'blur(30px) saturate(190%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(190%)',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          borderRadius: '16px',
+          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(26, 115, 232, 0.25)',
+          padding: '12px 16px',
+          animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+          {/* Top Line: Google Maps Badge + Routing Provider Status + Steps & Exit */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Google Maps Navigation Badge */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 10px',
+                borderRadius: '9999px',
+                background: 'rgba(28, 28, 30, 0.92)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#fff',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
+              }}>
+                <span>🗺️</span>
+                <span>Google Maps Navigation</span>
+              </div>
+
+              {/* Real Road Routing Provider Indicator */}
+              <span style={{
+                fontSize: '10.5px',
+                padding: '3px 9px',
+                borderRadius: '6px',
+                background: 'rgba(28, 28, 30, 0.92)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: '#fff',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {isRoutingLoading ? (
+                  <>
+                    <Loader2 size={10} className="animate-spin" />
+                    Calculating Live Roads...
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: '#34A853' }}>●</span>
+                    {liveRoute?.provider === 'google' ? 'Google Directions API' : 'Free Live Road GPS'}
+                  </>
+                )}
+              </span>
+            </div>
+
+            {/* Step Counter & Itinerary Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setShowStepsDrawer(!showStepsDrawer)}
+                className="apple-btn-dark-glass"
+                style={{ fontSize: '11px', padding: '4px 10px', height: '26px', gap: '4px' }}
+              >
+                <List size={12} />
+                <span>{showStepsDrawer ? 'Hide Steps' : `Steps (${steps.length})`}</span>
+              </button>
+
+              <button
+                onClick={onClearSelectedRoute}
+                title="End Navigation"
+                className="apple-btn-dark-glass"
+                style={{ width: '26px', height: '26px', padding: 0, borderRadius: '50%' }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Maneuver Banner: Maneuver Icon + Current Instruction */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: '#1A73E8',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 14px rgba(26, 115, 232, 0.4)'
+            }}>
+              {renderManeuverIcon(currentStep?.iconType)}
+            </div>
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                fontSize: '14.5px',
+                fontWeight: 700,
+                color: '#fff',
+                lineHeight: 1.25,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {currentStep?.instruction || `Board ${selectedRoute.name}`}
+              </div>
+              <div style={{
+                fontSize: '11.5px',
+                color: 'var(--apple-label-secondary)',
+                marginTop: '2px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {currentStep?.subText || `${originCampus} to ${destCampus} • ${selectedRoute.description}`}
+              </div>
+            </div>
+
+            {/* Step Advance Chevrons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <button
+                disabled={currentStepIndex <= 0}
+                onClick={() => setCurrentStepIndex(prev => Math.max(0, prev - 1))}
+                className="apple-btn-dark-glass"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  padding: 0,
+                  borderRadius: '7px',
+                  opacity: currentStepIndex <= 0 ? 0.35 : 1
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                disabled={currentStepIndex >= steps.length - 1}
+                onClick={() => setCurrentStepIndex(prev => Math.min(steps.length - 1, prev + 1))}
+                className="apple-btn-dark-glass"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  padding: 0,
+                  borderRadius: '7px',
+                  opacity: currentStepIndex >= steps.length - 1 ? 0.35 : 1
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Stop Selection Ribbon for Selected Route */}
+          {routeStops && routeStops.length > 0 && (
+            <div style={{
+              marginTop: '10px',
+              paddingTop: '8px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '10px',
+                fontWeight: 700,
+                color: 'rgba(235, 235, 245, 0.65)',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>Route Stops</span>
+                  <span style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    fontWeight: 700
+                  }}>
+                    {routeStops.length}
+                  </span>
+                </span>
+                <span style={{ color: '#0A84FF', fontWeight: 600, fontSize: '10px' }}>
+                  Tap stop to route
+                </span>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '6px',
+                overflowX: 'auto',
+                paddingBottom: '2px',
+                scrollbarWidth: 'none',
+                WebkitOverflowScrolling: 'touch'
+              }}>
+                {routeStops.map((st) => {
+                  const isBoarding = st.name === boardingStop.name;
+                  const isDropoff = st.name === dropoffStop.name;
+                  const shortCode = getStopShortCode(st.name);
+
+                  let badgeIcon = '🚏';
+                  let btnBg = 'rgba(255, 255, 255, 0.08)';
+                  let btnBorder = '1px solid rgba(255, 255, 255, 0.12)';
+                  let btnColor = '#ffffff';
+
+                  if (isDropoff) {
+                    badgeIcon = '▼';
+                    btnBg = 'rgba(255, 55, 95, 0.28)';
+                    btnBorder = '1.5px solid #FF375F';
+                    btnColor = '#FF375F';
+                  } else if (isBoarding) {
+                    badgeIcon = '▲';
+                    btnBg = 'rgba(48, 209, 88, 0.28)';
+                    btnBorder = '1.5px solid #30D158';
+                    btnColor = '#30D158';
+                  }
+
+                  return (
+                    <button
+                      key={st.name}
+                      onClick={() => onSelectTargetLocation?.(st.name)}
+                      title={`${st.name} (${st.campus} Campus) - Tap to route`}
+                      className="apple-btn-dark-glass"
+                      style={{
+                        padding: '4px 9px',
+                        fontSize: '11px',
+                        fontWeight: (isBoarding || isDropoff) ? 700 : 500,
+                        borderRadius: '9999px',
+                        flexShrink: 0,
+                        gap: '5px',
+                        background: btnBg,
+                        border: btnBorder,
+                        color: btnColor,
+                        transition: 'all 0.15s ease',
+                        boxShadow: isDropoff ? '0 0 10px rgba(255, 55, 95, 0.35)' : isBoarding ? '0 0 10px rgba(48, 209, 88, 0.35)' : 'none'
+                      }}
+                    >
+                      <span style={{ fontSize: '10px' }}>{badgeIcon}</span>
+                      <span>{shortCode}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Expandable Step-by-Step Itinerary Sheet */}
+          {showStepsDrawer && (
+            <div style={{
+              marginTop: '10px',
+              paddingTop: '10px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+              maxHeight: '220px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              {steps.map((st, idx) => {
+                const isCurrent = idx === currentStepIndex;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setCurrentStepIndex(idx)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '9px',
+                      padding: '6px 9px',
+                      borderRadius: '8px',
+                      background: isCurrent ? 'rgba(26, 115, 232, 0.22)' : 'rgba(28, 28, 30, 0.75)',
+                      border: isCurrent ? '1px solid rgba(26, 115, 232, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '6px',
+                      background: isCurrent ? '#1A73E8' : 'rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      flexShrink: 0
+                    }}>
+                      {renderManeuverIcon(st.iconType)}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '11.5px', fontWeight: isCurrent ? 700 : 500, color: '#fff' }}>
+                        {st.instruction}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                        {st.subText}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)', flexShrink: 0 }}>
+                      {st.distance} ({st.duration})
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Top HUD when idle / viewing corridor */
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          left: '12px',
+          right: '12px',
+          zIndex: 1000,
+          background: 'rgba(28, 28, 30, 0.92)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(255, 255, 255, 0.14)',
+          borderRadius: '14px',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.6)',
+          padding: '8px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          pointerEvents: 'auto'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px' }}>🗺️</span>
+            <div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#fff' }}>
+                Google Maps • Rutgers Transit Corridor
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--apple-label-secondary)' }}>
+                Select any route on the left to start live Google Maps turn-by-turn navigation
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10.5px', color: '#34A853', fontWeight: 700 }}>
+              ● {buses.length} Active Rutgers Buses
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          BOTTOM NAVIGATION BAR (GOOGLE NAVIGATION DOCK)
+          ======================================================== */}
+      <div style={{
+        position: 'absolute',
+        bottom: '12px',
+        left: '12px',
+        right: '12px',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '8px',
+        pointerEvents: 'none'
+      }}>
+        {/* Left: Navigation Dock or Campus Quick Focus */}
+        {selectedRoute ? (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            background: 'rgba(28, 28, 30, 0.94)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            borderRadius: '14px',
+            padding: '7px 14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            pointerEvents: 'auto'
+          }}>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+                ~{effectiveDurationMinutes} min
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--apple-label-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Clock size={10} />
+                <span>Arrive {getArrivalClock(effectiveDurationMinutes)} • {effectiveDistanceMiles} mi</span>
+              </div>
+            </div>
+
+            <button
+              onClick={onClearSelectedRoute}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '5px 11px',
+                borderRadius: '9999px',
+                background: '#EA4335',
+                color: '#fff',
+                border: 'none',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(234, 67, 53, 0.4)'
+              }}
+              title="Exit Navigation Mode"
+            >
+              <X size={12} strokeWidth={2.8} />
+              <span>End</span>
+            </button>
+          </div>
+        ) : (
+          /* Campus Focus Pills */
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: 'rgba(28, 28, 30, 0.92)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            padding: '4px 6px',
+            borderRadius: '9999px',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
+            pointerEvents: 'auto'
+          }}>
+            {["Busch", "Livingston", "College Ave", "Cook"].map((camp) => (
+              <button
+                key={camp}
+                onClick={() => {
+                  const map = mapInstanceRef.current;
+                  const coord = CAMPUS_COORDINATES[camp];
+                  if (map && coord) {
+                    map.flyTo([coord.lat, coord.lon], 15, { duration: 0.8 });
+                  }
+                }}
+                className="apple-segment-btn"
+                style={{ padding: '3px 9px', fontSize: '11px', height: '24px', color: '#fff' }}
+              >
+                {camp}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Right: Dark Frosted Glass Overlay Buttons */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          pointerEvents: 'auto'
+        }}>
+          {/* Quick Route Switcher if planResult is present and idle */}
+          {planResult && planResult.routes && onSelectRoute && !selectedRoute && (
+            <button
+              onClick={() => onSelectRoute(planResult.routes[0])}
+              className="apple-btn-dark-glass"
+              style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
+            >
+              <Navigation size={12} color="#1A73E8" />
+              <span>Start Navigation</span>
+            </button>
+          )}
+
+          {/* Toggle between Google Dark, Google Standard, and Google Satellite */}
+          <button
+            onClick={() => setMapTheme(prev =>
+              prev === 'google-dark' ? 'google-standard' : prev === 'google-standard' ? 'google-satellite' : 'google-dark'
+            )}
+            className="apple-btn-dark-glass"
+            style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px' }}
+            title="Switch Google Maps Style"
+          >
+            <Layers size={13} color="#FFFFFF" />
+            <span>
+              {mapTheme === 'google-dark' ? 'Google Dark' : mapTheme === 'google-standard' ? 'Google Road' : 'Google Satellite'}
+            </span>
+          </button>
+
+          {/* Open directly in Google Maps */}
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="apple-btn-dark-glass"
+            style={{ fontSize: '11px', padding: '5px 12px', height: '28px', gap: '5px', textDecoration: 'none' }}
+            title="Open transit directions in Google Maps app"
+          >
+            <MapPin size={13} color="#EA4335" />
+            <span>Google Maps</span>
+            <ExternalLink size={10} style={{ opacity: 0.7 }} />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TransitMap;
