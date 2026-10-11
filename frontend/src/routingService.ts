@@ -189,10 +189,15 @@ export async function fetchLiveRoute(
     }
   }
 
-  // 2. Free High-Precision OSRM Live Routing Engine (Zero API Key, 100% Free)
+  // 2. Free High-Precision OSRM / OpenStreetMap Live Routing Engine (Zero API Key, 100% Free)
   try {
-    const osrmProfile = transitType === 'walk' ? 'foot' : transitType === 'bike' ? 'bike' : 'driving';
-    const osrmUrl = `https://router.project-osrm.org/route/v1/${osrmProfile}/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+    let osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+    if (transitType === 'walk') {
+      // Use OpenStreetMap dedicated pedestrian footway & campus trail engine
+      osrmUrl = `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+    } else if (transitType === 'bike') {
+      osrmUrl = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
+    }
 
     const res = await fetch(osrmUrl);
     if (res.ok) {

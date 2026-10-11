@@ -274,20 +274,22 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
-    const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
-      (selectedRoute.name || '').toLowerCase().includes('walk') ||
-      (selectedRoute.name || '').toLowerCase().includes('pedestrian');
+    const isPureWalk = (selectedRoute.type || '').toLowerCase() === 'walking path' ||
+      (selectedRoute.name || '').toLowerCase() === 'campus pedestrian walk' ||
+      (selectedRoute.name || '').toLowerCase() === 'direct walk' ||
+      (selectedRoute.name || '').toLowerCase() === 'campus walk' ||
+      ((selectedRoute.type || '').toLowerCase().includes('walk') && !(selectedRoute.type || '').toLowerCase().includes('bus'));
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('bike') ||
       (selectedRoute.name || '').toLowerCase().includes('scooter');
     const isCar = (selectedRoute.name || '').toLowerCase().includes('knight') ||
       (selectedRoute.name || '').toLowerCase().includes('escort');
-    const mode: 'bus' | 'bike' | 'car' | 'walk' = isWalk ? 'walk' : isBike ? 'bike' : isCar ? 'car' : 'bus';
+    const mode: 'bus' | 'bike' | 'car' | 'walk' = isPureWalk ? 'walk' : isBike ? 'bike' : isCar ? 'car' : 'bus';
 
-    const originLat = isWalk ? (userLocation?.lat ?? origTarget.lat) : boardingStop.lat;
-    const originLon = isWalk ? (userLocation?.lon ?? origTarget.lon) : boardingStop.lon;
-    const destLat = isWalk ? destTarget.lat : dropoffStop.lat;
-    const destLon = isWalk ? destTarget.lon : dropoffStop.lon;
+    const originLat = isPureWalk ? (userLocation?.lat ?? origTarget.lat) : boardingStop.lat;
+    const originLon = isPureWalk ? (userLocation?.lon ?? origTarget.lon) : boardingStop.lon;
+    const destLat = isPureWalk ? destTarget.lat : dropoffStop.lat;
+    const destLon = isPureWalk ? destTarget.lon : dropoffStop.lon;
 
     fetchLiveRoute(originLat, originLon, destLat, destLon, mode, selectedRoute.name)
       .then((res) => {
@@ -943,25 +945,27 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       return;
     }
 
-    const isWalk = (selectedRoute.type || '').toLowerCase().includes('walk') ||
-      (selectedRoute.name || '').toLowerCase().includes('walk') ||
-      (selectedRoute.name || '').toLowerCase().includes('pedestrian');
+    const isPureWalk = (selectedRoute.type || '').toLowerCase() === 'walking path' ||
+      (selectedRoute.name || '').toLowerCase() === 'campus pedestrian walk' ||
+      (selectedRoute.name || '').toLowerCase() === 'direct walk' ||
+      (selectedRoute.name || '').toLowerCase() === 'campus walk' ||
+      ((selectedRoute.type || '').toLowerCase().includes('walk') && !(selectedRoute.type || '').toLowerCase().includes('bus'));
     const isBike = (selectedRoute.type || '').toLowerCase().includes('bike') || (selectedRoute.name || '').toLowerCase().includes('bike');
 
     // Use actual road/pathway coordinates from live routing engine if loaded, else fallback
     const pathCoords: [number, number][] = (liveRoute && liveRoute.coordinates.length > 0)
       ? liveRoute.coordinates
-      : isWalk
+      : isPureWalk
       ? [[userLocation?.lat ?? origTarget.lat, userLocation?.lon ?? origTarget.lon], [destTarget.lat, destTarget.lon]]
       : getFallbackRouteGeometry(originCampus, destCampus, isBike, boardingStop, dropoffStop, selectedRoute?.name);
 
     // Glowing navigation route line (transitstat.us route color, bike green, or pedestrian blue)
-    const routeColor = isWalk ? '#0A84FF' : isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
+    const routeColor = isPureWalk ? '#0A84FF' : isBike ? '#34A853' : getRouteColorInfo(selectedRoute.name).bg;
 
     // Outer glow casing
     const glowPolyline = L.polyline(pathCoords, {
       color: routeColor,
-      weight: isWalk ? 8 : 10,
+      weight: isPureWalk ? 8 : 10,
       opacity: 0.45,
       lineCap: 'round',
       lineJoin: 'round'
@@ -974,26 +978,49 @@ export const TransitMap: React.FC<TransitMapProps> = ({
       opacity: 0.95,
       lineCap: 'round',
       lineJoin: 'round',
-      dashArray: isWalk ? '4, 6' : isBike ? '6, 8' : undefined
+      dashArray: isPureWalk ? '4, 6' : isBike ? '6, 8' : undefined
     });
 
     routeGroup.addLayer(glowPolyline);
     routeGroup.addLayer(corePolyline);
 
-    // If destination building is a separate walk from the drop-off bus stop (only if not already a walking route)
-    if (!isWalk && walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
-      const walkPolyline = L.polyline([
-        [dropoffStop.lat, dropoffStop.lon],
-        [destTarget.lat, destTarget.lon]
-      ], {
-        color: '#FF9500',
-        weight: 3.5,
-        opacity: 0.9,
-        dashArray: '5, 7',
-        lineCap: 'round',
-        lineJoin: 'round'
-      });
-      routeGroup.addLayer(walkPolyline);
+    // If taking a bus, draw pedestrian walking connectors from origin building to boarding stop and drop-off to dest building
+    if (!isPureWalk) {
+      const boardDistMeters = getHaversineDistanceMeters(
+        userLocation?.lat ?? origTarget.lat,
+        userLocation?.lon ?? origTarget.lon,
+        boardingStop.lat,
+        boardingStop.lon
+      );
+      if (boardDistMeters > 30 && origTarget.name !== boardingStop.name) {
+        const walkToBoard = L.polyline([
+          [userLocation?.lat ?? origTarget.lat, userLocation?.lon ?? origTarget.lon],
+          [boardingStop.lat, boardingStop.lon]
+        ], {
+          color: '#30D158',
+          weight: 3.5,
+          opacity: 0.9,
+          dashArray: '5, 7',
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        routeGroup.addLayer(walkToBoard);
+      }
+
+      if (walkDistMeters > 35 && destTarget.name !== dropoffStop.name) {
+        const walkPolyline = L.polyline([
+          [dropoffStop.lat, dropoffStop.lon],
+          [destTarget.lat, destTarget.lon]
+        ], {
+          color: '#FF9500',
+          weight: 3.5,
+          opacity: 0.9,
+          dashArray: '5, 7',
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+        routeGroup.addLayer(walkPolyline);
+      }
     }
 
     // Animated Traveler / Active Nav Pin along the real road path

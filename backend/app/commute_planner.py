@@ -43,13 +43,23 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
         is_weekend = datetime.now().weekday() >= 5
         primary_bus = "Weekend 2" if is_weekend else ("Route B" if origin == "Busch" else "Route EE" if "college" in origin.lower() else "Route B")
         alt_bus = "Weekend 1" if is_weekend else ("Route A" if origin == "Busch" else "Route F")
+        walk_mins = max(2, walk_time_minutes(0.25, walking_speed_mph))
         routes = [
+            {
+                "name": "Campus Pedestrian Walk",
+                "type": "Walking Path",
+                "estimated_minutes": walk_mins,
+                "walk_miles": 0.25,
+                "rush_hour_minutes": walk_mins,
+                "badge": "Recommended Walk",
+                "description": f"Direct pedestrian path between buildings on {origin}. Fastest on-campus route with zero bus wait."
+            },
             {
                 "name": primary_bus,
                 "type": "Campus Bus",
-                "estimated_minutes": 5,
-                "rush_hour_minutes": 7,
-                "badge": "Recommended",
+                "estimated_minutes": 8,
+                "rush_hour_minutes": 10,
+                "badge": "Campus Bus",
                 "description": f"Direct campus bus connecting stops across {origin} (e.g. Student Center, Hill, Science, ARC)."
             },
             {
@@ -61,19 +71,10 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 "description": f"Hop on a Veo e-scooter or bike for the fastest cross-building transit on {origin}."
             },
             {
-                "name": "Campus Pedestrian Walk",
-                "type": "Walking Path",
-                "estimated_minutes": 6,
-                "walk_miles": 0.3,
-                "rush_hour_minutes": 8,
-                "badge": "Direct Walk",
-                "description": f"Direct pedestrian walk between buildings on {origin}. No bus wait required."
-            },
-            {
                 "name": alt_bus,
                 "type": "Campus Bus",
-                "estimated_minutes": 8,
-                "rush_hour_minutes": 10,
+                "estimated_minutes": 10,
+                "rush_hour_minutes": 12,
                 "badge": "Alternative Bus",
                 "description": f"Secondary loop servicing internal stops across {origin}."
             }
@@ -1306,6 +1307,49 @@ def plan_multimodal_route(
             "description": desc,
             "type": "Multimodal (Walk + Bus)",
         })
+
+    # ── 5b. Evaluate direct pedestrian walk between buildings ─────────────────
+    direct_walk_miles = haversine_distance_miles(olat, olon, dlat, dlon)
+    direct_walk_mins = max(1, walk_time_minutes(direct_walk_miles, walking_speed_mph))
+
+    if direct_walk_miles <= max(0.85, max_walk_miles):
+        fastest_bus_mins = options[0]["total_mins"] if options else 99
+        is_walk_faster = direct_walk_mins <= fastest_bus_mins
+        time_saved = max(0, fastest_bus_mins - direct_walk_mins)
+        badge = "🏆 Fastest Walk" if is_walk_faster else "🚶 Direct Campus Walk"
+
+        walk_desc = (
+            f"Walk directly from {origin_name} to {dest_name} along campus pedestrian paths "
+            f"({direct_walk_miles} mi, ~{direct_walk_mins} min at {walking_speed_mph} mph). "
+            f"Direct cross-building route with zero bus wait."
+        )
+        if time_saved >= 1:
+            walk_desc += f" ⚡ Arrives {time_saved} min faster than taking the bus!"
+
+        direct_walk_opt = {
+            "badge": badge,
+            "stop_name": dest_name,
+            "stop_campus": "",
+            "bus_route": "Campus Walk",
+            "dist_to_stop_miles": direct_walk_miles,
+            "walk_mins": direct_walk_mins,
+            "wait_mins": 0,
+            "bus_ride_mins": 0,
+            "bus_eta_mins": 0,
+            "total_mins": direct_walk_mins,
+            "time_saved_vs_closest": time_saved,
+            "within_user_max_walk": direct_walk_miles <= max_walk_miles,
+            "description": walk_desc,
+            "type": "Walking Path",
+        }
+
+        if is_walk_faster or (prefer_walking and direct_walk_miles <= 0.65):
+            options.insert(0, direct_walk_opt)
+        else:
+            options.append(direct_walk_opt)
+
+        for idx, opt in enumerate(options):
+            opt["rank"] = idx + 1
 
     # ── 6. Build summary string ───────────────────────────────────────────────
     if not options:
