@@ -212,51 +212,61 @@ export const RUTGERS_BUS_STOPS: BusStop[] = [
   }
 ];
 
-// Campus Buildings with exact GPS coordinates (mapped with transitstat.us authoritative coordinates)
+// Campus Buildings with exact GPS coordinates (mapped with Google Maps / Rutgers campus authoritative coordinates)
 export const RUTGERS_BUILDINGS: LandmarkLocation[] = [
   // College Ave
   { name: "College Avenue Student Center", code: "CASC", campus: "College Ave", lat: 40.50366, lon: -74.4524 },
   { name: "College Ave Student Center", code: "CASC", campus: "College Ave", lat: 40.50366, lon: -74.4524 },
   { name: "The Yard", code: "YARD", campus: "College Ave", lat: 40.49957, lon: -74.44824 },
-  { name: "Academic Building", code: "AB", campus: "College Ave", lat: 40.49957, lon: -74.44824 },
+  { name: "Academic Building", code: "AB", campus: "College Ave", lat: 40.5015, lon: -74.4475 },
   { name: "Student Activities Center", code: "SAC", campus: "College Ave", lat: 40.50391, lon: -74.44882 },
   { name: "SoCam Apts", code: "SOCAM", campus: "College Ave", lat: 40.49186, lon: -74.44309 },
-  { name: "Scott Hall", code: "SCOTT", campus: "College Ave", lat: 40.4991, lon: -74.4478 },
+  { name: "Scott Hall", code: "SCOTT", campus: "College Ave", lat: 40.4997, lon: -74.4475 },
   { name: "Murray Hall", code: "MUR", campus: "College Ave", lat: 40.4996, lon: -74.4473 },
   { name: "Voorhees Hall", code: "VWH", campus: "College Ave", lat: 40.4998, lon: -74.4468 },
   { name: "Hardenbergh Hall", code: "HARD", campus: "College Ave", lat: 40.5034, lon: -74.4502 },
   { name: "School of Communication and Information", code: "CI", campus: "College Ave", lat: 40.5045, lon: -74.4505 },
 
   // Busch
-  { name: "Busch Student Center", code: "BSC", campus: "Busch", lat: 40.5238, lon: -74.45826 },
-  { name: "Hill Center", code: "HILL", campus: "Busch", lat: 40.52192, lon: -74.4633 },
+  { name: "Busch Student Center", code: "BSC", campus: "Busch", lat: 40.5233, lon: -74.4586 },
+  { name: "Hill Center", code: "HILL", campus: "Busch", lat: 40.52198, lon: -74.46283 },
+  { name: "Hill Center for the Mathematical Sciences", code: "HILL", campus: "Busch", lat: 40.52198, lon: -74.46283 },
   { name: "Science Building", code: "SEC", campus: "Busch", lat: 40.52394, lon: -74.46422 },
-  { name: "Allison Road Classrooms", code: "ARC", campus: "Busch", lat: 40.52356, lon: -74.46519 },
+  { name: "Allison Road Classrooms", code: "ARC", campus: "Busch", lat: 40.5236, lon: -74.4650 },
   { name: "Science & Engineering Resource Center", code: "SERC", campus: "Busch", lat: 40.5228, lon: -74.4638 },
+  { name: "Science and Engineering Resource Center", code: "SERC", campus: "Busch", lat: 40.5228, lon: -74.4638 },
+  { name: "Science and Engineering Building", code: "SERC", campus: "Busch", lat: 40.5228, lon: -74.4638 },
+  { name: "SERC", code: "SERC", campus: "Busch", lat: 40.5228, lon: -74.4638 },
+  { name: "SEC", code: "SEC", campus: "Busch", lat: 40.52394, lon: -74.46422 },
   { name: "Richard Weeks Hall of Engineering", code: "WEEKS", campus: "Busch", lat: 40.5238, lon: -74.4619 },
   { name: "Stadium West Lot", code: "STAD", campus: "Busch", lat: 40.51456, lon: -74.46615 },
   { name: "Werblin Recreation Center", code: "WERB", campus: "Busch", lat: 40.51864, lon: -74.45985 },
 
   // Livingston
   { name: "Livingston Plaza", code: "PLAZA", campus: "Livingston", lat: 40.52511, lon: -74.43858 },
-  { name: "Livingston Student Center", code: "LSC", campus: "Livingston", lat: 40.524, lon: -74.43663 },
-  { name: "Rutgers Business School", code: "RBS", campus: "Livingston", lat: 40.52511, lon: -74.43858 },
-  { name: "Tillett Hall", code: "TIL", campus: "Livingston", lat: 40.5255, lon: -74.4371 },
-  { name: "Beck Hall", code: "BECK", campus: "Livingston", lat: 40.5248, lon: -74.4385 },
-  { name: "Lucy Stone Hall", code: "LSH", campus: "Livingston", lat: 40.5238, lon: -74.4365 },
+  { name: "Livingston Student Center", code: "LSC", campus: "Livingston", lat: 40.5240, lon: -74.4366 },
+  { name: "Rutgers Business School", code: "RBS", campus: "Livingston", lat: 40.52200, lon: -74.44096 },
+  { name: "RBS", code: "RBS", campus: "Livingston", lat: 40.52200, lon: -74.44096 },
+  { name: "Tillett Hall", code: "TIL", campus: "Livingston", lat: 40.52187, lon: -74.43606 },
+  { name: "Tillett", code: "TIL", campus: "Livingston", lat: 40.52187, lon: -74.43606 },
+  { name: "TIL", code: "TIL", campus: "Livingston", lat: 40.52187, lon: -74.43606 },
+  { name: "Beck Hall", code: "BECK", campus: "Livingston", lat: 40.5235, lon: -74.4357 },
+  { name: "Lucy Stone Hall", code: "LSH", campus: "Livingston", lat: 40.5218, lon: -74.4395 },
   { name: "Quads", code: "QUADS", campus: "Livingston", lat: 40.51986, lon: -74.43357 },
   { name: "Livingston Quads", code: "QUADS", campus: "Livingston", lat: 40.51986, lon: -74.43357 },
   { name: "Jersey Mike's Arena", code: "JMA", campus: "Livingston", lat: 40.52435, lon: -74.44064 },
   { name: "Livingston Apartments", code: "LYN", campus: "Livingston", lat: 40.5252, lon: -74.4362 },
 
   // Cook / Douglass
+  { name: "Ruth Adams Building", code: "RAB", campus: "Douglass", lat: 40.48696, lon: -74.43736 },
+  { name: "Ruth Adams", code: "RAB", campus: "Douglass", lat: 40.48696, lon: -74.43736 },
   { name: "College Hall", code: "CH", campus: "Douglass", lat: 40.48551, lon: -74.4372 },
   { name: "Red Oak Lane", code: "RO", campus: "Cook", lat: 40.48299, lon: -74.43753 },
   { name: "Lipman Hall", code: "LIP", campus: "Cook", lat: 40.48129, lon: -74.43627 },
-  { name: "Biel Road", code: "BIEL", campus: "Cook", lat: 40.48, lon: -74.43252 },
+  { name: "Biel Road", code: "BIEL", campus: "Cook", lat: 40.4800, lon: -74.4325 },
   { name: "Henderson", code: "HEND", campus: "Cook", lat: 40.48095, lon: -74.42872 },
   { name: "Gibbons", code: "GIBB", campus: "Douglass", lat: 40.48523, lon: -74.43194 },
-  { name: "Cook Student Center", code: "CSC", campus: "Cook", lat: 40.48, lon: -74.43252 },
+  { name: "Cook Student Center", code: "CSC", campus: "Cook", lat: 40.4800, lon: -74.4325 },
   { name: "Hickman Hall", code: "HICK", campus: "Douglass", lat: 40.48551, lon: -74.4372 },
   { name: "Loree Gym", code: "LOREE", campus: "Douglass", lat: 40.4842, lon: -74.4368 },
   { name: "Food Sciences Building", code: "FOOD", campus: "Cook", lat: 40.4796, lon: -74.4287 }
@@ -299,20 +309,33 @@ export function resolveLocationCoords(
   fallbackCampus: string = 'College Ave'
 ): { lat: number; lon: number; name: string; campus: string } {
   const q = (locationQuery || '').toLowerCase().trim();
+  const qNorm = q.replace(/&/g, 'and').replace(/[.,\/#!$%\^;\:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Special match: Science & Engineering Resource Center / SERC / SEC
+  if (qNorm.includes('science and engineering') || qNorm.includes('serc') || (qNorm.includes('sec') && (qNorm.includes('busch') || qNorm.includes('room') || qNorm.includes('202')))) {
+    return { lat: 40.5228, lon: -74.4638, name: "Science and Engineering Resource Center", campus: "Busch" };
+  }
+
+  // Special match: Tillett Hall on Livingston
+  if (qNorm.includes('tillett') || qNorm.includes('tillet')) {
+    return { lat: 40.52187, lon: -74.43606, name: "Tillett Hall", campus: "Livingston" };
+  }
 
   // 1. Check building directory by exact code or name match
   for (const b of RUTGERS_BUILDINGS) {
-    if (b.code && q === b.code.toLowerCase()) {
+    if (b.code && (q === b.code.toLowerCase() || qNorm.split(' ').includes(b.code.toLowerCase()))) {
       return { lat: b.lat, lon: b.lon, name: b.name, campus: b.campus };
     }
-    if (q.includes(b.name.toLowerCase()) || b.name.toLowerCase().includes(q)) {
+    const bNorm = b.name.toLowerCase().replace(/&/g, 'and').replace(/[.,\/#!$%\^;\:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (qNorm.includes(bNorm) || bNorm.includes(qNorm)) {
       return { lat: b.lat, lon: b.lon, name: b.name, campus: b.campus };
     }
   }
 
   // 2. Check bus stops by name
   for (const s of RUTGERS_BUS_STOPS) {
-    if (q.includes(s.name.toLowerCase()) || s.name.toLowerCase().includes(q)) {
+    const sNorm = s.name.toLowerCase().replace(/&/g, 'and').replace(/[.,\/#!$%\^;\:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (qNorm.includes(sNorm) || sNorm.includes(qNorm)) {
       return { lat: s.lat, lon: s.lon, name: s.name, campus: s.campus };
     }
   }

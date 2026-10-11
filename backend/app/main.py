@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import httpx
 from dotenv import load_dotenv, find_dotenv
 import hashlib
-from app.user_store import load_users, save_users
+from app.user_store import load_users, save_users, save_user_classes
 from app.constants import SPEED_OPTIONS, DISTANCE_OPTIONS
 
 from app.rutgers_data import CAMPUS_BUILDINGS, CAMPUS_STOPS, TRANSIT_MATRIX
@@ -823,6 +823,26 @@ def update_user_preferences(username: str, req: PreferencesUpdateRequest):
             "avoid_rain": users[clean].get("avoid_rain", True),
             "avoid_snow": users[clean].get("avoid_snow", True)
         }
+    }
+
+
+class ClassesUpdateRequest(BaseModel):
+    classes: List[Dict[str, Any]]
+
+
+@app.post("/api/user/{username}/classes")
+def update_user_classes_endpoint(username: str, req: ClassesUpdateRequest):
+    clean = username.strip().lower()
+    users = load_users()
+    if clean not in users:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    save_user_classes(clean, req.classes)
+    return {
+        "status": "success",
+        "username": clean,
+        "classes_count": len(req.classes),
+        "classes": req.classes
     }
 
 

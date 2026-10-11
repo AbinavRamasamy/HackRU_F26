@@ -280,6 +280,27 @@ export function App() {
     handleCalculateRoute();
   }, [originCampus, destCampus]);
 
+  const getFriendlyBuildingDisplay = (cls: ClassItem): string => {
+    if (cls.location === '(Online)' || cls.campus === '(Online)') return '(Online)';
+    const bldg = (cls.building || '').trim();
+    const loc = (cls.location || '').trim();
+
+    // If building is concise like "SEC (Room: 202)" or "SERC 202" or "Hill Center 114"
+    if (bldg && bldg.length < 32 && !bldg.toLowerCase().includes('rutgers university')) {
+      if (bldg.toUpperCase().includes('SEC') && !bldg.toUpperCase().includes('SERC')) {
+        return bldg.replace(/SEC/gi, 'SERC');
+      }
+      return bldg;
+    }
+
+    // If location has full address "Science and Engineering Resource Center, Rutgers University, ..."
+    if (loc.includes(',')) {
+      const firstPart = loc.split(',')[0].trim();
+      if (firstPart.length > 0) return firstPart;
+    }
+    return bldg || loc || 'Rutgers Campus';
+  };
+
   const handleGetToNextClass = async (specificClass?: ClassItem) => {
     let targetClass = specificClass;
     if (!targetClass) {
@@ -292,7 +313,10 @@ export function App() {
     }
 
     const targetCampus = targetClass.campus || "College Ave";
-    const targetBuilding = targetClass.location || targetClass.building || targetCampus;
+    const cleanBuilding = getFriendlyBuildingDisplay(targetClass);
+    const targetBuilding = (cleanBuilding && cleanBuilding !== '(Online)')
+      ? cleanBuilding
+      : (targetClass.building || targetClass.location || targetCampus);
 
     if (targetClass.location === "(Online)" || targetClass.campus === "(Online)") {
       alert(`${targetClass.course} is an Online class - no transit navigation needed!`);
@@ -397,6 +421,21 @@ export function App() {
       const result = await syncDefaultDeviceCalendar();
       if (result.success && result.classes && result.classes.length > 0) {
         setClasses(result.classes);
+        try {
+          const savedUser = localStorage.getItem('scarlethop_auth_user');
+          if (savedUser) {
+            const u = JSON.parse(savedUser);
+            if (u?.netId) {
+              await fetch(`${API_BASE_URL}/api/user/${u.netId}/classes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ classes: result.classes })
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Could not persist synced classes to profile:", e);
+        }
         alert(`Successfully synced ${result.classes.length} classes from your device calendar!`);
         const up = getNextUpcomingClass(result.classes);
         if (up.nextClass) {
@@ -424,6 +463,19 @@ export function App() {
       syncDefaultDeviceCalendar().then(res => {
         if (res.success && res.classes && res.classes.length > 0) {
           setClasses(res.classes);
+          try {
+            const savedUser = localStorage.getItem('scarlethop_auth_user');
+            if (savedUser) {
+              const u = JSON.parse(savedUser);
+              if (u?.netId) {
+                fetch(`${API_BASE_URL}/api/user/${u.netId}/classes`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ classes: res.classes })
+                }).catch(() => {});
+              }
+            }
+          } catch {}
         }
       }).catch(err => {
         console.log("Background calendar auto-sync skipped:", err);
@@ -785,7 +837,7 @@ export function App() {
                                 onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
                                 onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                               >
-                                {cls.location || cls.building}
+                                {getFriendlyBuildingDisplay(cls)}
                               </a>
                             )}
                           </div>

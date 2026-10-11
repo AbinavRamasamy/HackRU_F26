@@ -43,6 +43,7 @@ class UserClass(Base):
     days_display = Column(String(100), nullable=True)
     campus = Column(String(100), nullable=True)
     location = Column(String(255), nullable=True)
+    zoom_link = Column(String(500), nullable=True)
 
     user = relationship("User", back_populates="classes")
 
@@ -62,5 +63,6 @@ class UserClass(Base):
             "days": days_parsed,
             "days_display": self.days_display or "",
             "campus": self.campus or "",
-            "location": self.location or ""
+            "location": self.location or "",
+            "zoom_link": self.zoom_link or ""
         }

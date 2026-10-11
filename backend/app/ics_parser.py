@@ -30,16 +30,21 @@ IGNORE_KEYWORDS = [
     "final exam", "midterm", "quiz", "reading day"
 ]
 
+import html
+
 def extract_zoom_link(ev: Dict[str, str]) -> Optional[str]:
     """Extracts Zoom or video conferencing URL from event properties."""
     zoom_pattern = re.compile(
-        r"https://[a-zA-Z0-9.\-_]*(?:zoom\.us|webex\.com|teams\.microsoft\.com|meet\.google\.com)/[^\s\"'<>]+",
+        r"https?://[a-zA-Z0-9.\-_]*(?:zoom\.us|webex\.com|teams\.microsoft\.com|meet\.google\.com)/[^\s\"'<>\\,;)]+",
         re.I
     )
     for key, val in ev.items():
         if not val:
             continue
-        match = zoom_pattern.search(val)
+        # Unescape RFC 5545 backslashes and HTML entities
+        clean_val = html.unescape(val)
+        clean_val = clean_val.replace(r"\:", ":").replace(r"\/", "/").replace(r"\?", "?").replace(r"\=", "=").replace(r"\&", "&")
+        match = zoom_pattern.search(clean_val)
         if match:
             url = match.group(0).rstrip(".,;)\\")
             return url
@@ -139,6 +144,7 @@ For each of the following courses and raw locations, determine:
 1. Is it a physical in-person classroom location at Rutgers University, or is it online/remote/virtual/asynchronous/unspecified?
 2. If it is a physical location:
    - Provide the optimal Google Maps search location query (e.g. "Hill Center, Rutgers University, Busch Campus, Piscataway, NJ", "Tillett Hall, Rutgers University, Livingston Campus, Piscataway, NJ", "Academic Building, Rutgers University, College Ave, New Brunswick, NJ") that directly navigates to the building on Google Maps. Strip room numbers like 114 or 254 from the query so Google Maps pins the building accurately.
+   - For SEC / SERC / Science and Engineering Building, always format as "Science and Engineering Resource Center, Rutgers University, Busch Campus, Piscataway, NJ".
    - Provide the Rutgers campus name (one of: "Busch", "College Ave", "Livingston", "Cook/Douglass").
 3. If it is NOT a physical location (online, virtual, canvas, zoom, asynchronous, remote, or blank/unspecified):
    - "location" MUST be strictly "(Online)"
@@ -241,6 +247,12 @@ Return ONLY a strictly valid JSON array of objects with the exact schema:
                     item["is_online"] = False
                     item["has_real_location"] = True
 
+        # Standardize Science and Engineering Resource Center naming
+        if item.get("location"):
+            item["location"] = re.sub(r"Science and Engineering Building\b", "Science and Engineering Resource Center", item["location"], flags=re.I)
+        if item.get("building"):
+            item["building"] = re.sub(r"Science and Engineering Building\b", "Science and Engineering Resource Center", item["building"], flags=re.I)
+
     return classes
 
 
@@ -322,7 +334,7 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
         # 3. Verify meeting duration (academic classes are typically 25 mins to 5 hours)
         if dtend:
             duration_minutes = (dtend - dtstart).total_seconds() / 60
-            if duration_minutes < 20 or duration_minutes > 360:
+            if duration_minutes < 10 or duration_minutes > 480:
                 continue
             end_time = f"{dtend.hour:02d}:{dtend.minute:02d}"
         else:
@@ -342,9 +354,10 @@ def parse_ics_schedule(ics_content: str) -> Dict[str, Any]:
         rrule_line = ev.get("RRULE", "")
         rrule = rrule_line.split(":", 1)[-1].strip() if ":" in rrule_line else ""
 
-        # 4. Strict semester cutoff: Only events belonging to this semester
-        # (e.g. Rutgers Fall 2026: Sept 1, 2026 - Dec 23, 2026)
-        earliest_start = term_start - timedelta(days=2) # Grace buffer for timezone/orientation
+        # 4. Strict Rutgers Fall semester cutoff:
+        # Strictly exclude all events from August or earlier (Summer session / prior terms)
+        # Official Rutgers Fall 2026: September 1, 2026 to December 23, 2026
+        earliest_start = term_start - timedelta(days=1)
         if dtstart.date() < earliest_start or dtstart.date() > term_end:
             continue
 
