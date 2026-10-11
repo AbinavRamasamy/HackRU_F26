@@ -45,12 +45,13 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
         alt_bus = "Weekend 1" if is_weekend else ("Route A" if origin == "Busch" else "Route F")
         routes = [
             {
-                "name": primary_bus,
-                "type": "Campus Bus",
+                "name": "Campus Pedestrian Walk",
+                "type": "Walking Path",
                 "estimated_minutes": 5,
-                "rush_hour_minutes": 7,
+                "walk_miles": 0.3,
+                "rush_hour_minutes": 6,
                 "badge": "Recommended",
-                "description": f"Direct campus bus connecting stops across {origin} (e.g. Student Center, Hill, Science, ARC)."
+                "description": f"Direct pedestrian walkway straight across {origin} (5 min). Cuts directly in between campus buildings without waiting for the outer loop bus."
             },
             {
                 "name": "Rutgers E-Scooter / Campus Bike",
@@ -61,21 +62,20 @@ def get_commute_routes(origin_raw: str, dest_raw: str, target_time: Optional[str
                 "description": f"Hop on a Veo e-scooter or bike for the fastest cross-building transit on {origin}."
             },
             {
-                "name": "Campus Pedestrian Walk",
-                "type": "Walking Path",
-                "estimated_minutes": 6,
-                "walk_miles": 0.3,
-                "rush_hour_minutes": 8,
-                "badge": "Direct Walk",
-                "description": f"Direct pedestrian walk between buildings on {origin}. No bus wait required."
+                "name": primary_bus,
+                "type": "Campus Bus",
+                "estimated_minutes": 8,
+                "rush_hour_minutes": 12,
+                "badge": "Perimeter Bus Loop",
+                "description": f"Campus shuttle following the outer vehicle roadway loop on {origin}. Note: buses must follow outer perimeter roads (e.g. via Werblin) rather than direct pedestrian walkways."
             },
             {
                 "name": alt_bus,
                 "type": "Campus Bus",
-                "estimated_minutes": 8,
-                "rush_hour_minutes": 10,
+                "estimated_minutes": 11,
+                "rush_hour_minutes": 15,
                 "badge": "Alternative Bus",
-                "description": f"Secondary loop servicing internal stops across {origin}."
+                "description": f"Secondary shuttle loop servicing stops across {origin}."
             }
         ]
         return routes

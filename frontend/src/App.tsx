@@ -311,26 +311,28 @@ export function App() {
       const primaryBus = isWeekend ? "Weekend 2" : (originCampus === "Busch" ? "Route B" : originCampus === "College Ave" ? "Route EE" : "Route B");
       fallbackRoutes = [
         {
-          name: primaryBus,
-          type: "Campus Bus",
+          name: "Campus Pedestrian Walk",
+          type: "Walking Path",
           estimated_minutes: 5,
-          rush_hour_minutes: 7,
+          rush_hour_minutes: 6,
           badge: "Recommended",
-          description: `Direct bus connecting local stops across ${originCampus} (BSC, Hill, Science, ARC).`
+          description: `Direct pedestrian walk between buildings on ${originCampus} (cuts straight across campus walkways without taking the outer bus loop).`
         },
         {
           name: "Rutgers E-Scooter / Bike",
           type: "Bike / E-Scooter",
           estimated_minutes: 3,
           rush_hour_minutes: 4,
+          badge: "Fastest Active",
           description: `Hop on a Veo e-scooter or bike for quick cross-building transit on ${originCampus}.`
         },
         {
-          name: "Campus Pedestrian Walk",
-          type: "Walking Path",
-          estimated_minutes: 6,
-          rush_hour_minutes: 8,
-          description: `Direct pedestrian walk between buildings on ${originCampus}.`
+          name: primaryBus,
+          type: "Campus Bus",
+          estimated_minutes: 8,
+          rush_hour_minutes: 12,
+          badge: "Perimeter Bus Loop",
+          description: `Bus following the outer roadway loop on ${originCampus}. Note: vehicles take the outer road rather than direct pedestrian walkways.`
         }
       ];
     } else {
